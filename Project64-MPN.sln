@@ -6,7 +6,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "3rd Party", "3rd Party", "{
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Common", "Source\Common\Common.vcxproj", "{B4A4B994-9111-42B1-93C2-6F1CA8BC4421}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Project64", "Source\Project64-gui\Project64.vcxproj", "{7E534C8E-1ACE-4A88-8807-39A11ED4DA18}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Project64-MPN", "Source\Project64-gui\Project64.vcxproj", "{7E534C8E-1ACE-4A88-8807-39A11ED4DA18}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RSP", "Source\RSP\RSP.vcxproj", "{A7ED562C-63F3-4B7E-B6B3-2CF7848752E1}"
 EndProject
@@ -18,11 +18,13 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WTL", "Source\3rdParty\WTL\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "zlib", "Source\3rdParty\zlib\zlib.vcxproj", "{731BD205-2826-4631-B7AF-117658E88DBC}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Project64-core", "Source\Project64-core\Project64-core.vcxproj", "{00C7B43A-DED7-4DF0-B072-9A5783EF866D}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Project64 Core", "Source\Project64-core\Project64-core.vcxproj", "{00C7B43A-DED7-4DF0-B072-9A5783EF866D}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "png", "Source\3rdParty\png\png.vcxproj", "{17836496-31B0-46F2-B1B1-366D7DF6F04C}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "discord-rpc", "Source\3rdParty\discord-rpc\discord-rpc.vcxproj", "{DCC841B2-298A-40F0-84D1-ACBABD3B86E8}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Project64-Netplay", "Source\Project64-netplay\NetplayInputPlugin\NetplayInputPlugin.vcxproj", "{2A8BF4EB-CC43-4E52-AC79-792B2039EE9C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -196,6 +198,22 @@ Global
 		{DCC841B2-298A-40F0-84D1-ACBABD3B86E8}.Release|Win32.Build.0 = Release|Win32
 		{DCC841B2-298A-40F0-84D1-ACBABD3B86E8}.Release|x64.ActiveCfg = Release|x64
 		{DCC841B2-298A-40F0-84D1-ACBABD3B86E8}.Release|x64.Build.0 = Release|x64
+		{2A8BF4EB-CC43-4E52-AC79-792B2039EE9C}.Debug (Server)|Win32.ActiveCfg = Debug (Server)|Win32
+		{2A8BF4EB-CC43-4E52-AC79-792B2039EE9C}.Debug (Server)|Win32.Build.0 = Debug (Server)|Win32
+		{2A8BF4EB-CC43-4E52-AC79-792B2039EE9C}.Debug (Server)|x64.ActiveCfg = Debug (Server)|x64
+		{2A8BF4EB-CC43-4E52-AC79-792B2039EE9C}.Debug (Server)|x64.Build.0 = Debug (Server)|x64
+		{2A8BF4EB-CC43-4E52-AC79-792B2039EE9C}.Debug|Win32.ActiveCfg = Debug|Win32
+		{2A8BF4EB-CC43-4E52-AC79-792B2039EE9C}.Debug|Win32.Build.0 = Debug|Win32
+		{2A8BF4EB-CC43-4E52-AC79-792B2039EE9C}.Debug|x64.ActiveCfg = Debug|x64
+		{2A8BF4EB-CC43-4E52-AC79-792B2039EE9C}.Debug|x64.Build.0 = Debug|x64
+		{2A8BF4EB-CC43-4E52-AC79-792B2039EE9C}.Release (Server)|Win32.ActiveCfg = Release (Server)|Win32
+		{2A8BF4EB-CC43-4E52-AC79-792B2039EE9C}.Release (Server)|Win32.Build.0 = Release (Server)|Win32
+		{2A8BF4EB-CC43-4E52-AC79-792B2039EE9C}.Release (Server)|x64.ActiveCfg = Release (Server)|x64
+		{2A8BF4EB-CC43-4E52-AC79-792B2039EE9C}.Release (Server)|x64.Build.0 = Release (Server)|x64
+		{2A8BF4EB-CC43-4E52-AC79-792B2039EE9C}.Release|Win32.ActiveCfg = Release|Win32
+		{2A8BF4EB-CC43-4E52-AC79-792B2039EE9C}.Release|Win32.Build.0 = Release|Win32
+		{2A8BF4EB-CC43-4E52-AC79-792B2039EE9C}.Release|x64.ActiveCfg = Release|x64
+		{2A8BF4EB-CC43-4E52-AC79-792B2039EE9C}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

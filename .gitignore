@@ -6,6 +6,8 @@
 *.user
 *.opendb
 *.VC.db
+.vs/
+packages/
 
 # static library output (MSVC, GCC--from core components like Common)
 *.lib
