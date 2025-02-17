@@ -526,7 +526,6 @@ bool CMainMenu::ProcessMessage(HWND hWnd, DWORD /*FromAccelerator*/, DWORD MenuI
     case ID_HELP_ABOUTSETTINGFILES: m_Gui->AboutIniBox(); break;
 	case ID_NETPLAY_MPN: ShellExecute(NULL, "open", "https://discord.com/invite/marioparty", NULL, NULL, SW_SHOWMAXIMIZED); break;
 	case ID_NETPLAY_UPDATE_EMULATOR: ShellExecute(NULL, "open", "Plugin\\Updater\\Updater.exe", NULL, NULL, SW_SHOWDEFAULT); break;
-    case ID_NETPLAY_REPLACESAVES: ShellExecute(NULL, "open", "Replace.bat", NULL, NULL, NULL); break;
 
     default:
         if (MenuID >= ID_RECENT_ROM_START && MenuID < ID_RECENT_ROM_END)
@@ -801,15 +800,6 @@ void CMainMenu::FillOutMenu(HMENU hMenu)
     }
     FileMenu.push_back(MENU_ITEM(SPLITER));
     FileMenu.push_back(MENU_ITEM(ID_FILE_EXIT, MENU_EXIT, m_ShortCuts.ShortCutString(ID_FILE_EXIT, AccessLevel)));
-
-    /* Netplay Menu
-    ****************/
-    MenuItemList NetplayMenu;
-
-    NetplayMenu.push_back(MENU_ITEM(ID_NETPLAY_MPN, MENU_MPN));
-    NetplayMenu.push_back(MENU_ITEM(SPLITER));
-    NetplayMenu.push_back(MENU_ITEM(ID_NETPLAY_REPLACESAVES, MENU_REPLACESAVES));
-    NetplayMenu.push_back(MENU_ITEM(ID_NETPLAY_UPDATE_EMULATOR, MENU_UPDATE_EMULATOR));
 
     /* Current Save
     ****************/
@@ -1227,9 +1217,6 @@ void CMainMenu::FillOutMenu(HMENU hMenu)
     if (RomLoading) { Item.SetItemEnabled(false); }
     MainTitleMenu.push_back(Item);
 
-    Item.Reset(SUB_MENU, MENU_NETPLAY, EMPTY_STDSTR, &NetplayMenu);
-    if (RomLoading) { Item.SetItemEnabled(false); }
-    MainTitleMenu.push_back(Item);
 
     if (CPURunning)
     {

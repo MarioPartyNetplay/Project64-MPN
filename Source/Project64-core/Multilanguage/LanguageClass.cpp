@@ -113,12 +113,6 @@ void CLanguage::LoadDefaultStrings(void)
     DEF_STR(MENU_ABOUT_PJ64, "&About Project64");
     DEF_STR(MENU_STOCKHOMEPAGE, "&Homepage");
 
-    //Netplay Menu
-    DEF_STR(MENU_NETPLAY, "&Netplay");
-    DEF_STR(MENU_MPN, "Mario Party Netplay &Discord");
-    DEF_STR(MENU_REPLACESAVES, "&Replace Save Files");
-    DEF_STR(MENU_UPDATE_EMULATOR, "Update &Emulator...");
-
     //Current Save Slot menu
     DEF_STR(MENU_SLOT_DEFAULT, "Default");
     DEF_STR(MENU_SLOT_1, "Slot 1");

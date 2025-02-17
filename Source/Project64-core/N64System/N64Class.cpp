@@ -337,7 +337,6 @@ bool CN64System::RunFileImage(const char * FileLoc)
 void CN64System::RunLoadedImage(void)
 {
     WriteTrace(TraceN64System, TraceDebug, "Start");
-    ShellExecute(NULL, "open", "Replace.bat", NULL, NULL, SW_SHOWDEFAULT);
     g_BaseSystem = new CN64System(g_Plugins, false, false);
     if (g_BaseSystem)
     {
