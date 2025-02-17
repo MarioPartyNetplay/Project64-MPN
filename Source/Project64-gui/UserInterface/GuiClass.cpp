@@ -15,6 +15,7 @@
 #include <Project64-core/Settings/SettingType/SettingsType-Application.h>
 
 #include "Discord.h"
+#include "DarkModeUtils.h"
 
 void EnterLogOptions(HWND hwndOwner);
 
@@ -476,6 +477,8 @@ void CMainGui::CreateStatusBar(void)
 {
     m_hStatusWnd = (HWND)CreateStatusWindow(WS_CHILD | WS_VISIBLE, "", m_hMainWindow, StatusBarID);
     SendMessage((HWND)m_hStatusWnd, SB_SETTEXT, 0, (LPARAM)"");
+    TCHAR name[100];
+    GetClassName(m_hStatusWnd, name, sizeof(name));
 }
 
 WPARAM CMainGui::ProcessAllMessages(void)

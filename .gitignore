@@ -10,6 +10,8 @@
 x64/
 packages/
 
+Source/3rdParty/ANGLE
+
 # static library output (MSVC, GCC--from core components like Common)
 *.lib
 *.a

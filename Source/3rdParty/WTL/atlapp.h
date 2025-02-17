@@ -1638,17 +1638,6 @@ public:
 	}
 
 // COM Server methods
-	LONG Unlock()
-	{
-		LONG lRet = CComModule::Unlock();
-		if(lRet == 0)
-		{
-			m_bActivity = true;
-			::SetEvent(m_hEventShutdown); // tell monitor that we transitioned to zero
-		}
-		return lRet;
-	}
-
 	void MonitorShutdown()
 	{
 		for(;;)

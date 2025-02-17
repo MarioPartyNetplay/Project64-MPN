@@ -78,14 +78,6 @@ struct MD5Digest
     }
 };
 
-struct MD5Digest_less : std::binary_function < MD5Digest, MD5Digest, bool >
-{
-    bool operator()(const MD5Digest& x, const MD5Digest& y) const
-    {
-        return (memcmp(x.digest, y.digest, sizeof(x.digest)) < 0);
-    }
-};
-
 class MD5
 {
 public:

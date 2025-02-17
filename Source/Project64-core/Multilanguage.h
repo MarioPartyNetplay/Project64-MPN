@@ -266,6 +266,7 @@ enum LanguageStringID
     OPTION_CHECK_RUNNING = 467,
     OPTION_UNIQUE_SAVE_DIR = 468,
     OPTION_IPL_ROM_PATH = 469,
+    OPTION_DARK = 5912,
 
     //Rom Browser Tab
     RB_MAX_ROMS = 480,

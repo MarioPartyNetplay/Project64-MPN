@@ -1,6 +1,6 @@
 [submodule "Source/GLideN64"]
 	path = Source/GLideN64
-	url = https://github.com/Luna-Project64/GLideN64.git
+	url = htps://github.com/MarioPartyNetplay/GLideN64.gitt
 [submodule "Source/3rdParty/asio"]
 	path = Source/3rdParty/asio
 	url = https://github.com/chriskohlhoff/asio.git

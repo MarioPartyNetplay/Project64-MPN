@@ -2,11 +2,16 @@
 #include <Project64-core/AppInit.h>
 #include "Multilanguage\LanguageSelector.h"
 #include "Settings/UISettings.h"
+#include "DarkMode.h"
+
+extern bool DarkModeEnter(DWORD reason);
 
 int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR /*lpszArgs*/, int /*nWinMode*/)
 {
     try
     {
+        DarkModeEnter(DLL_PROCESS_ATTACH);
+
         CoInitialize(NULL);
         AppInit(&Notify(), CPath(CPath::MODULE_DIRECTORY), __argc, __argv);
         if (!g_Lang->IsLanguageLoaded())
@@ -86,6 +91,7 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR /
         MessageBox(NULL, stdstr_f("Exception caught\nFile: %s\nLine: %d", __FILE__, __LINE__).c_str(), "Exception", MB_OK);
     }
     AppCleanup();
+    DarkModeEnter(DLL_PROCESS_DETACH);
     CoUninitialize();
     return true;
 }

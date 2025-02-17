@@ -127,6 +127,8 @@
       <Filter>UI\Settings</Filter>
     </ClCompile>
     <ClCompile Include="Multilanguage\LanguageSelector.cpp" />
+    <ClCompile Include="DarkModeUtils.cpp" />
+    <ClCompile Include="DarkMode.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="UserInterface\resource.h">
@@ -262,6 +264,11 @@
       <Filter>UI\Settings</Filter>
     </ClInclude>
     <ClInclude Include="..\Project64-core\Version.h" />
+    <ClInclude Include="UAHMenuBar.h" />
+    <ClInclude Include="IatHook.h" />
+    <ClInclude Include="DarkModeUtils.h" />
+    <ClInclude Include="DarkMode.h" />
+    <ClInclude Include="DoubleBuffer.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="res\divider.cur">

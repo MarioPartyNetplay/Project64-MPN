@@ -272,6 +272,7 @@
 #define IDC_RECURSION                   1138
 #define IDC_V64                         1141
 #define IDC_LOAD_FULLSCREEN             1142
+#define IDC_DARK						1142
 #define IDC_Z64                         1142
 #define IDC_ROMSEL_TEXT5                1143
 #define IDC_REMEMBER_CHEAT              1143
