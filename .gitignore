@@ -7,6 +7,7 @@
 *.opendb
 *.VC.db
 .vs/
+x64/
 packages/
 
 # static library output (MSVC, GCC--from core components like Common)

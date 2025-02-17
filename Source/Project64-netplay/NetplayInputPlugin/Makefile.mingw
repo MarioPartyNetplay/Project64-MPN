@@ -1,0 +1,63 @@
+include Makefile.common
+
+BUILD_DIR = build/mingw
+
+PROG = $(BUILD_DIR)/netplay_input_plugin.dll
+SERVER = $(BUILD_DIR)/netplay_server.exe
+
+MINGW = i686-w64-mingw32
+CC = $(MINGW)-gcc-posix
+CXX = $(MINGW)-g++-posix
+LD = $(CXX)
+RC = $(MINGW)-windres
+
+CXXFLAGS = -std=c++17 -flto -fvisibility=hidden -fno-PIC -O3 -isystem ../asio/asio/include -Wno-conversion-null
+CXXFLAGS += -DUNICODE -D_UNICODE -DASIO_STANDALONE
+LDFLAGS = -s -lws2_32 -lmswsock -static-libgcc -static-libstdc++ -static -lpthread -lqwave
+RCFLAGS = -O coff
+
+SRCS = $(PLUGIN_SRC)
+OBJS = $(addprefix $(BUILD_DIR)/,$(subst .cpp,.o,$(SRCS)))
+PCH = $(BUILD_DIR)/$(HEADER).gch
+RSRC = resource.rc
+RSRC_OBJS = $(addprefix $(BUILD_DIR)/,$(subst .rc,.coff,$(RSRC)))
+
+SRV_SRCS = $(SERVER_SRC)
+SRV_OBJS = $(addprefix $(BUILD_DIR)/,$(subst .cpp,.o,$(SRV_SRCS)))
+
+.DEFAULT_GOAL := all
+.PHONY: all clean depend plugin server
+include .mingw.depend
+
+all: plugin server
+plugin: $(PROG)
+server: $(SERVER)
+
+$(PROG): $(OBJS) $(RSRC_OBJS)
+	$(LD) -o $@ $^ $(LDFLAGS) -shared -mwindows
+
+$(SERVER): $(SRV_OBJS)
+	$(LD) -o $@ $^ $(LDFLAGS)
+
+$(OBJS): $(PCH)
+
+$(SRV_OBJS): $(PCH)
+
+$(PCH): $(HEADER) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c -o $(PCH) $<
+	echo "#error precompiled header missing" > $(BUILD_DIR)/$(HEADER)
+
+$(BUILD_DIR):
+	 mkdir -p $(BUILD_DIR)
+
+$(BUILD_DIR)/%.o:
+	$(CXX) -include $(BUILD_DIR)/$(HEADER) $(CXXFLAGS) -c -o $@ $<
+
+$(RSRC_OBJS): $(RSRC)
+	$(RC) $< $(RCFLAGS) -o $@
+
+depend: $(SRCS) $(SRV_SRCS) $(VERSION)
+	$(CXX) $(CXXFLAGS) -MM $(SRCS) | sed "s/^\w/$(subst /,\/,$(BUILD_DIR)/)&/" > .mingw.depend
+
+clean:
+	rm -rf $(VERSION) $(BUILD_DIR)
