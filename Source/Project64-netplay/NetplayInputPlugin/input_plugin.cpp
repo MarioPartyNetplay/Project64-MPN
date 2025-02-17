@@ -38,7 +38,7 @@ input_plugin::input_plugin(string path) {
 
     if (info.Version == 0x0100) {
         InitiateControllers0100 = (void(*)(HWND hMainWindow, CONTROL Controls[4])) GetProcAddress(dll, "InitiateControllers");
-    } else if (info.Version == 0x0101) {
+    } else if (info.Version == 0x0101 || info.Version >= 0x0102) {
         InitiateControllers0101 = (void(*)(CONTROL_INFO Controls)) GetProcAddress(dll, "InitiateControllers");
     }
     CloseDLL                 = (void(*)(void))                                   GetProcAddress(dll, "CloseDLL");
