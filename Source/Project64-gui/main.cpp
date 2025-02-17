@@ -3,6 +3,10 @@
 #include "Multilanguage\LanguageSelector.h"
 #include "Settings/UISettings.h"
 #include "DarkMode.h"
+#include <Project64-core/Settings/SettingsClass.h>
+#include <Project64-core/Notification.h>
+#include <Project64-core/N64System/SystemGlobals.h>
+#include <Common/Util.h>
 
 extern bool DarkModeEnter(DWORD reason);
 
@@ -10,15 +14,15 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR /
 {
     try
     {
-        DarkModeEnter(DLL_PROCESS_ATTACH);
-
         CoInitialize(NULL);
         AppInit(&Notify(), CPath(CPath::MODULE_DIRECTORY), __argc, __argv);
         if (!g_Lang->IsLanguageLoaded())
         {
             CLanguageSelector().Select();
         }
-
+        if (g_Settings->LoadBool(Setting_DarkTheme)) {
+            DarkModeEnter(DLL_PROCESS_ATTACH);
+        }
         //Create the main window with Menu
         WriteTrace(TraceUserInterface, TraceDebug, "Create Main Window");
         CMainGui  MainWindow(true, stdstr_f("Project64 MPN").c_str()), HiddenWindow(false);
@@ -71,6 +75,7 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR /
                 MainWindow.Show(true);	//Show the main window
             }
         }
+
 
         //Process Messages till program is closed
         WriteTrace(TraceUserInterface, TraceDebug, "Entering Message Loop");

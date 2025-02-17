@@ -13,6 +13,7 @@
 
 #include <commctrl.h>
 #include <shlobj.h>
+#include "DarkModeUtils.h"
 
 std::string CRomBrowser::m_UnknownGoodName;
 
@@ -483,7 +484,13 @@ bool CRomBrowser::RomListDrawItem(int32_t idCtrl, uint32_t lParam)
     RECT rcItem, rcDraw;
     wchar_t String[300];
     LVITEMW lvItem;
-    HBRUSH hBrush = (HBRUSH)(COLOR_WINDOW + 1);
+    HBRUSH hBrush;
+    if (g_Settings->LoadBool(Setting_DarkTheme)) {
+        hBrush = (HBRUSH)load_config()->menubar_bgbrush;
+    }
+    else {
+        hBrush = (HBRUSH)(COLOR_WINDOW + 1);
+    }
     LV_COLUMN lvc;
     int32_t nColumn;
 
@@ -502,23 +509,32 @@ bool CRomBrowser::RomListDrawItem(int32_t idCtrl, uint32_t lParam)
     {
         return true;
     }
-    if (bSelected)
-    {
-        HBRUSH_MAP::iterator itr = m_Brushes.find(pRomInfo->SelColor);
-        if (itr != m_Brushes.end())
+    if (g_Settings->LoadBool(Setting_DarkTheme)) {
+        SetTextColor(ditem->hDC, load_config()->menubar_textcolor);
+        if (bSelected)
         {
-            hBrush = itr->second;
+            hBrush = load_config()->menubaritem_bgbrush_selected;
+        }
+    }
+    else {
+        if (bSelected)
+        {
+            HBRUSH_MAP::iterator itr = m_Brushes.find(pRomInfo->SelColor);
+            if (itr != m_Brushes.end())
+            {
+                hBrush = itr->second;
+            }
+            else
+            {
+                std::pair<HBRUSH_MAP::iterator, bool> res = m_Brushes.insert(HBRUSH_MAP::value_type(pRomInfo->SelColor, CreateSolidBrush(pRomInfo->SelColor)));
+                hBrush = res.first->second;
+            }
+            SetTextColor(ditem->hDC, pRomInfo->SelTextColor);
         }
         else
         {
-            std::pair<HBRUSH_MAP::iterator, bool> res = m_Brushes.insert(HBRUSH_MAP::value_type(pRomInfo->SelColor, CreateSolidBrush(pRomInfo->SelColor)));
-            hBrush = res.first->second;
+            SetTextColor(ditem->hDC, pRomInfo->TextColor);
         }
-        SetTextColor(ditem->hDC, pRomInfo->SelTextColor);
-    }
-    else
-    {
-        SetTextColor(ditem->hDC, pRomInfo->TextColor);
     }
     FillRect(ditem->hDC, &ditem->rcItem, hBrush);
     SetBkMode(ditem->hDC, TRANSPARENT);

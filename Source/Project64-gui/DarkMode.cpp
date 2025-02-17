@@ -3,7 +3,6 @@
 #include "UAHMenuBar.h"
 #include "DoubleBuffer.h"
 #include "DarkModeUtils.h"
-#include "DarkMode.h"
 
 #include <dwmapi.h>
 #include <uxtheme.h>
@@ -707,13 +706,12 @@ LRESULT CALLBACK CallWndSubClassProc(HWND hWnd, UINT uMsg, WPARAM wParam,
 
             const HBRUSH* pbrBackground = &load_config()->menubaritem_bgbrush;
             // get the menu item string
-
+            wchar_t menuString[256] = { 0 };
             MENUITEMINFO mii = { sizeof(mii), MIIM_STRING };
             char menuStringA[256] = { 0 };  // Separate ANSI buffer
             mii.dwTypeData = menuStringA;
             mii.cch = sizeof(menuStringA) - 1; // Byte count for ANSI
             GetMenuItemInfoA(pUDMI->um.hmenu, pUDMI->umi.iPosition, TRUE, &mii);
-
             // get the item state for drawing
             DWORD dwFlags = DT_CENTER | DT_SINGLELINE | DT_VCENTER;
             int iTextStateID = 0;
@@ -751,7 +749,7 @@ LRESULT CALLBACK CallWndSubClassProc(HWND hWnd, UINT uMsg, WPARAM wParam,
 
             DTTOPTS opts = { sizeof(opts), DTT_TEXTCOLOR, iTextStateID != MPI_DISABLED ? load_config()->menubar_textcolor : load_config()->menubar_textcolor_disabled };
             FillRect(pUDMI->um.hdc, &pUDMI->dis.rcItem, *pbrBackground);
-            //DrawThemeTextEx(g_menuTheme, pUDMI->um.hdc, MENU_BARITEM, MBI_NORMAL, menuStringA, mii.cch, dwFlags, &pUDMI->dis.rcItem, &opts);
+            DrawThemeTextEx(g_menuTheme, pUDMI->um.hdc, MENU_BARITEM, MBI_NORMAL, menuString, mii.cch, dwFlags, &pUDMI->dis.rcItem, &opts);
             return true;
         }
         break;

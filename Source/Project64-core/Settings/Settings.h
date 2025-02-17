@@ -47,6 +47,7 @@ enum SettingID
     Setting_CN64TimeCritical,
     Setting_AutoStart,
     Setting_CheckEmuRunning,
+    Setting_DarkTheme,
     Setting_EraseGameDefaults,
 
     Setting_AutoZipInstantSave,

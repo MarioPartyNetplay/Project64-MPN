@@ -272,7 +272,6 @@
 #define IDC_RECURSION                   1138
 #define IDC_V64                         1141
 #define IDC_LOAD_FULLSCREEN             1142
-#define IDC_DARK						1142
 #define IDC_Z64                         1142
 #define IDC_ROMSEL_TEXT5                1143
 #define IDC_REMEMBER_CHEAT              1143
@@ -355,6 +354,7 @@
 #define IDC_RAIN_DETAILS				1235
 #define IDC_LAVE_DETAILS				1236
 #define IDC_PJ64MPN_TEAM				1237
+#define IDC_DARKTHEME                   1732
 #define ID_POPUP_SHOWINMEMORYVIEWER     40005
 #define ID_POPUPMENU_PLAYGAMEWITHDISK   40008
 #define ID_POPUPMENU_ROMDIRECTORY       40137
