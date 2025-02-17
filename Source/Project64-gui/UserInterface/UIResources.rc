@@ -400,7 +400,7 @@ LTEXT           "PJ64 cheat database, testing, end user support", IDC_GENT_DETAI
 LTEXT           "Project64-MPN Team:", IDC_PJ64MPN_TEAM, 233, 88, 168, 12
 LTEXT           "Special Thanks to:", IDC_THANKS, 16, 239, 403, 12
 LTEXT           "Jahra!n, Witten, RadeonUser, Trotterwatch, Pixi", IDC_THANK_LIST, 16, 255, 403, 27
-LTEXT           "Nayla", IDC_NORA, 231, 103, 49, 11
+LTEXT           "Tabitha", IDC_NORA, 231, 103, 49, 11
 LTEXT           "Celerizer", IDC_CELERIZER, 232, 128, 49, 25
 LTEXT           "Current application programmer and maintainer", IDC_NORA_DETAILS, 310, 103, 136, 24
 LTEXT           "CoderTim", IDC_AQZ, 231, 165, 49, 11
