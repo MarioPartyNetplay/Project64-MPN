@@ -99,7 +99,6 @@ void user::on_receive(packet& p, bool udp) {
             for (int i = 0; i < info.saves.size(); i++) {
                 auto save = p.read<save_info>();
                 new_saves[i] = save;
-                log("[" + my_room->get_id() + "] Syncing room with save. Hash: " + save.sha1_data);
             }
 
             info.saves = new_saves;
@@ -129,24 +128,36 @@ void user::on_receive(packet& p, bool udp) {
 
         case CHEAT_SYNC: {
             // Forward cheat sync to all other users in the room
-            size_t cheat_count = p.read_var<size_t>();
-            packet cheat_packet;
-            cheat_packet << CHEAT_SYNC;
-            cheat_packet.write_var(cheat_count);
-            
-            // Read and forward cheats
-            for (size_t i = 0; i < cheat_count; i++) {
-                auto cheat = p.read<cheat_info>();
-                cheat_packet << cheat;
-            }
-
-            log("[" + my_room->get_id() + "] Forwarding cheat sync (" + to_string(cheat_count) + " cheats)");
-            
-            // Send to all other users
-            for (auto& user : my_room->user_list) {
-                if (user->id != id) {
-                    user->send(cheat_packet);
+            try {
+                // Read the entire .cht file content
+                std::string cheat_file_content = "";
+                if (p.available() > 0) {
+                    cheat_file_content = p.read<std::string>();
                 }
+                
+                // Read the entire .cht_enabled file content
+                std::string enabled_file_content = "";
+                if (p.available() > 0) {
+                    enabled_file_content = p.read<std::string>();
+                }
+                
+                packet cheat_packet;
+                cheat_packet << CHEAT_SYNC;
+                // Forward the entire .cht file content
+                cheat_packet << cheat_file_content;
+                // Forward the entire .cht_enabled file content
+                cheat_packet << enabled_file_content;
+
+                log("[" + my_room->get_id() + "] Forwarding cheat sync");
+
+                // Send to all other users
+                for (auto& user : my_room->user_list) {
+                    if (user->id != id) {
+                        user->send(cheat_packet);
+                    }
+                }
+            } catch (const std::exception& e) {
+                log("[" + my_room->get_id() + "] Error forwarding cheat sync: " + std::string(e.what()));
             }
             break;
         }

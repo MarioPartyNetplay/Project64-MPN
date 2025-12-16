@@ -10,6 +10,7 @@
 ****************************************************************************/
 #include "stdafx.h"
 #include "SystemGlobals.h"
+#include "N64Class.h"
 
 CN64System    * g_System = NULL;
 CN64System    * g_BaseSystem = NULL;
@@ -34,3 +35,12 @@ uint8_t      ** g_RecompPos = NULL;
 CMempak       * g_Mempak = NULL;
 
 int * g_NextTimer;
+
+extern "C" bool SaveStateToFileForNetplay(const char * FilePath)
+{
+    if (g_BaseSystem)
+    {
+        return g_BaseSystem->SaveStateToFile(FilePath);
+    }
+    return false;
+}

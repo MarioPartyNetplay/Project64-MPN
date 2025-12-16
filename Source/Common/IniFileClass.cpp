@@ -422,6 +422,37 @@ void CIniFileBase::OpenIniFile(bool bCreate)
 {
     //Open for reading/Writing
     m_ReadOnly = false;
+    
+    // Remove write protection from cheat files (.cht and .cht_enabled)
+    // This ensures cheat files can always be written to, even if they're read-only
+    stdstr fileName = m_FileName;
+    if (fileName.length() >= 4)
+    {
+        stdstr ext = fileName.substr(fileName.length() - 4);
+        if (_stricmp(ext.c_str(), ".cht") == 0)
+        {
+            // Check if file exists and is read-only
+            DWORD attrs = GetFileAttributes(fileName.c_str());
+            if (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_READONLY))
+            {
+                SetFileAttributes(fileName.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
+            }
+        }
+    }
+    if (fileName.length() >= 12)
+    {
+        stdstr ext = fileName.substr(fileName.length() - 12);
+        if (_stricmp(ext.c_str(), ".cht_enabled") == 0)
+        {
+            // Check if file exists and is read-only
+            DWORD attrs = GetFileAttributes(fileName.c_str());
+            if (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_READONLY))
+            {
+                SetFileAttributes(fileName.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
+            }
+        }
+    }
+    
     if (!m_File.Open(m_FileName.c_str(), CFileBase::modeReadWrite | CFileBase::shareDenyWrite))
     {
         if (!m_File.Open(m_FileName.c_str(), CFileBase::modeRead))

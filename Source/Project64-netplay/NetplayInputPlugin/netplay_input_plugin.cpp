@@ -263,6 +263,7 @@ EXPORT void CALL RomClosed (void) {
         my_settings->set_name(my_client->get_name());
         my_client->post_close();
         my_client->revert_save_data();
+        my_client->revert_cheat_data();
         my_client.reset();
     }
 

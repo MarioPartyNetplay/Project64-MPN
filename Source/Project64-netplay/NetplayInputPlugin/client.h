@@ -30,8 +30,12 @@ class client: public service_wrapper, public connection {
         void move_original_saves_to_temp();
         void ensure_save_directories();
         void restore_leftover_backups();
+        void restore_leftover_cheat_backups();
         void backup_cheat_files();
         void restore_cheat_files();
+        void move_original_cheats_to_temp();
+        void revert_cheat_data();
+        std::string get_config_path() const;
         client_dialog& get_dialog();
         virtual void on_receive(packet& packet, bool udp);
         virtual void on_error(const std::error_code& error);
@@ -114,6 +118,6 @@ class client: public service_wrapper, public connection {
         std::string get_cheat_enabled_file_path() const;
         std::vector<cheat_info> load_cheats();
         void save_cheats(const std::vector<cheat_info>& cheats);
-        void apply_cheats(const std::vector<cheat_info>& cheats);
+        void apply_cheats(const std::string& cheat_file_content, const std::string& enabled_file_content);
 };
     

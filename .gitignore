@@ -15,6 +15,7 @@ Source/3rdParty/ANGLE
 # static library output (MSVC, GCC--from core components like Common)
 *.lib
 *.a
+bin/
 
 # compiler-generated sources (MSVC, GCC)
 *.asm

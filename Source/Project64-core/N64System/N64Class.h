@@ -80,6 +80,7 @@ public:
     void   Pause();
     void   RunRSP();
     bool   SaveState();
+    bool   SaveStateToFile(const char * FilePath);
     bool   LoadState(const char * FileName);
     bool   LoadState();
 

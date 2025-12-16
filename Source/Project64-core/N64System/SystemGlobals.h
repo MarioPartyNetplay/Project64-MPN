@@ -61,5 +61,9 @@ extern CDebugger     * g_Debugger;
 
 extern uint8_t      ** g_RecompPos;
 
+// Function to save state to a specific file path (for netplay desync detection)
+// Export from main executable so plugin can use GetProcAddress
+extern "C" __declspec(dllexport) bool SaveStateToFileForNetplay(const char * FilePath);
+
 class CMempak;
 extern CMempak       * g_Mempak;
