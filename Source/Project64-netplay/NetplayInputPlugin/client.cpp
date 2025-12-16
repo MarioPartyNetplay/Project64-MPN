@@ -6,12 +6,12 @@
 #include "util.h"
 #include "uri.h"
 
-#include "dirent.h"
-#include <cryptopp/sha.h>
-#include <cryptopp/files.h>
-#include <cryptopp/filters.h>
-#include <cryptopp/base64.h>
-#include <cryptopp/hex.h>
+#include <dirent/dirent.h>
+#include <sha.h>
+#include <files.h>
+#include <filters.h>
+#include <base64.h>
+#include <hex.h>
 
 #include <Windows.h>
 #include <filesystem> 
@@ -465,6 +465,10 @@ void client::on_message(string message) {
                 }
                 Sleep(1000);
                 send_savesync();
+                if (is_host()) {
+                    my_dialog->info("Syncing host's cheats with everyone else");
+                    send_cheatsync();
+                }
                 Sleep(5000);
 
                 if (is_open()) {
@@ -860,6 +864,27 @@ void client::on_receive(packet& p, bool udp) {
             break;
         }
 
+        case CHEAT_SYNC: {
+            if (is_host()) {
+                // Host receives cheat sync requests, forward to other clients
+                // This shouldn't happen normally, but handle it gracefully
+                break;
+            }
+
+            size_t cheat_count = p.read_var<size_t>();
+            std::vector<cheat_info> cheats;
+            cheats.reserve(cheat_count);
+
+            for (size_t i = 0; i < cheat_count; i++) {
+                cheats.push_back(p.read<cheat_info>());
+            }
+
+            if (!cheats.empty()) {
+                apply_cheats(cheats);
+            }
+            break;
+        }
+
         case ACCEPT: {
             auto udp_port = p.read<uint16_t>();
             if (udp_socket && udp_port) {
@@ -1185,6 +1210,25 @@ void client::send_savesync() {
     send(p);
 }
 
+void client::send_cheatsync() {
+    if (!is_host()) {
+        return; // Only host sends cheats
+    }
+
+    std::vector<cheat_info> cheats = load_cheats();
+    if (cheats.empty()) {
+        return; // No cheats to sync
+    }
+
+    packet p;
+    p << CHEAT_SYNC;
+    p.write_var(cheats.size());
+    for (const auto& cheat : cheats) {
+        p << cheat;
+    }
+    send(p);
+}
+
 void client::send_controllers() {
     packet p;
     p << CONTROLLERS;
@@ -1300,4 +1344,189 @@ bool client::is_host() const {
 
 void client::set_host_status(bool status) {
     host_status = status;
+}
+
+std::string client::get_game_identifier() const {
+    char identifier[100];
+    sprintf_s(identifier, sizeof(identifier), "%08X-%08X-C:%X", me->rom.crc1, me->rom.crc2, (unsigned char)me->rom.country_code);
+    return std::string(identifier);
+}
+
+std::string client::get_cheat_file_path() const {
+    // save_path is "Project64/Save/", so go up one level and into Config
+    std::string config_path = save_path;
+    // Remove "Save\" from the end
+    if (config_path.length() >= 5 && config_path.substr(config_path.length() - 5) == "Save\\") {
+        config_path = config_path.substr(0, config_path.length() - 5);
+    }
+    config_path += "Config\\Project64.cht";
+    return config_path;
+}
+
+std::string client::get_config_file_path() const {
+    // save_path is "Project64/Save/", so go up one level and into Config
+    std::string config_path = save_path;
+    // Remove "Save\" from the end
+    if (config_path.length() >= 5 && config_path.substr(config_path.length() - 5) == "Save\\") {
+        config_path = config_path.substr(0, config_path.length() - 5);
+    }
+    config_path += "Config\\Project64.cfg";
+    return config_path;
+}
+
+std::vector<cheat_info> client::load_cheats() {
+    std::vector<cheat_info> cheats;
+    std::string cheat_file = get_cheat_file_path();
+    std::string game_id = get_game_identifier();
+    std::wstring wcheat_file = utf8_to_wstring(cheat_file);
+    std::wstring wgame_id = utf8_to_wstring(game_id);
+
+    // Check if cheat file exists
+    if (GetFileAttributes(wcheat_file.c_str()) == INVALID_FILE_ATTRIBUTES) {
+        return cheats; // File doesn't exist, return empty
+    }
+
+    // Get Project64.cfg path for active status
+    std::string config_file = get_config_file_path();
+    std::wstring wconfig_file = utf8_to_wstring(config_file);
+
+    // Read up to MaxCheats cheats (50000)
+    for (int i = 0; i < 50000; i++) {
+        std::wstring key = L"Cheat" + std::to_wstring(i);
+        
+        wchar_t cheat_entry[4096];
+        DWORD len = GetPrivateProfileString(wgame_id.c_str(), key.c_str(), L"", cheat_entry, sizeof(cheat_entry) / sizeof(wchar_t), wcheat_file.c_str());
+        
+        if (len == 0) {
+            break; // No more cheats
+        }
+
+        std::string entry = wstring_to_utf8(cheat_entry);
+        if (entry.empty()) {
+            continue;
+        }
+
+        // Parse cheat entry: format is "Name" code1,code2,code3,...
+        // Find the name between quotes
+        size_t name_start = entry.find('"');
+        if (name_start == std::string::npos) {
+            continue;
+        }
+        size_t name_end = entry.find('"', name_start + 1);
+        if (name_end == std::string::npos) {
+            continue;
+        }
+
+        cheat_info cheat;
+        cheat.name = entry.substr(name_start + 1, name_end - name_start - 1);
+        
+        // Get the code part (after the closing quote and space)
+        size_t code_start = name_end + 1;
+        while (code_start < entry.length() && (entry[code_start] == ' ' || entry[code_start] == '\t')) {
+            code_start++;
+        }
+        cheat.code = entry.substr(code_start);
+
+        // Check if cheat is active - read from Project64.cfg under game identifier section
+        std::wstring active_key = L"Cheat" + std::to_wstring(i);
+        wchar_t active_value[16];
+        GetPrivateProfileString(wgame_id.c_str(), active_key.c_str(), L"0", active_value, sizeof(active_value) / sizeof(wchar_t), wconfig_file.c_str());
+        cheat.active = (_wtoi(active_value) != 0);
+
+        cheats.push_back(cheat);
+    }
+
+    return cheats;
+}
+
+void client::save_cheats(const std::vector<cheat_info>& cheats) {
+    std::string cheat_file = get_cheat_file_path();
+    std::string config_file = get_config_file_path();
+    std::string game_id = get_game_identifier();
+    std::wstring wcheat_file = utf8_to_wstring(cheat_file);
+    std::wstring wconfig_file = utf8_to_wstring(config_file);
+    std::wstring wgame_id = utf8_to_wstring(game_id);
+
+    // Ensure Config directory exists
+    std::string config_dir = save_path;
+    if (config_dir.length() >= 5 && config_dir.substr(config_dir.length() - 5) == "Save\\") {
+        config_dir = config_dir.substr(0, config_dir.length() - 5);
+    }
+    config_dir += "Config\\";
+    std::filesystem::create_directories(utf8_to_wstring(config_dir));
+
+    // Try to make cheat file writable if it exists
+    DWORD cheat_attrs = GetFileAttributes(wcheat_file.c_str());
+    bool cheat_was_readonly = false;
+    if (cheat_attrs != INVALID_FILE_ATTRIBUTES) {
+        if (cheat_attrs & FILE_ATTRIBUTE_READONLY) {
+            cheat_was_readonly = true;
+            SetFileAttributes(wcheat_file.c_str(), cheat_attrs & ~FILE_ATTRIBUTE_READONLY);
+        }
+    }
+
+    // First, clear existing cheats for this game in cheat file
+    for (int i = 0; i < 50000; i++) {
+        std::wstring key = L"Cheat" + std::to_wstring(i);
+        wchar_t value[4096];
+        DWORD len = GetPrivateProfileString(wgame_id.c_str(), key.c_str(), L"", value, sizeof(value) / sizeof(wchar_t), wcheat_file.c_str());
+        if (len == 0) {
+            break;
+        }
+        WritePrivateProfileString(wgame_id.c_str(), key.c_str(), NULL, wcheat_file.c_str());
+    }
+
+    // Write new cheats to Project64.cht (replacing existing ones)
+    for (size_t i = 0; i < cheats.size(); i++) {
+        const auto& cheat = cheats[i];
+        std::wstring key = L"Cheat" + std::to_wstring((int)i);
+        
+        // Format: "Name" code
+        std::string entry = "\"" + cheat.name + "\" " + cheat.code;
+        std::wstring wentry = utf8_to_wstring(entry);
+        WritePrivateProfileString(wgame_id.c_str(), key.c_str(), wentry.c_str(), wcheat_file.c_str());
+    }
+
+    // Restore cheat file attributes if needed
+    if (cheat_was_readonly) {
+        SetFileAttributes(wcheat_file.c_str(), cheat_attrs);
+    }
+
+    // Now handle Project64.cfg - temporarily remove read-only and write enabled status
+    DWORD config_attrs = GetFileAttributes(wconfig_file.c_str());
+    bool config_was_readonly = false;
+    if (config_attrs != INVALID_FILE_ATTRIBUTES) {
+        if (config_attrs & FILE_ATTRIBUTE_READONLY) {
+            config_was_readonly = true;
+            SetFileAttributes(wconfig_file.c_str(), config_attrs & ~FILE_ATTRIBUTE_READONLY);
+        }
+    }
+
+    // Clear existing enabled status for this game
+    for (int i = 0; i < 50000; i++) {
+        std::wstring key = L"Cheat" + std::to_wstring(i);
+        wchar_t value[16];
+        DWORD len = GetPrivateProfileString(wgame_id.c_str(), key.c_str(), L"", value, sizeof(value) / sizeof(wchar_t), wconfig_file.c_str());
+        if (len == 0) {
+            break;
+        }
+        WritePrivateProfileString(wgame_id.c_str(), key.c_str(), NULL, wconfig_file.c_str());
+    }
+
+    // Write enabled status to Project64.cfg
+    for (size_t i = 0; i < cheats.size(); i++) {
+        const auto& cheat = cheats[i];
+        std::wstring key = L"Cheat" + std::to_wstring((int)i);
+        WritePrivateProfileString(wgame_id.c_str(), key.c_str(), cheat.active ? L"1" : L"0", wconfig_file.c_str());
+    }
+
+    // Restore config file attributes if needed
+    if (config_was_readonly) {
+        SetFileAttributes(wconfig_file.c_str(), config_attrs);
+    }
+}
+
+void client::apply_cheats(const std::vector<cheat_info>& cheats) {
+    save_cheats(cheats);
+    my_dialog->info("Cheats synced from host (" + std::to_string(cheats.size()) + " cheats)");
 }

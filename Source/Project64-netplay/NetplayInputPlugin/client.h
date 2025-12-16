@@ -99,10 +99,17 @@ class client: public service_wrapper, public connection {
         void send_request_authority(uint32_t user_id, uint32_t authority_id);
         void send_delegate_authority(uint32_t user_id, uint32_t authority_id);
         void send_savesync();
+        void send_cheatsync();
         void update_save_info();
         std::vector<std::string> find_rom_save_files(const std::string& path);
         std::string sha1_save_info(const save_info& saveInfo);
         std::string slurp(const std::string& file);
         std::string slurp2(const std::string& file);
         void replace_save_file(const save_info& save_data);
+        std::string get_game_identifier() const;
+        std::string get_cheat_file_path() const;
+        std::string get_config_file_path() const;
+        std::vector<cheat_info> load_cheats();
+        void save_cheats(const std::vector<cheat_info>& cheats);
+        void apply_cheats(const std::vector<cheat_info>& cheats);
 };

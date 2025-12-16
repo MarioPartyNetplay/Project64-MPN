@@ -3,7 +3,7 @@
 #include "stdafx.h"
 #include "packet.h"
 
-constexpr static uint32_t PROTOCOL_VERSION = 47;
+constexpr static uint32_t PROTOCOL_VERSION = 48;
 constexpr static uint32_t INPUT_HISTORY_LENGTH = 12;
 
 enum packet_type : uint8_t {
@@ -30,7 +30,8 @@ enum packet_type : uint8_t {
     INPUT_UPDATE,
     INPUT_RATE,
     REQUEST_AUTHORITY,
-    DELEGATE_AUTHORITY
+    DELEGATE_AUTHORITY,
+    CHEAT_SYNC
 };
 
 enum query_type : uint8_t {
@@ -312,6 +313,29 @@ inline packet& packet::write<save_info>(const save_info& saveInfo) {
     write(saveInfo.save_name);
     write(saveInfo.save_data);
     write(saveInfo.sha1_data);
+    return *this;
+}
+
+struct cheat_info {
+    std::string name;
+    std::string code;
+    bool active;
+};
+
+template<>
+inline cheat_info packet::read<cheat_info>() {
+    cheat_info cheat;
+    cheat.name = read<std::string>();
+    cheat.code = read<std::string>();
+    cheat.active = read<bool>();
+    return cheat;
+}
+
+template<>
+inline packet& packet::write<cheat_info>(const cheat_info& cheat) {
+    write(cheat.name);
+    write(cheat.code);
+    write(cheat.active);
     return *this;
 }
 

@@ -127,6 +127,30 @@ void user::on_receive(packet& p, bool udp) {
             break;
         }
 
+        case CHEAT_SYNC: {
+            // Forward cheat sync to all other users in the room
+            size_t cheat_count = p.read_var<size_t>();
+            packet cheat_packet;
+            cheat_packet << CHEAT_SYNC;
+            cheat_packet.write_var(cheat_count);
+            
+            // Read and forward cheats
+            for (size_t i = 0; i < cheat_count; i++) {
+                auto cheat = p.read<cheat_info>();
+                cheat_packet << cheat;
+            }
+
+            log("[" + my_room->get_id() + "] Forwarding cheat sync (" + to_string(cheat_count) + " cheats)");
+            
+            // Send to all other users
+            for (auto& user : my_room->user_list) {
+                if (user->id != id) {
+                    user->send(cheat_packet);
+                }
+            }
+            break;
+        }
+
         case ROOM_CHECK: {
             my_room->send_info("Rechecking all room checks");
             my_room->check_save_data();
