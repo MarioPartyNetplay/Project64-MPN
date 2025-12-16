@@ -35,6 +35,8 @@ enum SettingID
     SupportFile_Glide64RDBDefault,
     SupportFile_Cheats,
     SupportFile_CheatsDefault,
+    SupportFile_CheatsEnabled,
+    SupportFile_CheatsEnabledDefault,
     SupportFile_Notes,
     SupportFile_NotesDefault,
     SupportFile_ExtInfo,

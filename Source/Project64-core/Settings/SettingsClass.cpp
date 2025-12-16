@@ -15,6 +15,7 @@
 #include "SettingType/SettingsType-ApplicationPath.h"
 #include "SettingType/SettingsType-ApplicationIndex.h"
 #include "SettingType/SettingsType-Cheats.h"
+#include "SettingType/SettingsType-CheatsEnabled.h"
 #include "SettingType/SettingsType-GameSetting.h"
 #include "SettingType/SettingsType-GameSettingIndex.h"
 #include "SettingType/SettingsType-RelativePath.h"
@@ -47,6 +48,7 @@ CSettings::~CSettings()
     CSettingTypeRomDatabase::CleanUp();
     CSettingTypeGame::CleanUp();
     CSettingTypeCheats::CleanUp();
+    CSettingTypeCheatsEnabled::CleanUp();
 
     for (SETTING_MAP::iterator iter = m_SettingInfo.begin(); iter != m_SettingInfo.end(); iter++)
     {
@@ -98,6 +100,8 @@ void CSettings::AddHowToHandleSetting(const char * BaseDirectory)
     AddHandler(SupportFile_Glide64RDBDefault, new CSettingTypeRelativePath("Config", "Glide64.rdb"));
     AddHandler(SupportFile_Cheats, new CSettingTypeApplicationPath("", "Cheats", SupportFile_CheatsDefault));
     AddHandler(SupportFile_CheatsDefault, new CSettingTypeRelativePath("Config", "Project64.cht"));
+    AddHandler(SupportFile_CheatsEnabled, new CSettingTypeApplicationPath("", "CheatsEnabled", SupportFile_CheatsEnabledDefault));
+    AddHandler(SupportFile_CheatsEnabledDefault, new CSettingTypeRelativePath("Config", "Project64.cht_enabled"));
     AddHandler(SupportFile_Notes, new CSettingTypeApplicationPath("", "Notes", SupportFile_NotesDefault));
     AddHandler(SupportFile_NotesDefault, new CSettingTypeRelativePath("Config", "Project64.rdn"));
     AddHandler(SupportFile_ExtInfo, new CSettingTypeApplicationPath("", "ExtInfo", SupportFile_ExtInfoDefault));
@@ -393,7 +397,7 @@ void CSettings::AddHowToHandleSetting(const char * BaseDirectory)
 
     // cheats
     AddHandler(Cheat_Entry, new CSettingTypeCheats(""));
-    AddHandler(Cheat_Active, new CSettingTypeGameIndex("Cheat", "", (uint32_t)false));
+    AddHandler(Cheat_Active, new CSettingTypeCheatsEnabled("", false));
     AddHandler(Cheat_Extension, new CSettingTypeGameIndex("Cheat", ".exten", "??? - Not Set"));
     AddHandler(Cheat_Notes, new CSettingTypeCheats("_N"));
     AddHandler(Cheat_Options, new CSettingTypeCheats("_O"));
@@ -442,6 +446,7 @@ uint32_t CSettings::FindSetting(CSettings * _this, const char * Name)
 void CSettings::FlushSettings(CSettings * /*_this*/)
 {
     CSettingTypeCheats::FlushChanges();
+    CSettingTypeCheatsEnabled::FlushChanges();
     CSettingTypeApplication::Flush();
 }
 
@@ -629,6 +634,7 @@ bool CSettings::Initialize(const char * BaseDirectory, const char * AppName)
     CSettingTypeRomDatabase::Initialize();
     CSettingTypeGame::Initialize();
     CSettingTypeCheats::Initialize();
+    CSettingTypeCheatsEnabled::Initialize();
 
     g_Settings->SaveString(Setting_ApplicationName, AppName);
     WriteTrace(TraceAppInit, TraceDebug, "Done");

@@ -167,28 +167,18 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;WIN32;_DEBUG;NETPLAYINPUTPLUGIN_EXPORTS;_WINDOWS;_USRDLL;WIN32_LEAN_AND_MEAN;_WIN32_WINNT=0x0600;ASIO_STANDALONE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)\Source\3rdParty\asio\asio\include;$(SolutionDir)\Source\3rdParty\cryptopp;$(SolutionDir)\Source\3rdParty\dirent\include;$(SolutionDir)\Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\Source\3rdParty\asio\asio\include;$(SolutionDir)\Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)\Source\3rdParty\dirent\include;$(SolutionDir)\Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <DebugInformationFormat>None</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <ImportLibrary></ImportLibrary>
+      <AdditionalOptions>/NOIMPLIB %(AdditionalOptions)</AdditionalOptions>
       <AdditionalLibraryDirectories>$(SolutionDir)build\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>cryptopp.lib;qwave.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <PreBuildEvent>
-      <Command>git rev-list HEAD --count  &gt; %TEMP%\count.txt
-set /p COUNT= &lt; %TEMP%\count.txt
-git rev-parse --short HEAD &gt; %TEMP%\commit.txt
-set /p COMMIT= &lt; %TEMP%\commit.txt
-git status --short | find " " &gt;nul
-if errorlevel 1 (del %TEMP%\dirty.txt 2&gt; nul) else (echo -dirty&gt; %TEMP%\dirty.txt)
-set /p DIRTY= &lt; %TEMP%\dirty.txt 2&gt; nul
-echo #define APP_NAME "AQZ NetPlay" &gt; version.h
-echo #define APP_VERSION "%COUNT% (%COMMIT%%DIRTY%)" &gt;&gt; version.h
-echo #define APP_NAME_AND_VERSION "AQZ NetPlay v%COUNT% (%COMMIT%%DIRTY%)" &gt;&gt; version.h
-</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug (Server)|Win32'">
     <ClCompile>
@@ -198,28 +188,18 @@ echo #define APP_NAME_AND_VERSION "AQZ NetPlay v%COUNT% (%COMMIT%%DIRTY%)" &gt;&
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;WIN32;_DEBUG;NETPLAYINPUTPLUGIN_EXPORTS;_WINDOWS;_USRDLL;WIN32_LEAN_AND_MEAN;_WIN32_WINNT=0x0600;ASIO_STANDALONE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)\Source\3rdParty\asio\asio\include;$(SolutionDir)\Source\3rdParty\cryptopp;$(SolutionDir)\Source\3rdParty\dirent\include;$(SolutionDir)\Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\Source\3rdParty\asio\asio\include;$(SolutionDir)\Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)\Source\3rdParty\dirent\include;$(SolutionDir)\Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <DebugInformationFormat>None</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <ImportLibrary></ImportLibrary>
+      <AdditionalOptions>/NOIMPLIB %(AdditionalOptions)</AdditionalOptions>
       <AdditionalLibraryDirectories>$(SolutionDir)build\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>cryptopp.lib;qwave.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <PreBuildEvent>
-      <Command>git rev-list HEAD --count  &gt; %TEMP%\count.txt
-set /p COUNT= &lt; %TEMP%\count.txt
-git rev-parse --short HEAD &gt; %TEMP%\commit.txt
-set /p COMMIT= &lt; %TEMP%\commit.txt
-git status --short | find " " &gt;nul
-if errorlevel 1 (del %TEMP%\dirty.txt 2&gt; nul) else (echo -dirty&gt; %TEMP%\dirty.txt)
-set /p DIRTY= &lt; %TEMP%\dirty.txt 2&gt; nul
-echo #define APP_NAME "AQZ NetPlay" &gt; version.h
-echo #define APP_VERSION "%COUNT% (%COMMIT%%DIRTY%)" &gt;&gt; version.h
-echo #define APP_NAME_AND_VERSION "AQZ NetPlay v%COUNT% (%COMMIT%%DIRTY%)" &gt;&gt; version.h
-</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -229,28 +209,18 @@ echo #define APP_NAME_AND_VERSION "AQZ NetPlay v%COUNT% (%COMMIT%%DIRTY%)" &gt;&
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;_DEBUG;NETPLAYINPUTPLUGIN_EXPORTS;_WINDOWS;_USRDLL;WIN32_LEAN_AND_MEAN;_WIN32_WINNT=0x0600;ASIO_STANDALONE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)\Source\3rdParty\asio\asio\include;$(SolutionDir)\Source\3rdParty\cryptopp;$(SolutionDir)\Source\3rdParty\dirent\include;$(SolutionDir)\Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\Source\3rdParty\asio\asio\include;$(SolutionDir)\Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)\Source\3rdParty\dirent\include;$(SolutionDir)\Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <DebugInformationFormat>None</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <ImportLibrary></ImportLibrary>
+      <AdditionalOptions>/NOIMPLIB %(AdditionalOptions)</AdditionalOptions>
       <AdditionalLibraryDirectories>$(SolutionDir)build\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>cryptopp.lib;qwave.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <PreBuildEvent>
-      <Command>git rev-list HEAD --count  &gt; %TEMP%\count.txt
-set /p COUNT= &lt; %TEMP%\count.txt
-git rev-parse --short HEAD &gt; %TEMP%\commit.txt
-set /p COMMIT= &lt; %TEMP%\commit.txt
-git status --short | find " " &gt;nul
-if errorlevel 1 (del %TEMP%\dirty.txt 2&gt; nul) else (echo -dirty&gt; %TEMP%\dirty.txt)
-set /p DIRTY= &lt; %TEMP%\dirty.txt 2&gt; nul
-echo #define APP_NAME "AQZ NetPlay" &gt; version.h
-echo #define APP_VERSION "%COUNT% (%COMMIT%%DIRTY%)" &gt;&gt; version.h
-echo #define APP_NAME_AND_VERSION "AQZ NetPlay v%COUNT% (%COMMIT%%DIRTY%)" &gt;&gt; version.h
-</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug (Server)|x64'">
     <ClCompile>
@@ -260,28 +230,18 @@ echo #define APP_NAME_AND_VERSION "AQZ NetPlay v%COUNT% (%COMMIT%%DIRTY%)" &gt;&
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;_DEBUG;NETPLAYINPUTPLUGIN_EXPORTS;_WINDOWS;_USRDLL;WIN32_LEAN_AND_MEAN;_WIN32_WINNT=0x0600;ASIO_STANDALONE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)\Source\3rdParty\asio\asio\include;$(SolutionDir)\Source\3rdParty\cryptopp;$(SolutionDir)\Source\3rdParty\dirent\include;$(SolutionDir)\Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\Source\3rdParty\asio\asio\include;$(SolutionDir)\Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)\Source\3rdParty\dirent\include;$(SolutionDir)\Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <DebugInformationFormat>None</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <ImportLibrary></ImportLibrary>
+      <AdditionalOptions>/NOIMPLIB %(AdditionalOptions)</AdditionalOptions>
       <AdditionalLibraryDirectories>$(SolutionDir)build\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>cryptopp.lib;qwave.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <PreBuildEvent>
-      <Command>git rev-list HEAD --count  &gt; %TEMP%\count.txt
-set /p COUNT= &lt; %TEMP%\count.txt
-git rev-parse --short HEAD &gt; %TEMP%\commit.txt
-set /p COMMIT= &lt; %TEMP%\commit.txt
-git status --short | find " " &gt;nul
-if errorlevel 1 (del %TEMP%\dirty.txt 2&gt; nul) else (echo -dirty&gt; %TEMP%\dirty.txt)
-set /p DIRTY= &lt; %TEMP%\dirty.txt 2&gt; nul
-echo #define APP_NAME "AQZ NetPlay" &gt; version.h
-echo #define APP_VERSION "%COUNT% (%COMMIT%%DIRTY%)" &gt;&gt; version.h
-echo #define APP_NAME_AND_VERSION "AQZ NetPlay v%COUNT% (%COMMIT%%DIRTY%)" &gt;&gt; version.h
-</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -293,32 +253,22 @@ echo #define APP_NAME_AND_VERSION "AQZ NetPlay v%COUNT% (%COMMIT%%DIRTY%)" &gt;&
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;WIN32;NDEBUG;NETPLAYINPUTPLUGIN_EXPORTS;_WINDOWS;_USRDLL;WIN32_LEAN_AND_MEAN;_WIN32_WINNT=0x0600;ASIO_STANDALONE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)\Source\3rdParty\asio\asio\include;$(SolutionDir)\Source\3rdParty\cryptopp;$(SolutionDir)\Source\3rdParty\dirent\include;$(SolutionDir)\Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\Source\3rdParty\asio\asio\include;$(SolutionDir)\Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)\Source\3rdParty\dirent\include;$(SolutionDir)\Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <DebugInformationFormat>None</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <ImportLibrary></ImportLibrary>
+      <AdditionalOptions>/NOIMPLIB %(AdditionalOptions)</AdditionalOptions>
       <AdditionalLibraryDirectories>$(SolutionDir)build\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>cryptopp.lib;qwave.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <PreBuildEvent>
-      <Command>git rev-list HEAD --count  &gt; %TEMP%\count.txt
-set /p COUNT= &lt; %TEMP%\count.txt
-git rev-parse --short HEAD &gt; %TEMP%\commit.txt
-set /p COMMIT= &lt; %TEMP%\commit.txt
-git status --short | find " " &gt;nul
-if errorlevel 1 (del %TEMP%\dirty.txt 2&gt; nul) else (echo -dirty&gt; %TEMP%\dirty.txt)
-set /p DIRTY= &lt; %TEMP%\dirty.txt 2&gt; nul
-echo #define APP_NAME "MPN64 NetPlay" &gt; version.h
-echo #define APP_VERSION "(%COMMIT%)" &gt;&gt; version.h
-echo #define APP_NAME_AND_VERSION "MPN64 NetPlay (%COMMIT%)" &gt;&gt; version.h
-</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release (Server)|Win32'">
     <ClCompile>
@@ -330,31 +280,21 @@ echo #define APP_NAME_AND_VERSION "MPN64 NetPlay (%COMMIT%)" &gt;&gt; version.h
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;WIN32;NDEBUG;NETPLAYINPUTPLUGIN_EXPORTS;_WINDOWS;_USRDLL;WIN32_LEAN_AND_MEAN;_WIN32_WINNT=0x0600;ASIO_STANDALONE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)\Source\3rdParty\asio\asio\include;$(SolutionDir)\Source\3rdParty\cryptopp;$(SolutionDir)\Source\3rdParty\dirent\include;$(SolutionDir)\Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\Source\3rdParty\asio\asio\include;$(SolutionDir)\Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)\Source\3rdParty\dirent\include;$(SolutionDir)\Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <DebugInformationFormat>None</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <ImportLibrary></ImportLibrary>
+      <AdditionalOptions>/NOIMPLIB %(AdditionalOptions)</AdditionalOptions>
       <AdditionalLibraryDirectories>$(SolutionDir)build\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>cryptopp.lib;qwave.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <PreBuildEvent>
-      <Command>git rev-list HEAD --count  &gt; %TEMP%\count.txt
-set /p COUNT= &lt; %TEMP%\count.txt
-git rev-parse --short HEAD &gt; %TEMP%\commit.txt
-set /p COMMIT= &lt; %TEMP%\commit.txt
-git status --short | find " " &gt;nul
-if errorlevel 1 (del %TEMP%\dirty.txt 2&gt; nul) else (echo -dirty&gt; %TEMP%\dirty.txt)
-set /p DIRTY= &lt; %TEMP%\dirty.txt 2&gt; nul
-echo #define APP_NAME "AQZ NetPlay" &gt; version.h
-echo #define APP_VERSION "%COUNT% (%COMMIT%%DIRTY%)" &gt;&gt; version.h
-echo #define APP_NAME_AND_VERSION "AQZ NetPlay v%COUNT% (%COMMIT%%DIRTY%)" &gt;&gt; version.h
-</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -366,30 +306,20 @@ echo #define APP_NAME_AND_VERSION "AQZ NetPlay v%COUNT% (%COMMIT%%DIRTY%)" &gt;&
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;NDEBUG;NETPLAYINPUTPLUGIN_EXPORTS;_WINDOWS;_USRDLL;WIN32_LEAN_AND_MEAN;_WIN32_WINNT=0x0600;ASIO_STANDALONE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)\Source\3rdParty\asio\asio\include;$(SolutionDir)\Source\3rdParty\cryptopp;$(SolutionDir)\Source\3rdParty\dirent\include;$(SolutionDir)\Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\Source\3rdParty\asio\asio\include;$(SolutionDir)\Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)\Source\3rdParty\dirent\include;$(SolutionDir)\Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <DebugInformationFormat>None</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <ImportLibrary></ImportLibrary>
+      <AdditionalOptions>/NOIMPLIB %(AdditionalOptions)</AdditionalOptions>
       <AdditionalLibraryDirectories>$(SolutionDir)build\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>cryptopp.lib;qwave.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <PreBuildEvent>
-      <Command>git rev-list HEAD --count  &gt; %TEMP%\count.txt
-set /p COUNT= &lt; %TEMP%\count.txt
-git rev-parse --short HEAD &gt; %TEMP%\commit.txt
-set /p COMMIT= &lt; %TEMP%\commit.txt
-git status --short | find " " &gt;nul
-if errorlevel 1 (del %TEMP%\dirty.txt 2&gt; nul) else (echo -dirty&gt; %TEMP%\dirty.txt)
-set /p DIRTY= &lt; %TEMP%\dirty.txt 2&gt; nul
-echo #define APP_NAME "AQZ NetPlay" &gt; version.h
-echo #define APP_VERSION "%COUNT% (%COMMIT%%DIRTY%)" &gt;&gt; version.h
-echo #define APP_NAME_AND_VERSION "AQZ NetPlay v%COUNT% (%COMMIT%%DIRTY%)" &gt;&gt; version.h
-</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release (Server)|x64'">
     <ClCompile>
@@ -401,30 +331,20 @@ echo #define APP_NAME_AND_VERSION "AQZ NetPlay v%COUNT% (%COMMIT%%DIRTY%)" &gt;&
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;NDEBUG;NETPLAYINPUTPLUGIN_EXPORTS;_WINDOWS;_USRDLL;WIN32_LEAN_AND_MEAN;_WIN32_WINNT=0x0600;ASIO_STANDALONE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)\Source\3rdParty\asio\asio\include;$(SolutionDir)\Source\3rdParty\cryptopp;$(SolutionDir)\Source\3rdParty\dirent\include;$(SolutionDir)\Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\Source\3rdParty\asio\asio\include;$(SolutionDir)\Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)\Source\3rdParty\dirent\include;$(SolutionDir)\Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <DebugInformationFormat>None</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <ImportLibrary></ImportLibrary>
+      <AdditionalOptions>/NOIMPLIB %(AdditionalOptions)</AdditionalOptions>
       <AdditionalLibraryDirectories>$(SolutionDir)build\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>cryptopp.lib;qwave.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <PreBuildEvent>
-      <Command>git rev-list HEAD --count  &gt; %TEMP%\count.txt
-set /p COUNT= &lt; %TEMP%\count.txt
-git rev-parse --short HEAD &gt; %TEMP%\commit.txt
-set /p COMMIT= &lt; %TEMP%\commit.txt
-git status --short | find " " &gt;nul
-if errorlevel 1 (del %TEMP%\dirty.txt 2&gt; nul) else (echo -dirty&gt; %TEMP%\dirty.txt)
-set /p DIRTY= &lt; %TEMP%\dirty.txt 2&gt; nul
-echo #define APP_NAME "AQZ NetPlay" &gt; version.h
-echo #define APP_VERSION "%COUNT% (%COMMIT%%DIRTY%)" &gt;&gt; version.h
-echo #define APP_NAME_AND_VERSION "AQZ NetPlay v%COUNT% (%COMMIT%%DIRTY%)" &gt;&gt; version.h
-</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="client_dialog.h" />

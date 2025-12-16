@@ -4,8 +4,8 @@
 [submodule "Source/3rdParty/asio"]
 	path = Source/3rdParty/asio
 	url = https://github.com/chriskohlhoff/asio.git
-[submodule "Source/3rdParty/cryptopp"]
-	path = Source/3rdParty/cryptopp
+[submodule "Source/3rdParty/cryptopp/cryptopp"]
+	path = Source/3rdParty/cryptopp/cryptopp
 	url = https://github.com/weidai11/cryptopp.git
 [submodule "Source/3rdParty/dirent"]
 	path = Source/3rdParty/dirent

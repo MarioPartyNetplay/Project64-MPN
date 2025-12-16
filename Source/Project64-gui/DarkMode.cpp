@@ -7,6 +7,7 @@
 #include <dwmapi.h>
 #include <uxtheme.h>
 #include <vsstyle.h>
+#include <commctrl.h>
 
 #include <sstream>
 
@@ -203,7 +204,8 @@ static bool needsToBePatched(HWND hwnd)
         || wndName == "ComboBox"
         // pick some widgets that aren't theme-able and leave the others alone
         || (wndName == "SysListView32" && (style & WS_CHILDWINDOW))
-        || (wndName == "SysTreeView32" && (style & WS_CHILDWINDOW));
+        || (wndName == "SysTreeView32" && (style & WS_CHILDWINDOW))
+        || (wndName == "SysHeader32" && (style & WS_CHILDWINDOW));
 }
 
 LRESULT CALLBACK CBTProc(int nCode,
@@ -569,6 +571,15 @@ LRESULT CALLBACK CallWndSubClassProc(HWND hWnd, UINT uMsg, WPARAM wParam,
         }
         if (name == "SysListView32") {
             SetWindowTheme(hWnd, L"ItemsView", nullptr); // DarkMode
+            // Also theme the header control for dark mode
+            HWND hHeader = (HWND)SendMessage(hWnd, LVM_GETHEADER, 0, 0);
+            if (hHeader) {
+                SetWindowTheme(hHeader, L"ItemsView", nullptr);
+                allowDarkMode(hHeader);
+            }
+        }
+        if (name == "SysHeader32") {
+            SetWindowTheme(hWnd, L"ItemsView", nullptr); // DarkMode for header
         }
         if (name == "Button") {
             DWORD style = GetWindowLongPtr(hWnd, GWL_STYLE);
@@ -604,6 +615,42 @@ LRESULT CALLBACK CallWndSubClassProc(HWND hWnd, UINT uMsg, WPARAM wParam,
     }
     case WM_NOTIFY:
     {
+        LPNMHDR nmhdr = reinterpret_cast<LPNMHDR>(lParam);
+        if (nmhdr->code == NM_CUSTOMDRAW) {
+            auto childName = getClass(nmhdr->hwndFrom);
+            // Handle header custom draw for dark mode
+            if (childName == "SysHeader32") {
+                LPNMCUSTOMDRAW nmcd = reinterpret_cast<LPNMCUSTOMDRAW>(lParam);
+                switch (nmcd->dwDrawStage) {
+                case CDDS_PREPAINT:
+                    return CDRF_NOTIFYITEMDRAW;
+                case CDDS_ITEMPREPAINT:
+                {
+                    // Fill background with dark color
+                    FillRect(nmcd->hdc, &nmcd->rc, load_config()->menubar_bgbrush);
+                    
+                    // Get header item text
+                    HDITEMW hdi = { 0 };
+                    wchar_t szText[256] = { 0 };
+                    hdi.mask = HDI_TEXT;
+                    hdi.pszText = szText;
+                    hdi.cchTextMax = 256;
+                    SendMessageW(nmhdr->hwndFrom, HDM_GETITEMW, nmcd->dwItemSpec, (LPARAM)&hdi);
+                    
+                    // Draw text with white color for visibility
+                    SetBkMode(nmcd->hdc, TRANSPARENT);
+                    SetTextColor(nmcd->hdc, RGB(255, 255, 255));
+                    
+                    RECT rcText = nmcd->rc;
+                    rcText.left += 6; // Add some padding
+                    DrawTextW(nmcd->hdc, szText, -1, &rcText, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+                    
+                    return CDRF_SKIPDEFAULT;
+                }
+                }
+            }
+        }
+
         auto name = getClass(hWnd);
         if (name == "SysListView32") { // left pane of FX dialog
             LPNMCUSTOMDRAW nmcd = reinterpret_cast<LPNMCUSTOMDRAW>(lParam);

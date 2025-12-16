@@ -29,6 +29,9 @@ class client: public service_wrapper, public connection {
         void revert_save_data();
         void move_original_saves_to_temp();
         void ensure_save_directories();
+        void restore_leftover_backups();
+        void backup_cheat_files();
+        void restore_cheat_files();
         client_dialog& get_dialog();
         virtual void on_receive(packet& packet, bool udp);
         virtual void on_error(const std::error_code& error);
@@ -108,8 +111,9 @@ class client: public service_wrapper, public connection {
         void replace_save_file(const save_info& save_data);
         std::string get_game_identifier() const;
         std::string get_cheat_file_path() const;
-        std::string get_config_file_path() const;
+        std::string get_cheat_enabled_file_path() const;
         std::vector<cheat_info> load_cheats();
         void save_cheats(const std::vector<cheat_info>& cheats);
         void apply_cheats(const std::vector<cheat_info>& cheats);
 };
+    

@@ -41,13 +41,11 @@ void room::check_save_data() {
             auto& save_data = u->info.saves[i];
             auto& hash = first_hashes[i];
             if (save_data.sha1_data != hash) {
-                send_error("Save data mismatch, you may desync in-game");
                 return;
             }
         }
 
     }
-    send_info("Save data is in sync!");
 }
 
 void room::on_user_join(user* user) {

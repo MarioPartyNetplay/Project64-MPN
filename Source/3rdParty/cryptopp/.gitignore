@@ -1,9 +1,0 @@
-# Ignore everything except the wrapper files
-/*
-# But keep these files
-!.gitignore
-!README.txt
-!update_project.bat
-!cryptopp.vcxproj
-!cryptopp.vcxproj.filters
-

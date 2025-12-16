@@ -73,12 +73,12 @@ BEGIN
     BEGIN
         BLOCK "04090026"
         BEGIN
-            VALUE "CompanyName", "play64.com"
-            VALUE "FileDescription", "N64 Input Plugin for Online Netplay"
+            VALUE "CompanyName", "Tabitha Hanegan"
+            VALUE "FileDescription", "MPN Netplay plugin"
             VALUE "FileVersion", APP_VERSION
-            VALUE "InternalName", "netplay_input_plugin"
-            VALUE "LegalCopyright", "play64.com © 2019"
-            VALUE "OriginalFilename", "netplay_input_plugin.dll"
+            VALUE "InternalName", "Project64-Netplay"
+            VALUE "LegalCopyright", "Tabitha Hanegan ï¿½ 2025"
+            VALUE "OriginalFilename", "Project64-Netplay.dll"
             VALUE "ProductName", APP_NAME
             VALUE "ProductVersion", APP_VERSION
         END

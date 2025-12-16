@@ -459,10 +459,7 @@ void client::on_message(string message) {
             } else if (params[0] == "/start") {
                 if (started) throw runtime_error("Game has already started");
 
-                my_dialog->info("Syncing host's save with everyone else");
-                if (!is_host()) {
-                    move_original_saves_to_temp();
-                }
+                my_dialog->info("Syncing saves with everyone else");
                 Sleep(1000);
                 send_savesync();
                 if (is_host()) {
@@ -645,18 +642,12 @@ void client::close(const std::error_code& error) {
 }
 
 void client::start_game() {
-    static bool save_data_reverted = false;
     unique_lock<mutex> lock(start_mutex);
     if (started) return;
     started = true;
     start_condition.notify_all();
     my_dialog->info("Starting game...");
-
-    if (!save_data_reverted) {
-        Sleep(2500);
-        revert_save_data();
-        save_data_reverted = true;
-    }
+    // Note: Save reversion happens in RomClosed() after the game writes its final save
 }
 
 void client::connect(const string& host, uint16_t port, const string& room) {
@@ -773,8 +764,6 @@ string client::slurp2(const string& path) {
 void client::update_save_info()
 {
     std::vector<string> save_files = find_rom_save_files(me->rom.name);
-    if (save_files.size() == 0)
-        my_dialog->error("Save data is empty");
 
     std::sort(save_files.begin(), save_files.end());
 
@@ -842,6 +831,12 @@ void client::on_receive(packet& p, bool udp) {
         }
 
         case SAVE_SYNC: {
+            // Non-hosts backup their original saves BEFORE replacing them with host's saves
+            // Host doesn't need backup since their save is the one being synced
+            if (!is_host()) {
+                move_original_saves_to_temp();
+            }
+
             for (int i = 0; i < me->saves.size(); i++) {
                 auto save_data = p.read<save_info>();
                 auto my_save = me->saves[i];
@@ -1307,14 +1302,28 @@ void client::revert_save_data() {
 
     for (auto& save : me->saves) {
         if (!save.save_name.empty()) {
-            // Move netplay save to NetplayTemp
-            std::string netplay_path = save_path + save.save_name;
-            std::string temp_path = netplay_temp_dir + save.save_name;
-            std::filesystem::rename(netplay_path, temp_path);
+            try {
+                std::string netplay_path = save_path + save.save_name;
+                std::string temp_path = netplay_temp_dir + save.save_name;
+                std::string original_path = original_dir + save.save_name;
 
-            // Restore original save
-            std::string original_path = original_dir + save.save_name;
-            std::filesystem::rename(original_path, save_path + save.save_name);
+                // Only revert if we have a backup (non-hosts have backups, hosts don't)
+                if (!std::filesystem::exists(original_path)) {
+                    continue;
+                }
+
+                // Move current (netplay) save to NetplayTemp if it exists
+                if (std::filesystem::exists(netplay_path)) {
+                    // Ensure NetplayTemp directory exists
+                    std::filesystem::create_directories(netplay_temp_dir);
+                    std::filesystem::rename(netplay_path, temp_path);
+                }
+
+                // Restore original save from backup
+                std::filesystem::rename(original_path, netplay_path);
+            } catch (const std::filesystem::filesystem_error& e) {
+                my_dialog->error("Failed to revert save " + save.save_name + ": " + e.what());
+            }
         }
     }
 }
@@ -1327,13 +1336,146 @@ void client::ensure_save_directories() {
     std::filesystem::create_directories(temp_dir);
 }
 
+void client::restore_leftover_backups() {
+    // Check for leftover backups from a previous session that was force-closed (Alt+F4)
+    // If any exist in the Original folder, restore them now
+    std::string original_dir = save_path + "Original\\";
+    std::string netplay_temp_dir = save_path + "NetplayTemp\\";
+
+    try {
+        if (!std::filesystem::exists(original_dir)) {
+            return; // No backups to restore
+        }
+
+        for (const auto& entry : std::filesystem::directory_iterator(original_dir)) {
+            if (!entry.is_regular_file()) continue;
+            
+            std::string filename = entry.path().filename().string();
+            std::string ext = entry.path().extension().string();
+            
+            // Process save files (.sra, .eep, .fla, .mpk)
+            if (ext == ".sra" || ext == ".eep" || ext == ".fla" || ext == ".mpk") {
+                std::string backup_path = entry.path().string();
+                std::string main_path = save_path + filename;
+                std::string temp_path = netplay_temp_dir + filename;
+
+                my_dialog->info("Restoring leftover backup: " + filename);
+
+                // Move current (netplay) save to NetplayTemp if it exists
+                if (std::filesystem::exists(main_path)) {
+                    std::filesystem::create_directories(netplay_temp_dir);
+                    std::filesystem::rename(main_path, temp_path);
+                }
+
+                // Restore the backup
+                std::filesystem::rename(backup_path, main_path);
+            }
+            // Process cheat files (.cht, .cht_enabled)
+            else if (filename == "Project64.cht" || filename == "Project64.cht_enabled") {
+                std::string backup_path = entry.path().string();
+                std::string cheat_file = get_cheat_file_path();
+                std::string enabled_file = get_cheat_enabled_file_path();
+                std::string main_path = (filename == "Project64.cht") ? cheat_file : enabled_file;
+
+                my_dialog->info("Restoring leftover cheat backup: " + filename);
+
+                // Remove read-only if set (for .cht files)
+                if (filename == "Project64.cht") {
+                    std::wstring wmain_path = utf8_to_wstring(main_path);
+                    DWORD attrs = GetFileAttributes(wmain_path.c_str());
+                    if (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_READONLY)) {
+                        SetFileAttributes(wmain_path.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
+                    }
+                }
+
+                // Restore the backup
+                std::filesystem::rename(backup_path, main_path);
+            }
+        }
+    } catch (const std::filesystem::filesystem_error& e) {
+        my_dialog->error("Failed to restore leftover backups: " + std::string(e.what()));
+    }
+}
+
+void client::backup_cheat_files() {
+    // Backup cheat files before syncing so we can restore them after netplay
+    std::string original_dir = save_path + "Original\\";
+    std::string cheat_file = get_cheat_file_path();
+    std::string enabled_file = get_cheat_enabled_file_path();
+
+    try {
+        std::filesystem::create_directories(original_dir);
+
+        // Backup Project64.cht
+        std::string cht_backup = original_dir + "Project64.cht";
+        if (std::filesystem::exists(cheat_file) && !std::filesystem::exists(cht_backup)) {
+            std::filesystem::copy(cheat_file, cht_backup, std::filesystem::copy_options::overwrite_existing);
+        }
+
+        // Backup Project64.cht_enabled
+        std::string enabled_backup = original_dir + "Project64.cht_enabled";
+        if (std::filesystem::exists(enabled_file) && !std::filesystem::exists(enabled_backup)) {
+            std::filesystem::copy(enabled_file, enabled_backup, std::filesystem::copy_options::overwrite_existing);
+        }
+    } catch (const std::filesystem::filesystem_error& e) {
+        my_dialog->error("Failed to backup cheat files: " + std::string(e.what()));
+    }
+}
+
+void client::restore_cheat_files() {
+    // Restore original cheat files after netplay session
+    std::string original_dir = save_path + "Original\\";
+    std::string cheat_file = get_cheat_file_path();
+    std::string enabled_file = get_cheat_enabled_file_path();
+
+    try {
+        // Restore Project64.cht
+        std::string cht_backup = original_dir + "Project64.cht";
+        if (std::filesystem::exists(cht_backup)) {
+            // Remove read-only if set
+            std::wstring wcheat_file = utf8_to_wstring(cheat_file);
+            DWORD attrs = GetFileAttributes(wcheat_file.c_str());
+            if (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_READONLY)) {
+                SetFileAttributes(wcheat_file.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
+            }
+            std::filesystem::rename(cht_backup, cheat_file);
+        }
+
+        // Restore Project64.cht_enabled
+        std::string enabled_backup = original_dir + "Project64.cht_enabled";
+        if (std::filesystem::exists(enabled_backup)) {
+            std::filesystem::rename(enabled_backup, enabled_file);
+        }
+    } catch (const std::filesystem::filesystem_error& e) {
+        my_dialog->error("Failed to restore cheat files: " + std::string(e.what()));
+    }
+}
+
 void client::move_original_saves_to_temp() {
     std::string original_dir = save_path + "Original\\";
+    
+    // Ensure the Original directory exists
+    try {
+        std::filesystem::create_directories(original_dir);
+    } catch (const std::filesystem::filesystem_error& e) {
+        my_dialog->error("Failed to create Original directory: " + std::string(e.what()));
+        return;
+    }
+
     for (auto& save : me->saves) {
         if (!save.save_name.empty()) {
-            std::string original_path = save_path + save.save_name;
-            std::string temp_path = original_dir + save.save_name;
-            std::filesystem::copy(original_path, temp_path, std::filesystem::copy_options::overwrite_existing);
+            try {
+                std::string original_path = save_path + save.save_name;
+                std::string backup_path = original_dir + save.save_name;
+
+                // Only backup if the original save exists and we don't already have a backup
+                // (prevents overwriting backup during reconnect scenarios)
+                if (std::filesystem::exists(original_path) && !std::filesystem::exists(backup_path)) {
+                    std::filesystem::copy(original_path, backup_path, std::filesystem::copy_options::overwrite_existing);
+                }
+            } catch (const std::filesystem::filesystem_error& e) {
+                my_dialog->error("Failed to backup save " + save.save_name + ": " + e.what());
+            }
         }
     }
 }
@@ -1363,14 +1505,14 @@ std::string client::get_cheat_file_path() const {
     return config_path;
 }
 
-std::string client::get_config_file_path() const {
+std::string client::get_cheat_enabled_file_path() const {
     // save_path is "Project64/Save/", so go up one level and into Config
     std::string config_path = save_path;
     // Remove "Save\" from the end
     if (config_path.length() >= 5 && config_path.substr(config_path.length() - 5) == "Save\\") {
         config_path = config_path.substr(0, config_path.length() - 5);
     }
-    config_path += "Config\\Project64.cfg";
+    config_path += "Config\\Project64.cht_enabled";
     return config_path;
 }
 
@@ -1386,9 +1528,9 @@ std::vector<cheat_info> client::load_cheats() {
         return cheats; // File doesn't exist, return empty
     }
 
-    // Get Project64.cfg path for active status
-    std::string config_file = get_config_file_path();
-    std::wstring wconfig_file = utf8_to_wstring(config_file);
+    // Get .cht_enabled path for active status
+    std::string enabled_file = get_cheat_enabled_file_path();
+    std::wstring wenabled_file = utf8_to_wstring(enabled_file);
 
     // Read up to MaxCheats cheats (50000)
     for (int i = 0; i < 50000; i++) {
@@ -1427,10 +1569,10 @@ std::vector<cheat_info> client::load_cheats() {
         }
         cheat.code = entry.substr(code_start);
 
-        // Check if cheat is active - read from Project64.cfg under game identifier section
+        // Check if cheat is active - read from .cht_enabled file
         std::wstring active_key = L"Cheat" + std::to_wstring(i);
         wchar_t active_value[16];
-        GetPrivateProfileString(wgame_id.c_str(), active_key.c_str(), L"0", active_value, sizeof(active_value) / sizeof(wchar_t), wconfig_file.c_str());
+        GetPrivateProfileString(wgame_id.c_str(), active_key.c_str(), L"0", active_value, sizeof(active_value) / sizeof(wchar_t), wenabled_file.c_str());
         cheat.active = (_wtoi(active_value) != 0);
 
         cheats.push_back(cheat);
@@ -1441,10 +1583,10 @@ std::vector<cheat_info> client::load_cheats() {
 
 void client::save_cheats(const std::vector<cheat_info>& cheats) {
     std::string cheat_file = get_cheat_file_path();
-    std::string config_file = get_config_file_path();
+    std::string enabled_file = get_cheat_enabled_file_path();
     std::string game_id = get_game_identifier();
     std::wstring wcheat_file = utf8_to_wstring(cheat_file);
-    std::wstring wconfig_file = utf8_to_wstring(config_file);
+    std::wstring wenabled_file = utf8_to_wstring(enabled_file);
     std::wstring wgame_id = utf8_to_wstring(game_id);
 
     // Ensure Config directory exists
@@ -1492,37 +1634,22 @@ void client::save_cheats(const std::vector<cheat_info>& cheats) {
         SetFileAttributes(wcheat_file.c_str(), cheat_attrs);
     }
 
-    // Now handle Project64.cfg - temporarily remove read-only and write enabled status
-    DWORD config_attrs = GetFileAttributes(wconfig_file.c_str());
-    bool config_was_readonly = false;
-    if (config_attrs != INVALID_FILE_ATTRIBUTES) {
-        if (config_attrs & FILE_ATTRIBUTE_READONLY) {
-            config_was_readonly = true;
-            SetFileAttributes(wconfig_file.c_str(), config_attrs & ~FILE_ATTRIBUTE_READONLY);
-        }
-    }
-
-    // Clear existing enabled status for this game
+    // Clear existing enabled status for this game in .cht_enabled
     for (int i = 0; i < 50000; i++) {
         std::wstring key = L"Cheat" + std::to_wstring(i);
         wchar_t value[16];
-        DWORD len = GetPrivateProfileString(wgame_id.c_str(), key.c_str(), L"", value, sizeof(value) / sizeof(wchar_t), wconfig_file.c_str());
+        DWORD len = GetPrivateProfileString(wgame_id.c_str(), key.c_str(), L"", value, sizeof(value) / sizeof(wchar_t), wenabled_file.c_str());
         if (len == 0) {
             break;
         }
-        WritePrivateProfileString(wgame_id.c_str(), key.c_str(), NULL, wconfig_file.c_str());
+        WritePrivateProfileString(wgame_id.c_str(), key.c_str(), NULL, wenabled_file.c_str());
     }
 
-    // Write enabled status to Project64.cfg
+    // Write enabled status to .cht_enabled
     for (size_t i = 0; i < cheats.size(); i++) {
         const auto& cheat = cheats[i];
         std::wstring key = L"Cheat" + std::to_wstring((int)i);
-        WritePrivateProfileString(wgame_id.c_str(), key.c_str(), cheat.active ? L"1" : L"0", wconfig_file.c_str());
-    }
-
-    // Restore config file attributes if needed
-    if (config_was_readonly) {
-        SetFileAttributes(wconfig_file.c_str(), config_attrs);
+        WritePrivateProfileString(wgame_id.c_str(), key.c_str(), cheat.active ? L"1" : L"0", wenabled_file.c_str());
     }
 }
 

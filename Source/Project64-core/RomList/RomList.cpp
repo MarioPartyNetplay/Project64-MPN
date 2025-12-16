@@ -497,8 +497,11 @@ void CRomList::FillRomExtensionInfo(ROM_INFO * pRomInfo)
     //Get the text color
     stdstr String = m_RomIniFile->GetString("Rom Status", pRomInfo->Status, "A0A0A0");
     if (g_Settings->LoadBool(Setting_DarkTheme)) {
-        pRomInfo->TextColor = (strtoul(String.c_str(), 0, 16) & 0x2D2D2D);
-        pRomInfo->TextColor = (pRomInfo->TextColor & 0x00FF00) | ((pRomInfo->TextColor >> 0x10) & 0xFF) | ((pRomInfo->TextColor & 0xFF) << 0x10);// Get the selected color
+        // For dark theme, use light text colors (default to white/light gray)
+        String = m_RomIniFile->GetString("Rom Status", pRomInfo->Status, "E0E0E0");
+        pRomInfo->TextColor = (strtoul(String.c_str(), 0, 16) & 0xFFFFFF);
+        pRomInfo->TextColor = (pRomInfo->TextColor & 0x00FF00) | ((pRomInfo->TextColor >> 0x10) & 0xFF) | ((pRomInfo->TextColor & 0xFF) << 0x10);
+        // Get the selected color
         String.Format("%s.Sel", pRomInfo->Status);
         String = m_RomIniFile->GetString("Rom Status", String.c_str(), "2D2D2D2D");
         uint32_t selcol = strtoul(String.c_str(), nullptr, 16);
@@ -512,10 +515,10 @@ void CRomList::FillRomExtensionInfo(ROM_INFO * pRomInfo)
             pRomInfo->SelColor = selcol;
         }
 
-        // Get the selected text color
+        // Get the selected text color (use light color for dark theme)
         String.Format("%s.Seltext", pRomInfo->Status);
-        String = m_RomIniFile->GetString("Rom Status", String.c_str(), "2D2D2D");
-        pRomInfo->SelTextColor = (strtoul(String.c_str(), 0, 16) & 0x2D2D2D);
+        String = m_RomIniFile->GetString("Rom Status", String.c_str(), "FFFFFF");
+        pRomInfo->SelTextColor = (strtoul(String.c_str(), 0, 16) & 0xFFFFFF);
         pRomInfo->SelTextColor = (pRomInfo->SelTextColor & 0x00FF00) | ((pRomInfo->SelTextColor >> 0x10) & 0xFF) | ((pRomInfo->SelTextColor & 0xFF) << 0x10);
     }
     else {

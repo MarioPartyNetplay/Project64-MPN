@@ -71,7 +71,7 @@ void load() {
     my_project64_location = get_parent_directory(my_plugins_location).append("\\");
     my_saves_location = my_project64_location.append("Save\\");
 
-    my_settings = make_shared<settings>(my_location + "netplay_input_plugin.ini");
+    my_settings = make_shared<settings>(my_location + "netplay.ini");
 
     try {
         my_plugin = make_shared<input_plugin>(my_location + my_settings->get_plugin_dll());
@@ -283,7 +283,8 @@ EXPORT void CALL RomOpen(void) {
         my_client->set_name(my_settings->get_name());
         my_client->set_rom_info(rom);
         my_client->set_save_info(my_saves_location);
-        my_client->ensure_save_directories(); // Ensure directories exist
+        my_client->ensure_save_directories();
+        my_client->restore_leftover_backups(); // Restore any backups from force-closed sessions
         my_client->set_dst_controllers(control_info.Controls);
         my_client->load_public_server_list();
         my_client->get_external_address();

@@ -13,6 +13,8 @@
 
 #include <commctrl.h>
 #include <shlobj.h>
+#include <shobjidl.h>
+#include <comdef.h>
 #include "DarkModeUtils.h"
 
 std::string CRomBrowser::m_UnknownGoodName;
@@ -959,64 +961,107 @@ void CRomBrowser::SaveRomListColoumnInfo(void)
     WriteTrace(TraceUserInterface, TraceDebug, "Done");
 }
 
-int32_t CALLBACK CRomBrowser::SelectRomDirCallBack(HWND hwnd, uint32_t uMsg, uint32_t /*lp*/, uint32_t lpData)
-{
-    switch (uMsg)
-    {
-    case BFFM_INITIALIZED:
-        // WParam is TRUE since you are passing a path.
-        // It would be FALSE if you were passing a pidl.
-        if (lpData)
-        {
-            SendMessage(hwnd, BFFM_SETSELECTION, TRUE, lpData);
-            SetWindowTextW(hwnd, wGS(DIR_SELECT_ROM).c_str());
-        }
-        break;
-    }
-    return 0;
-}
-
 void CRomBrowser::SelectRomDir(void)
 {
-    wchar_t SelectedDir[MAX_PATH];
-    LPITEMIDLIST pidl;
-    BROWSEINFOW bi;
-
-    std::wstring title = wGS(SELECT_ROM_DIR);
-
-    WriteTrace(TraceUserInterface, TraceDebug, "1");
-    stdstr RomDir = g_Settings->LoadStringVal(RomList_GameDir).c_str();
-    bi.hwndOwner = m_MainWindow;
-    bi.pidlRoot = NULL;
-    bi.pszDisplayName = SelectedDir;
-    bi.lpszTitle = title.c_str();
-    bi.ulFlags = BIF_RETURNFSANCESTORS | BIF_RETURNONLYFSDIRS;
-    bi.lpfn = (BFFCALLBACK)SelectRomDirCallBack;
-    bi.lParam = (uint32_t)RomDir.c_str();
-    WriteTrace(TraceUserInterface, TraceDebug, "2");
-    if ((pidl = SHBrowseForFolderW(&bi)) != NULL)
+    // Use modern IFileDialog API (Windows Vista+)
+    IFileDialog *pFileDialog = NULL;
+    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pFileDialog));
+    
+    if (FAILED(hr))
     {
-        WriteTrace(TraceUserInterface, TraceDebug, "3");
-        char Directory[_MAX_PATH];
-        if (SHGetPathFromIDList(pidl, Directory))
-        {
-            int32_t len = strlen(Directory);
+        // Fallback to old API if COM initialization fails
+        wchar_t SelectedDir[MAX_PATH];
+        LPITEMIDLIST pidl;
+        BROWSEINFOW bi;
 
-            WriteTrace(TraceUserInterface, TraceDebug, "4");
-            if (Directory[len - 1] != '\\')
+        std::wstring title = wGS(SELECT_ROM_DIR);
+        stdstr RomDir = g_Settings->LoadStringVal(RomList_GameDir).c_str();
+        bi.hwndOwner = m_MainWindow;
+        bi.pidlRoot = NULL;
+        bi.pszDisplayName = SelectedDir;
+        bi.lpszTitle = title.c_str();
+        bi.ulFlags = BIF_RETURNFSANCESTORS | BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
+        bi.lpfn = NULL;
+        bi.lParam = 0;
+        
+        if ((pidl = SHBrowseForFolderW(&bi)) != NULL)
+        {
+            char Directory[_MAX_PATH];
+            if (SHGetPathFromIDList(pidl, Directory))
             {
-                strcat(Directory, "\\");
+                int32_t len = strlen(Directory);
+                if (Directory[len - 1] != '\\')
+                {
+                    strcat(Directory, "\\");
+                }
+                g_Settings->SaveString(RomList_GameDir, Directory);
+                Notify().AddRecentDir(Directory);
+                RefreshRomList();
             }
-            WriteTrace(TraceUserInterface, TraceDebug, "5");
-            WriteTrace(TraceUserInterface, TraceDebug, "6");
-            g_Settings->SaveString(RomList_GameDir, Directory);
-            WriteTrace(TraceUserInterface, TraceDebug, "7");
-            Notify().AddRecentDir(Directory);
-            WriteTrace(TraceUserInterface, TraceDebug, "8");
-            RefreshRomList();
-            WriteTrace(TraceUserInterface, TraceDebug, "9");
+            CoTaskMemFree(pidl);
+        }
+        return;
+    }
+
+    // Set options for folder picker
+    DWORD dwOptions;
+    hr = pFileDialog->GetOptions(&dwOptions);
+    if (SUCCEEDED(hr))
+    {
+        hr = pFileDialog->SetOptions(dwOptions | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
+    }
+
+    // Set title
+    std::wstring title = wGS(SELECT_ROM_DIR);
+    pFileDialog->SetTitle(title.c_str());
+
+    // Set initial directory
+    stdstr RomDir = g_Settings->LoadStringVal(RomList_GameDir).c_str();
+    if (!RomDir.empty())
+    {
+        IShellItem *pShellItem = NULL;
+        std::wstring wRomDir = std::wstring(RomDir.begin(), RomDir.end());
+        hr = SHCreateItemFromParsingName(wRomDir.c_str(), NULL, IID_PPV_ARGS(&pShellItem));
+        if (SUCCEEDED(hr))
+        {
+            pFileDialog->SetFolder(pShellItem);
+            pShellItem->Release();
         }
     }
+
+    // Show the dialog
+    hr = pFileDialog->Show(m_MainWindow);
+    if (SUCCEEDED(hr))
+    {
+        IShellItem *pShellItem = NULL;
+        hr = pFileDialog->GetResult(&pShellItem);
+        if (SUCCEEDED(hr))
+        {
+            PWSTR pszPath = NULL;
+            hr = pShellItem->GetDisplayName(SIGDN_FILESYSPATH, &pszPath);
+            if (SUCCEEDED(hr))
+            {
+                // Convert wide string to multibyte
+                char Directory[_MAX_PATH];
+                WideCharToMultiByte(CP_ACP, 0, pszPath, -1, Directory, _MAX_PATH, NULL, NULL);
+                
+                int32_t len = strlen(Directory);
+                if (Directory[len - 1] != '\\')
+                {
+                    strcat(Directory, "\\");
+                }
+                
+                g_Settings->SaveString(RomList_GameDir, Directory);
+                Notify().AddRecentDir(Directory);
+                RefreshRomList();
+                
+                CoTaskMemFree(pszPath);
+            }
+            pShellItem->Release();
+        }
+    }
+
+    pFileDialog->Release();
 }
 
 void CRomBrowser::FixRomListWindow(void)

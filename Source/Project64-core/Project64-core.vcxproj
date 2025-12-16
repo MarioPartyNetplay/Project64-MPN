@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -107,6 +107,7 @@
     <ClCompile Include="Settings\SettingType\SettingsType-ApplicationIndex.cpp" />
     <ClCompile Include="Settings\SettingType\SettingsType-ApplicationPath.cpp" />
     <ClCompile Include="Settings\SettingType\SettingsType-Cheats.cpp" />
+    <ClCompile Include="Settings\SettingType\SettingsType-CheatsEnabled.cpp" />
     <ClCompile Include="Settings\SettingType\SettingsType-GameSetting.cpp" />
     <ClCompile Include="Settings\SettingType\SettingsType-GameSettingIndex.cpp" />
     <ClCompile Include="Settings\SettingType\SettingsType-RDBCpuType.cpp" />
@@ -213,6 +214,7 @@
     <ClInclude Include="Settings\SettingType\SettingsType-ApplicationPath.h" />
     <ClInclude Include="Settings\SettingType\SettingsType-Base.h" />
     <ClInclude Include="Settings\SettingType\SettingsType-Cheats.h" />
+    <ClInclude Include="Settings\SettingType\SettingsType-CheatsEnabled.h" />
     <ClInclude Include="Settings\SettingType\SettingsType-GameSetting.h" />
     <ClInclude Include="Settings\SettingType\SettingsType-GameSettingIndex.h" />
     <ClInclude Include="Settings\SettingType\SettingsType-RDBCpuType.h" />
