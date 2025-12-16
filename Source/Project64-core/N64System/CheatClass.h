@@ -22,7 +22,7 @@ public:
     enum
     {
         MaxCheats = 50000,
-        MaxGSEntries = 1024,
+        MaxGSEntries = 20480,
     };
 
     void ApplyCheats(CMipsMemoryVM * MMU);

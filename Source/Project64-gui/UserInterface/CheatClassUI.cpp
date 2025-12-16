@@ -936,7 +936,7 @@ int CALLBACK CCheatsUI::ManageCheatsProc(HWND hDlg, uint32_t uMsg, uint32_t wPar
         GetWindowPlacement(hDlg, &WndPlac);
 
         SetWindowTextW(hDlg, wGS(CHEAT_TITLE).c_str());
-        _this->m_hSelectCheat = CreateDialogParamW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_Cheats_List), hDlg, (DLGPROC)CheatListProc, (LPARAM)_this);
+        _this->m_hSelectCheat = CreateDialogParamW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_CHEATS_LIST), hDlg, (DLGPROC)CheatListProc, (LPARAM)_this);
         SetWindowPos(_this->m_hSelectCheat, HWND_TOP, 5, 8, 0, 0, SWP_NOSIZE);
         ShowWindow(_this->m_hSelectCheat, SW_SHOW);
 
@@ -956,7 +956,7 @@ int CALLBACK CCheatsUI::ManageCheatsProc(HWND hDlg, uint32_t uMsg, uint32_t wPar
         }
         else
         {
-            _this->m_AddCheat = CreateDialogParamW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_Cheats_Add), hDlg, (DLGPROC)CheatAddProc, (LPARAM)_this);
+            _this->m_AddCheat = CreateDialogParamW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_CHEATS_ADD), hDlg, (DLGPROC)CheatAddProc, (LPARAM)_this);
             SetWindowPos(_this->m_AddCheat, HWND_TOP, (rc->right - rc->left) / 2, 8, 0, 0, SWP_NOSIZE);
             ShowWindow(_this->m_AddCheat, SW_HIDE);
 
@@ -1349,26 +1349,26 @@ stdstr CCheatsUI::ReadCodeString(HWND hDlg, bool &validcodes, bool &validoptions
     validcodes = true;
     nooptions = true;
     codeformat = -1;
-    int numcodes = 0;
+    int numcodes =0;
 
-    char codestring[65536];
-    memset(codestring, '\0', sizeof(codestring));
+    // Use heap-backed string instead of a huge stack allocation
+    std::string codestring;
 
-    numlines = SendDlgItemMessage(hDlg, IDC_CHEAT_CODES, EM_GETLINECOUNT, 0, 0);
-    if (numlines == 0) { validcodes = false; }
+    numlines = SendDlgItemMessage(hDlg, IDC_CHEAT_CODES, EM_GETLINECOUNT,0,0);
+    if (numlines ==0) { validcodes = false; }
 
-    for (linecount = 0; linecount < numlines; linecount++) //read line after line (bypassing limitation GetDlgItemText)
+    for (linecount =0; linecount < numlines; linecount++) //read line after line (bypassing limitation GetDlgItemText)
     {
-        memset(tempformat, 0, sizeof(tempformat));
+        memset(tempformat,0, sizeof(tempformat));
 
-        //str[0] = sizeof(str) > 255?255:sizeof(str);
+        //str[0] = sizeof(str) >255?255:sizeof(str);
         *(LPWORD)str = sizeof(str);
         len = SendDlgItemMessage(hDlg, IDC_CHEAT_CODES, EM_GETLINE, (WPARAM)linecount, (LPARAM)(const char *)str);
-        str[len] = 0;
+        str[len] =0;
 
-        if (len <= 0) { continue; }
+        if (len <=0) { continue; }
 
-        for (i = 0; i < 128; i++)
+        for (i =0; i <128; i++)
         {
             if (isxdigit(str[i]))
             {
@@ -1378,23 +1378,23 @@ stdstr CCheatsUI::ReadCodeString(HWND hDlg, bool &validcodes, bool &validoptions
             {
                 tempformat[i] = str[i];
             }
-            if (str[i] == 0) { break; }
+            if (str[i] ==0) { break; }
         }
-        if (strcmp(tempformat, formatnormal) == 0)
+        if (strcmp(tempformat, formatnormal) ==0)
         {
-            strcat(codestring, ",");
-            strcat(codestring, str);
+            codestring += ",";
+            codestring += str;
             numcodes++;
-            if (codeformat < 0) codeformat = 0;
+            if (codeformat <0) codeformat =0;
         }
-        else if (strcmp(tempformat, formatoptionlb) == 0)
+        else if (strcmp(tempformat, formatoptionlb) ==0)
         {
-            if (codeformat != 2)
+            if (codeformat !=2)
             {
-                strcat(codestring, ",");
-                strcat(codestring, str);
+                codestring += ",";
+                codestring += str;
                 numcodes++;
-                codeformat = 1;
+                codeformat =1;
                 nooptions = false;
                 validoptions = false;
             }
@@ -1403,14 +1403,14 @@ stdstr CCheatsUI::ReadCodeString(HWND hDlg, bool &validcodes, bool &validoptions
                 validcodes = false;
             }
         }
-        else if (strcmp(tempformat, formatoptionw) == 0)
+        else if (strcmp(tempformat, formatoptionw) ==0)
         {
-            if (codeformat != 1)
+            if (codeformat !=1)
             {
-                strcat(codestring, ",");
-                strcat(codestring, str);
+                codestring += ",";
+                codestring += str;
                 numcodes++;
-                codeformat = 2;
+                codeformat =2;
                 nooptions = false;
                 validoptions = false;
             }
@@ -1424,11 +1424,11 @@ stdstr CCheatsUI::ReadCodeString(HWND hDlg, bool &validcodes, bool &validoptions
             validcodes = false;
         }
     }
-    if (strlen(codestring) == 0)
+    if (codestring.empty())
     {
         validcodes = false;
     }
-    return codestring;
+    return stdstr(codestring.c_str());
 }
 
 stdstr CCheatsUI::ReadOptionsString(HWND hDlg, bool &/*validcodes*/, bool &validoptions, bool &/*nooptions*/, int &codeformat)
