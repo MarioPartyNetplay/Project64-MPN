@@ -22,6 +22,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Project64 Core", "Source\Pr
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "png", "Source\3rdParty\png\png.vcxproj", "{17836496-31B0-46F2-B1B1-366D7DF6F04C}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cryptopp", "Source\3rdParty\cryptopp\cryptopp.vcxproj", "{A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "discord-rpc", "Source\3rdParty\discord-rpc\discord-rpc.vcxproj", "{DCC841B2-298A-40F0-84D1-ACBABD3B86E8}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Project64-Netplay", "Source\Project64-netplay\NetplayInputPlugin\NetplayInputPlugin.vcxproj", "{2A8BF4EB-CC43-4E52-AC79-792B2039EE9C}"
@@ -194,6 +196,22 @@ Global
 		{17836496-31B0-46F2-B1B1-366D7DF6F04C}.Release|Win32.Build.0 = Release|Win32
 		{17836496-31B0-46F2-B1B1-366D7DF6F04C}.Release|x64.ActiveCfg = Release|x64
 		{17836496-31B0-46F2-B1B1-366D7DF6F04C}.Release|x64.Build.0 = Release|x64
+		{A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D}.Debug (Server)|Win32.ActiveCfg = Debug|Win32
+		{A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D}.Debug (Server)|Win32.Build.0 = Debug|Win32
+		{A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D}.Debug (Server)|x64.ActiveCfg = Debug|x64
+		{A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D}.Debug (Server)|x64.Build.0 = Debug|x64
+		{A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D}.Debug|Win32.ActiveCfg = Debug|Win32
+		{A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D}.Debug|Win32.Build.0 = Debug|Win32
+		{A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D}.Debug|x64.ActiveCfg = Debug|x64
+		{A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D}.Debug|x64.Build.0 = Debug|x64
+		{A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D}.Release (Server)|Win32.ActiveCfg = Release|Win32
+		{A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D}.Release (Server)|Win32.Build.0 = Release|Win32
+		{A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D}.Release (Server)|x64.ActiveCfg = Release|x64
+		{A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D}.Release (Server)|x64.Build.0 = Release|x64
+		{A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D}.Release|Win32.ActiveCfg = Release|Win32
+		{A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D}.Release|Win32.Build.0 = Release|Win32
+		{A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D}.Release|x64.ActiveCfg = Release|x64
+		{A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D}.Release|x64.Build.0 = Release|x64
 		{DCC841B2-298A-40F0-84D1-ACBABD3B86E8}.Debug (Server)|Win32.ActiveCfg = Debug|Win32
 		{DCC841B2-298A-40F0-84D1-ACBABD3B86E8}.Debug (Server)|Win32.Build.0 = Debug|Win32
 		{DCC841B2-298A-40F0-84D1-ACBABD3B86E8}.Debug (Server)|x64.ActiveCfg = Debug|x64

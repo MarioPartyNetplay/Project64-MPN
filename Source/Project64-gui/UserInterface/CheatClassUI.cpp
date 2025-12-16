@@ -936,7 +936,7 @@ int CALLBACK CCheatsUI::ManageCheatsProc(HWND hDlg, uint32_t uMsg, uint32_t wPar
         GetWindowPlacement(hDlg, &WndPlac);
 
         SetWindowTextW(hDlg, wGS(CHEAT_TITLE).c_str());
-        _this->m_hSelectCheat = CreateDialogParamW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_CHEATS_LIST), hDlg, (DLGPROC)CheatListProc, (LPARAM)_this);
+        _this->m_hSelectCheat = CreateDialogParamW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_Cheats_List), hDlg, (DLGPROC)CheatListProc, (LPARAM)_this);
         SetWindowPos(_this->m_hSelectCheat, HWND_TOP, 5, 8, 0, 0, SWP_NOSIZE);
         ShowWindow(_this->m_hSelectCheat, SW_SHOW);
 
@@ -956,7 +956,7 @@ int CALLBACK CCheatsUI::ManageCheatsProc(HWND hDlg, uint32_t uMsg, uint32_t wPar
         }
         else
         {
-            _this->m_AddCheat = CreateDialogParamW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_CHEATS_ADD), hDlg, (DLGPROC)CheatAddProc, (LPARAM)_this);
+            _this->m_AddCheat = CreateDialogParamW(GetModuleHandle(NULL), MAKEINTRESOURCEW(IDD_Cheats_Add), hDlg, (DLGPROC)CheatAddProc, (LPARAM)_this);
             SetWindowPos(_this->m_AddCheat, HWND_TOP, (rc->right - rc->left) / 2, 8, 0, 0, SWP_NOSIZE);
             ShowWindow(_this->m_AddCheat, SW_HIDE);
 

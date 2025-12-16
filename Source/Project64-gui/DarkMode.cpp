@@ -48,11 +48,11 @@ void UAHDrawMenuNCBottomLine(HWND hWnd)
 }
 
 #ifndef NDEBUG
-static TCHAR __debug_buff[512];
+static wchar_t __debug_buff[512];
 #undef DBG_HWND
 #define DBG_HWND(x,y) \
         { \
-            swprintf_s(__debug_buff, 512, "%p", x); \
+            swprintf_s(__debug_buff, 512, L"%p", x); \
             std::wstringstream ss; \
             ss << " DBG_HWND(0x" << __debug_buff << ") " << L#y << " "; \
             GetWindowText(x, __debug_buff, 512); \
