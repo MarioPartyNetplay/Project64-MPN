@@ -13,6 +13,7 @@ RC = $(MINGW)-windres
 
 CXXFLAGS = -std=c++17 -flto -fvisibility=hidden -fno-PIC -O3 -isystem ../asio/asio/include -Wno-conversion-null
 CXXFLAGS += -DUNICODE -D_UNICODE -DASIO_STANDALONE
+CXXFLAGS_SERVER = $(CXXFLAGS) -DBUILD_SERVER
 LDFLAGS = -s -lws2_32 -lmswsock -static-libgcc -static-libstdc++ -static -lpthread -lqwave
 RCFLAGS = -O coff
 
@@ -49,6 +50,10 @@ $(PCH): $(HEADER) | $(BUILD_DIR)
 
 $(BUILD_DIR):
 	 mkdir -p $(BUILD_DIR)
+
+# Server-specific rule must come before generic rule to ensure BUILD_SERVER is used
+$(BUILD_DIR)/server.o: server.cpp $(PCH)
+	$(CXX) -include $(BUILD_DIR)/$(HEADER) $(CXXFLAGS_SERVER) -c -o $@ $<
 
 $(BUILD_DIR)/%.o:
 	$(CXX) -include $(BUILD_DIR)/$(HEADER) $(CXXFLAGS) -c -o $@ $<

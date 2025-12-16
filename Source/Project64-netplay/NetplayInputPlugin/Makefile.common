@@ -25,11 +25,18 @@ SERVER_SRC = \
 	common.cpp
 
 VERSION = version.h
-GIT_COUNT = $(shell git rev-list HEAD --count)
-GIT_COMMIT = $(shell git rev-parse --short HEAD)
-GIT_DIRTY = $(shell git status --short 2>/dev/null | grep -q '\S' && echo '-dirty')
+GIT_ROOT = $(shell git rev-parse --show-toplevel 2>/dev/null)
+GIT_COUNT = $(shell git rev-list HEAD --count 2>/dev/null || echo "0")
+GIT_COMMIT = $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+GIT_DIRTY = $(shell git status --short 2>/dev/null | grep -q '\S' && echo '-dirty' || echo '')
 
-$(VERSION): ../.git/index
-	echo '#define APP_NAME "$(APP_NAME)"' > $(VERSION)
-	echo '#define APP_VERSION "$(GIT_COUNT) ($(GIT_COMMIT)$(GIT_DIRTY))"' >> $(VERSION)
-	echo '#define APP_NAME_AND_VERSION "$(APP_NAME) v$(GIT_COUNT) ($(GIT_COMMIT)$(GIT_DIRTY))"' >> $(VERSION)
+# Generate version.h - use git info if available, otherwise use defaults
+$(VERSION):
+	@echo '#define APP_NAME "$(APP_NAME)"' > $(VERSION)
+	@echo '#define APP_VERSION "$(GIT_COUNT) ($(GIT_COMMIT)$(GIT_DIRTY))"' >> $(VERSION)
+	@echo '#define APP_NAME_AND_VERSION "$(APP_NAME) v$(GIT_COUNT) ($(GIT_COMMIT)$(GIT_DIRTY))"' >> $(VERSION)
+
+# Optional dependency on git index if git repo exists
+ifneq ($(GIT_ROOT),)
+$(VERSION): $(GIT_ROOT)/.git/index
+endif
