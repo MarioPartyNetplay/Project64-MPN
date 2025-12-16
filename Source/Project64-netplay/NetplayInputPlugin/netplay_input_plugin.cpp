@@ -30,6 +30,7 @@ static shared_ptr<settings> my_settings;
 static shared_ptr<input_plugin> my_plugin;
 static shared_ptr<client> my_client;
 static string my_location;
+static string my_input_location;
 static string my_project64_location;
 static string my_saves_location;
 static string my_plugins_location;
@@ -67,14 +68,21 @@ void load() {
     wcsrchr(my_location_array, L'\\')[1] = 0;
     my_location = wstring_to_utf8(my_location_array);
 
+    // Set input plugin location to ../Input/ relative to netplay plugin location
     my_plugins_location = get_parent_directory(wstring_to_utf8(my_location_array));
+    my_input_location = my_plugins_location;
+    if (!my_input_location.empty() && my_input_location.back() != '\\') {
+        my_input_location += "\\";
+    }
+    my_input_location += "Input\\";
+
     my_project64_location = get_parent_directory(my_plugins_location).append("\\");
     my_saves_location = my_project64_location.append("Save\\");
 
     my_settings = make_shared<settings>(my_location + "netplay.ini");
 
     try {
-        my_plugin = make_shared<input_plugin>(my_location + my_settings->get_plugin_dll());
+        my_plugin = make_shared<input_plugin>(my_input_location + my_settings->get_plugin_dll());
     } catch (const exception&) {
         my_plugin.reset();
     }
@@ -143,7 +151,7 @@ EXPORT void CALL DllConfig ( HWND hParent ) {
     } else {
         my_plugin.reset();
 
-        plugin_dialog dialog(this_dll, hParent, my_location, my_settings->get_plugin_dll(), control_info);
+        plugin_dialog dialog(this_dll, hParent, my_input_location, my_settings->get_plugin_dll(), control_info);
 
         if (dialog.ok_clicked()) {
             my_settings->set_plugin_dll(dialog.get_plugin_dll());
@@ -151,7 +159,7 @@ EXPORT void CALL DllConfig ( HWND hParent ) {
 
         if (!my_settings->get_plugin_dll().empty()) {
             try {
-                my_plugin = make_shared<input_plugin>(my_location + my_settings->get_plugin_dll());
+                my_plugin = make_shared<input_plugin>(my_input_location + my_settings->get_plugin_dll());
                 my_plugin->initiate_controllers(control_info);
             } catch (exception& e) {
                 MessageBox(hParent, utf8_to_wstring(e.what()).c_str(), L"Error", MB_OK | MB_ICONERROR);

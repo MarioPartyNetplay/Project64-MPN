@@ -1,29 +1,49 @@
 [2829657E-A0621877-C:45]
 Cheat0=1
-Cheat10=1
-Cheat21=1
-Cheat22=1
-Cheat33=1
-Cheat34=1
-Cheat37=1
+Cheat1=1
+Cheat10=0
+Cheat2=1
+Cheat21=0
+Cheat22=0
+Cheat3=1
+Cheat33=0
+Cheat34=0
+Cheat37=0
+Cheat38=0
+Cheat4=1
+Cheat5=1
+Cheat6=0
 Good Name=Mario Party (U)
 
 [9EA95858-AF72B618-C:45]
 Cheat0=1
-Cheat21=1
-Cheat24=1
-Cheat25=1
-Cheat26=1
-Cheat27=1
-Cheat36=1
-Cheat37=1
+Cheat1=1
+Cheat2=1
+Cheat21=0
+Cheat24=0
+Cheat25=0
+Cheat26=0
+Cheat27=0
+Cheat3=1
+Cheat36=0
+Cheat37=0
+Cheat4=1
+Cheat5=1
+Cheat6=1
+Cheat7=1
+Cheat8=1
 Good Name=Mario Party 2 (U)
 
 [7C3829D9-6E8247CE-C:45]
 Cheat0=1
 Cheat1=1
+Cheat2=1
+Cheat3=1
+Cheat4=1
 Cheat44=1
 Cheat45=1
+Cheat5=1
 Cheat53=1
 Cheat56=1
+Cheat6=1
 Good Name=Mario Party 3 (U)
