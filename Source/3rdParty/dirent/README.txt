@@ -1,9 +1,14 @@
 dirent Library Setup Instructions
 ==================================
 
-dirent is a single-header library that provides POSIX directory operations for Windows.
+This directory contains dirent as a git submodule pointing to:
+  https://github.com/tronkko/dirent.git
 
-The dirent.h header file is already included in this directory.
+To initialize the submodule:
+  git submodule update --init --recursive Source/3rdParty/dirent
 
-Source: https://github.com/tronkko/dirent
+After initialization, the dirent.h header file will be available at:
+  Source/3rdParty/dirent/include/dirent.h
 
+The include paths in NetplayInputPlugin.vcxproj are already configured to find
+dirent.h from this location. Use #include <dirent.h> in your code.

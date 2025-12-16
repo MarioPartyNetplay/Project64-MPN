@@ -6,7 +6,7 @@
 #include "util.h"
 #include "uri.h"
 
-#include <dirent/dirent.h>
+#include <dirent.h>
 #include <sha.h>
 #include <files.h>
 #include <filters.h>
