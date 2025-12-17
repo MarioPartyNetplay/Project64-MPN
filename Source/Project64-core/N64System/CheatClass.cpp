@@ -16,7 +16,12 @@
 #include <Project64-core/Plugins/AudioPlugin.h>
 #include <Project64-core/Plugins/RSPPlugin.h>
 #include <Project64-core/Plugins/ControllerPlugin.h>
+#include <Project64-core/N64System/Recompiler/RecompilerClass.h>
+#include <Project64-core/N64System/SystemGlobals.h>
 #include <stdlib.h>
+#include <string>
+#include <sstream>
+#include <map>
 
 CCheats::CCheats()
 {
@@ -173,6 +178,187 @@ void CCheats::LoadCheats(bool DisableSelected, CPlugins * Plugins)
     }
 }
 
+void CCheats::LoadCheatsFromData(const char * cheat_file_content, const char * enabled_file_content, const char * game_identifier, CPlugins * Plugins)
+{
+    m_Codes.clear();
+    LoadPermCheats(Plugins);
+
+    if (!cheat_file_content || !game_identifier)
+    {
+        return;
+    }
+
+    // Parse enabled file to get active cheat status
+    std::map<int, bool> active_cheats;
+    if (enabled_file_content)
+    {
+        std::istringstream enabled_stream(enabled_file_content);
+        std::string line;
+        std::string current_section;
+        
+        while (std::getline(enabled_stream, line))
+        {
+            // Remove carriage return if present
+            if (!line.empty() && line.back() == '\r')
+            {
+                line.pop_back();
+            }
+            
+            // Trim whitespace
+            size_t start = line.find_first_not_of(" \t");
+            if (start == std::string::npos)
+            {
+                continue;
+            }
+            size_t end = line.find_last_not_of(" \t");
+            line = line.substr(start, end - start + 1);
+            
+            // Check for section header
+            if (!line.empty() && line[0] == '[' && line.back() == ']')
+            {
+                current_section = line.substr(1, line.length() - 2);
+                continue;
+            }
+            
+            // Only process entries for the game identifier section
+            if (current_section != game_identifier)
+            {
+                continue;
+            }
+            
+            // Parse key=value
+            size_t eq_pos = line.find('=');
+            if (eq_pos == std::string::npos)
+            {
+                continue;
+            }
+            
+            std::string key = line.substr(0, eq_pos);
+            std::string value = line.substr(eq_pos + 1);
+            
+            // Check if it's a CheatN key
+            if (key.length() > 5 && key.substr(0, 5) == "Cheat")
+            {
+                int cheat_no = atoi(key.substr(5).c_str());
+                active_cheats[cheat_no] = (value == "1" || value == "true" || value == "True");
+            }
+        }
+    }
+
+    // Parse cheat file content
+    std::istringstream cheat_stream(cheat_file_content);
+    std::string line;
+    std::string current_section;
+    std::map<int, std::string> cheat_entries;
+    
+    while (std::getline(cheat_stream, line))
+    {
+        // Remove carriage return if present
+        if (!line.empty() && line.back() == '\r')
+        {
+            line.pop_back();
+        }
+        
+        // Trim whitespace
+        size_t start = line.find_first_not_of(" \t");
+        if (start == std::string::npos)
+        {
+            continue;
+        }
+        size_t end = line.find_last_not_of(" \t");
+        line = line.substr(start, end - start + 1);
+        
+        // Check for section header
+        if (!line.empty() && line[0] == '[' && line.back() == ']')
+        {
+            current_section = line.substr(1, line.length() - 2);
+            continue;
+        }
+        
+        // Only process entries for the game identifier section
+        if (current_section != game_identifier)
+        {
+            continue;
+        }
+        
+        // Parse key=value
+        size_t eq_pos = line.find('=');
+        if (eq_pos == std::string::npos)
+        {
+            continue;
+        }
+        
+        std::string key = line.substr(0, eq_pos);
+        std::string value = line.substr(eq_pos + 1);
+        
+        // Check if it's a CheatN key
+        if (key.length() > 5 && key.substr(0, 5) == "Cheat")
+        {
+            int cheat_no = atoi(key.substr(5).c_str());
+            cheat_entries[cheat_no] = value;
+        }
+    }
+
+    // Load active cheats
+    // If enabled_file_content is empty or no active cheats found, load all cheats (fallback)
+    bool load_all_cheats = (!enabled_file_content || (enabled_file_content[0] == '\0') || active_cheats.empty());
+    
+    for (const auto& entry : cheat_entries)
+    {
+        int cheat_no = entry.first;
+        
+        // Check if cheat is active
+        bool is_active = false;
+        if (!load_all_cheats)
+        {
+            auto active_it = active_cheats.find(cheat_no);
+            if (active_it != active_cheats.end())
+            {
+                is_active = active_it->second;
+            }
+        }
+        else
+        {
+            // Fallback: load all cheats if enabled file is empty or parsing failed
+            is_active = true;
+        }
+        
+        if (!is_active)
+        {
+            continue;
+        }
+        
+        // Parse the cheat entry: format is "Name" code1,code2,code3,...
+        std::string cheat_entry = entry.second;
+        
+        // Find the start and end of the name which is surrounded in ""
+        size_t start_of_name = cheat_entry.find("\"");
+        if (start_of_name == std::string::npos) { continue; }
+        size_t end_of_name = cheat_entry.find("\"", start_of_name + 1);
+        if (end_of_name == std::string::npos) { continue; }
+        
+        // Get the code part (after the closing quote and space)
+        size_t code_start = end_of_name + 1;
+        while (code_start < cheat_entry.length() && (cheat_entry[code_start] == ' ' || cheat_entry[code_start] == '\t'))
+        {
+            code_start++;
+        }
+        
+        std::string cheat_code = cheat_entry.substr(code_start);
+        
+        // Load the cheat code directly (use -1 for CheatNo since we're not using extensions)
+        if (LoadCode(-1, cheat_code.c_str()))
+        {
+            // Cheat loaded successfully
+        }
+        else
+        {
+            // Cheat failed to load (invalid code format or requires extension)
+            // This is OK - some cheats require extensions which we don't support for p2-4
+        }
+    }
+}
+
 /********************************************************************************************
 ConvertXP64Address
 
@@ -211,6 +397,25 @@ uint16_t ConvertXP64Value(uint16_t Value)
     return tmpValue;
 }
 
+// Helper function to invalidate recompiler cache after writing to memory
+static void InvalidateRecompilerCache(uint32_t VAddr)
+{
+    // Always invalidate recompiler cache when cheats write to memory
+    // This ensures the dynarec sees the updated values
+    if (g_Recompiler)
+    {
+        // ClearRecompCode_Virt handles virtual addresses directly
+        // Invalidate a 4KB page (0x1000 bytes) aligned to page boundary
+        // This ensures any recompiled code that reads from this address will be recompiled
+        // Use Remove_ProtectedMem reason to indicate this is a cheat/modification
+        try {
+            g_Recompiler->ClearRecompCode_Virt(VAddr & ~0xFFF, 0x1000, CRecompiler::Remove_ProtectedMem);
+        } catch (...) {
+            // Ignore errors - recompiler might not be active or address might be invalid
+        }
+    }
+}
+
 void CCheats::ApplyCheats(CMipsMemoryVM * MMU)
 {
     for (size_t CurrentCheat = 0; CurrentCheat < m_Codes.size(); CurrentCheat++)
@@ -236,19 +441,23 @@ void CCheats::ApplyGSButton(CMipsMemoryVM * MMU)
             case 0x88000000:
                 Address = 0x80000000 | (Code.Command & 0xFFFFFF);
                 MMU->SB_VAddr(Address, (uint8_t)Code.Value);
+                InvalidateRecompilerCache(Address);
                 break;
             case 0x89000000:
                 Address = 0x80000000 | (Code.Command & 0xFFFFFF);
                 MMU->SH_VAddr(Address, Code.Value);
+                InvalidateRecompilerCache(Address);
                 break;
                 // Xplorer64
             case 0xA8000000:
                 Address = 0x80000000 | (ConvertXP64Address(Code.Command) & 0xFFFFFF);
                 MMU->SB_VAddr(Address, (uint8_t)ConvertXP64Value(Code.Value));
+                InvalidateRecompilerCache(Address);
                 break;
             case 0xA9000000:
                 Address = 0x80000000 | (ConvertXP64Address(Code.Command) & 0xFFFFFF);
                 MMU->SH_VAddr(Address, ConvertXP64Value(Code.Value));
+                InvalidateRecompilerCache(Address);
                 break;
             }
         }
@@ -369,6 +578,7 @@ int CCheats::ApplyCheatEntry(CMipsMemoryVM * MMU, const CODES & CodeEntry, int C
             for (i = 0; i < numrepeats; i++)
             {
                 MMU->SB_VAddr(Address, (uint8_t)wMemory);
+                InvalidateRecompilerCache(Address);
                 Address += offset;
                 wMemory += (uint16_t)incr;
             }
@@ -380,6 +590,7 @@ int CCheats::ApplyCheatEntry(CMipsMemoryVM * MMU, const CODES & CodeEntry, int C
             for (i = 0; i < numrepeats; i++)
             {
                 MMU->SH_VAddr(Address, wMemory);
+                InvalidateRecompilerCache(Address);
                 Address += offset;
                 wMemory += (uint16_t)incr;
             }
@@ -390,19 +601,35 @@ int CCheats::ApplyCheatEntry(CMipsMemoryVM * MMU, const CODES & CodeEntry, int C
     break;
     case 0x80000000:
         Address = 0x80000000 | (Code.Command & 0xFFFFFF);
-        if (Execute) { MMU->SB_VAddr(Address, (uint8_t)Code.Value); }
+        if (Execute) 
+        { 
+            MMU->SB_VAddr(Address, (uint8_t)Code.Value);
+            InvalidateRecompilerCache(Address);
+        }
         break;
     case 0x81000000:
         Address = 0x80000000 | (Code.Command & 0xFFFFFF);
-        if (Execute) { MMU->SH_VAddr(Address, Code.Value); }
+        if (Execute) 
+        { 
+            MMU->SH_VAddr(Address, Code.Value);
+            InvalidateRecompilerCache(Address);
+        }
         break;
     case 0xA0000000:
         Address = 0xA0000000 | (Code.Command & 0xFFFFFF);
-        if (Execute) { MMU->SB_VAddr(Address, (uint8_t)Code.Value); }
+        if (Execute) 
+        { 
+            MMU->SB_VAddr(Address, (uint8_t)Code.Value);
+            InvalidateRecompilerCache(Address);
+        }
         break;
     case 0xA1000000:
         Address = 0xA0000000 | (Code.Command & 0xFFFFFF);
-        if (Execute) { MMU->SH_VAddr(Address, Code.Value); }
+        if (Execute) 
+        { 
+            MMU->SH_VAddr(Address, Code.Value);
+            InvalidateRecompilerCache(Address);
+        }
         break;
     case 0xD0000000:
         Address = 0x80000000 | (Code.Command & 0xFFFFFF);
@@ -430,29 +657,53 @@ int CCheats::ApplyCheatEntry(CMipsMemoryVM * MMU, const CODES & CodeEntry, int C
     case 0x82000000:
     case 0x84000000:
         Address = 0x80000000 | (Code.Command & 0xFFFFFF);
-        if (Execute) { MMU->SB_VAddr(Address, (uint8_t)Code.Value); }
+        if (Execute) 
+        { 
+            MMU->SB_VAddr(Address, (uint8_t)Code.Value);
+            InvalidateRecompilerCache(Address);
+        }
         break;
     case 0x31000000:
     case 0x83000000:
     case 0x85000000:
         Address = 0x80000000 | (Code.Command & 0xFFFFFF);
-        if (Execute) { MMU->SH_VAddr(Address, Code.Value); }
+        if (Execute) 
+        { 
+            MMU->SH_VAddr(Address, Code.Value);
+            InvalidateRecompilerCache(Address);
+        }
         break;
     case 0xE8000000:
         Address = 0x80000000 | (ConvertXP64Address(Code.Command) & 0xFFFFFF);
-        if (Execute) { MMU->SB_VAddr(Address, (uint8_t)ConvertXP64Value(Code.Value)); }
+        if (Execute) 
+        { 
+            MMU->SB_VAddr(Address, (uint8_t)ConvertXP64Value(Code.Value));
+            InvalidateRecompilerCache(Address);
+        }
         break;
     case 0xE9000000:
         Address = 0x80000000 | (ConvertXP64Address(Code.Command) & 0xFFFFFF);
-        if (Execute) { MMU->SH_VAddr(Address, ConvertXP64Value(Code.Value)); }
+        if (Execute) 
+        { 
+            MMU->SH_VAddr(Address, ConvertXP64Value(Code.Value));
+            InvalidateRecompilerCache(Address);
+        }
         break;
     case 0xC8000000:
         Address = 0xA0000000 | (ConvertXP64Address(Code.Command) & 0xFFFFFF);
-        if (Execute) { MMU->SB_VAddr(Address, (uint8_t)Code.Value); }
+        if (Execute) 
+        { 
+            MMU->SB_VAddr(Address, (uint8_t)Code.Value);
+            InvalidateRecompilerCache(Address);
+        }
         break;
     case 0xC9000000:
         Address = 0xA0000000 | (ConvertXP64Address(Code.Command) & 0xFFFFFF);
-        if (Execute) { MMU->SH_VAddr(Address, ConvertXP64Value(Code.Value)); }
+        if (Execute) 
+        { 
+            MMU->SH_VAddr(Address, ConvertXP64Value(Code.Value));
+            InvalidateRecompilerCache(Address);
+        }
         break;
     case 0xB8000000:
         Address = 0x80000000 | (ConvertXP64Address(Code.Command) & 0xFFFFFF);

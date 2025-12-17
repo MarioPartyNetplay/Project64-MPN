@@ -95,7 +95,8 @@ bool CSettingTypeCheatsEnabled::Load(int Index, uint32_t & Value) const
         Value = m_DefaultValue ? 1 : 0;
         return false;
     }
-    stdstr_f Key("Cheat%d%s", Index, m_PostFix);
+    // Use CheatN_ENABLED format in .cht file instead of separate .cht_enabled file
+    stdstr_f Key("Cheat%d_K%s", Index, m_PostFix);
     return m_EnabledIniFile->GetNumber(m_SectionIdent->c_str(), Key.c_str(), m_DefaultValue ? 1 : 0, Value);
 }
 

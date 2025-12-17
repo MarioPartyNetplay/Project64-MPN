@@ -65,5 +65,25 @@ extern uint8_t      ** g_RecompPos;
 // Export from main executable so plugin can use GetProcAddress
 extern "C" __declspec(dllexport) bool SaveStateToFileForNetplay(const char * FilePath);
 
+// Function to close cheat file handle (for netplay cheat syncing)
+// Export from main executable so plugin can use GetProcAddress
+extern "C" __declspec(dllexport) void CloseCheatFileForNetplay(void);
+
+// Function to trigger cheat reload (for netplay cheat syncing)
+// Export from main executable so plugin can use GetProcAddress
+extern "C" __declspec(dllexport) void TriggerCheatReloadForNetplay(void);
+
+// Function to trigger force cheat reload - completely clears cache and forces full file re-scan
+// Export from main executable so plugin can use GetProcAddress
+extern "C" __declspec(dllexport) void TriggerForceCheatReloadForNetplay(void);
+
+// Function to trigger soft reset (for netplay cheat syncing)
+// Export from main executable so plugin can use GetProcAddress
+extern "C" __declspec(dllexport) void TriggerSoftResetForNetplay(void);
+
+// Function to apply cheats directly to memory from cheat data (for p2-4 netplay clients)
+// Export from main executable so plugin can use GetProcAddress
+extern "C" __declspec(dllexport) void ApplyCheatsDirectlyForNetplay(const char * cheat_file_content, const char * enabled_file_content, const char * game_identifier);
+
 class CMempak;
 extern CMempak       * g_Mempak;

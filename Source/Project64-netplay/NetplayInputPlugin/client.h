@@ -25,16 +25,12 @@ class client: public service_wrapper, public connection {
         void set_save_info(const std::string& save_path);
         void process_input(std::array<BUTTONS, 4>& input);
         bool wait_until_start();
+        bool has_started() const; // Check if game has started without blocking
         void post_close();
         void revert_save_data();
         void move_original_saves_to_temp();
         void ensure_save_directories();
         void restore_leftover_backups();
-        void restore_leftover_cheat_backups();
-        void backup_cheat_files();
-        void restore_cheat_files();
-        void move_original_cheats_to_temp();
-        void revert_cheat_data();
         std::string get_config_path() const;
         client_dialog& get_dialog();
         virtual void on_receive(packet& packet, bool udp);

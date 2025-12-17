@@ -28,6 +28,7 @@ public:
     void ApplyCheats(CMipsMemoryVM * MMU);
     void ApplyGSButton(CMipsMemoryVM * MMU);
     void LoadCheats(bool DisableSelected, CPlugins * Plugins);
+    void LoadCheatsFromData(const char * cheat_file_content, const char * enabled_file_content, const char * game_identifier, CPlugins * Plugins);
 
     static bool IsValid16BitCode(const char * CheatString);
 

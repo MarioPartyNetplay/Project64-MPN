@@ -47,6 +47,9 @@ public:
     static void Initialize   ( void );
     static void CleanUp      ( void );
     static void FlushChanges ( void );
+    static void ReloadCheatFile ( void );
+    static void CloseCheatFile ( void ); // Close file handle to allow external writes
+    static void ForceReloadCheatFile ( void ); // Aggressive reload: clear all caches and force full re-scan
 
 protected:
     static CIniFile * m_CheatIniFile;

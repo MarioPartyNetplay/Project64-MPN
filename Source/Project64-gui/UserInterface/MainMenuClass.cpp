@@ -933,7 +933,19 @@ void CMainMenu::FillOutMenu(HMENU hMenu)
     OptionMenu.push_back(Item);
 
     OptionMenu.push_back(MENU_ITEM(SPLITER));
-    OptionMenu.push_back(MENU_ITEM(ID_SYSTEM_CHEAT, MENU_CHEAT, m_ShortCuts.ShortCutString(ID_SYSTEM_CHEAT, AccessLevel)));
+    Item.Reset(ID_SYSTEM_CHEAT, MENU_CHEAT, m_ShortCuts.ShortCutString(ID_SYSTEM_CHEAT, AccessLevel));
+    // Disable cheats menu when netplay is active (cheats are synced from host)
+    if (CPURunning && g_Plugins && g_Plugins->Control())
+    {
+        // Check if netplay plugin is active
+        const char* pluginName = g_Plugins->Control()->PluginName();
+        bool isNetplayActive = (pluginName != NULL && strstr(pluginName, "NetPlay") != NULL);
+        if (isNetplayActive)
+        {
+            Item.SetItemEnabled(false);
+        }
+    }
+    OptionMenu.push_back(Item);
     OptionMenu.push_back(MENU_ITEM(SPLITER));
     if (!inBasicMode)
     {

@@ -126,41 +126,52 @@ void user::on_receive(packet& p, bool udp) {
             break;
         }
 
+        // Cheat syncing disabled for now
+        /*
         case CHEAT_SYNC: {
             // Forward cheat sync to all other users in the room
+            std::string cheat_file_content = "";
+            std::string enabled_file_content = "";
+            
+            // Try to read both strings, but don't let exceptions escape
             try {
-                // Read the entire .cht file content
-                std::string cheat_file_content = "";
                 if (p.available() > 0) {
                     cheat_file_content = p.read<std::string>();
                 }
-                
-                // Read the entire .cht_enabled file content
-                std::string enabled_file_content = "";
+            } catch (...) {
+                cheat_file_content = "";
+            }
+            
+            try {
                 if (p.available() > 0) {
                     enabled_file_content = p.read<std::string>();
                 }
-                
+            } catch (...) {
+                enabled_file_content = "";
+            }
+            
+            // Always forward, even if both are empty (to clear client cheats)
+            try {
                 packet cheat_packet;
                 cheat_packet << CHEAT_SYNC;
-                // Forward the entire .cht file content
                 cheat_packet << cheat_file_content;
-                // Forward the entire .cht_enabled file content
                 cheat_packet << enabled_file_content;
 
                 log("[" + my_room->get_id() + "] Forwarding cheat sync");
 
-                // Send to all other users
+                // Send to all other users (if any)
                 for (auto& user : my_room->user_list) {
                     if (user->id != id) {
                         user->send(cheat_packet);
                     }
                 }
-            } catch (const std::exception& e) {
-                log("[" + my_room->get_id() + "] Error forwarding cheat sync: " + std::string(e.what()));
+            } catch (...) {
+                // If forwarding fails, just log and continue - don't disconnect
+                log("[" + my_room->get_id() + "] Error forwarding cheat sync packet");
             }
             break;
         }
+        */
 
         case ROOM_CHECK: {
             my_room->send_info("Rechecking all room checks");

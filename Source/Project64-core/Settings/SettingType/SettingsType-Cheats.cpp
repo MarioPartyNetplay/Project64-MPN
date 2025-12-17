@@ -138,3 +138,27 @@ void CSettingTypeCheats::Delete ( int Index )
     stdstr_f Key("Cheat%d%s",Index,m_PostFix);
     m_CheatIniFile->SaveString(m_SectionIdent->c_str(),Key.c_str(),NULL);
 }
+
+void CSettingTypeCheats::CloseCheatFile ( void )
+{
+    if (m_CheatIniFile == NULL) { return; }
+    
+    // Close the file handle to allow external writes
+    m_CheatIniFile->CloseFile();
+}
+
+void CSettingTypeCheats::ReloadCheatFile ( void )
+{
+    if (m_CheatIniFile == NULL) { return; }
+    
+    // Force reload by closing and reopening the file, clearing the cache
+    m_CheatIniFile->ReloadFile();
+}
+
+void CSettingTypeCheats::ForceReloadCheatFile ( void )
+{
+    if (m_CheatIniFile == NULL) { return; }
+    
+    // Aggressive reload: clear all caches and force complete file re-scan
+    m_CheatIniFile->ForceReloadFile();
+}

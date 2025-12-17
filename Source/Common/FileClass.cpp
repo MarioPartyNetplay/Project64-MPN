@@ -91,7 +91,7 @@ bool CFile::Open(const char * lpszFileName, uint32_t nOpenFlags)
     // map share mode
     ULONG dwShareMode = 0;
 
-    dwShareMode = FILE_SHARE_READ | FILE_SHARE_WRITE;
+    dwShareMode = FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE;
     if ((nOpenFlags & shareDenyWrite) == shareDenyWrite) { dwShareMode &= ~FILE_SHARE_WRITE; }
     if ((nOpenFlags & shareDenyRead) == shareDenyRead)   { dwShareMode &= ~FILE_SHARE_READ; }
     if ((nOpenFlags & shareExclusive) == shareExclusive) { dwShareMode = 0; }

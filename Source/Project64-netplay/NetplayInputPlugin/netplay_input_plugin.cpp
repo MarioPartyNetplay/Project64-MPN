@@ -23,6 +23,7 @@ extern "C" {
 
 static bool loaded = false;
 static bool rom_open = false;
+static bool plugin_opened = false; // Track if plugin has been opened (delayed for netplay)
 static HMODULE this_dll = NULL;
 static CONTROL_INFO control_info = { NULL, NULL, FALSE, NULL, NULL };
 static bool controllers_initiated = false;
@@ -194,10 +195,32 @@ EXPORT void CALL GetKeys(int Control, BUTTONS* Keys) {
         return;
     }
 
-    if (my_client->wait_until_start()) {
-        if (!my_plugin) {
+    // Wait for game to start, and open plugin if it hasn't been opened yet
+    bool just_started = my_client->wait_until_start();
+    
+    if (just_started && !plugin_opened && my_plugin) {
+        // Game just started, now open the plugin (cheats should be synced by now)
+        my_plugin->RomOpen();
+        plugin_opened = true;
+        
+        // Reload cheats to ensure they're loaded
+        HMODULE hModule = GetModuleHandle(NULL);
+        if (hModule) {
+            typedef void(__cdecl* TriggerCheatReloadFunc)(void);
+            TriggerCheatReloadFunc triggerCheatReload = (TriggerCheatReloadFunc)GetProcAddress(hModule, "TriggerCheatReloadForNetplay");
+            if (triggerCheatReload) {
+                triggerCheatReload();
+            }
+        }
+        
+        my_client->set_src_controllers(my_plugin->controls);
+    }
+    
+    if (!my_plugin) {
+        if (just_started) {
             my_client->get_dialog().error("No base input plugin");
         }
+        return;
     }
 
     if (my_plugin && port_already_visited[Control]) {
@@ -263,12 +286,12 @@ EXPORT void CALL RomClosed (void) {
         my_settings->set_name(my_client->get_name());
         my_client->post_close();
         my_client->revert_save_data();
-        my_client->revert_cheat_data();
         my_client.reset();
     }
 
-    if (my_plugin) {
+    if (my_plugin && plugin_opened) {
         my_plugin->RomClosed();
+        plugin_opened = false;
     }
 
     rom_open = false;
@@ -280,6 +303,7 @@ EXPORT void CALL RomOpen(void) {
     assert(control_info.hMainWindow);
 
     rom_open = true;
+    plugin_opened = false; // Reset flag
 
     if (!my_plugin) {
         DllConfig(control_info.hMainWindow);
@@ -298,8 +322,16 @@ EXPORT void CALL RomOpen(void) {
         my_client->load_public_server_list();
         my_client->get_external_address();
 
-        my_plugin->RomOpen();
-        my_client->set_src_controllers(my_plugin->controls);
+        // Delay plugin RomOpen() until game starts (so cheats are synced first)
+        // If not in netplay or game already started, open immediately
+        // Otherwise, plugin will be opened in GetKeys() when game starts (after cheat sync)
+        if (!my_client->is_open() || my_client->has_started()) {
+            // Not in netplay or game already started, open immediately
+            my_plugin->RomOpen();
+            plugin_opened = true;
+            my_client->set_src_controllers(my_plugin->controls);
+        }
+        // Otherwise, plugin will be opened when game starts in GetKeys() (after cheat sync)
     }
 
     port_already_visited.fill(true);
