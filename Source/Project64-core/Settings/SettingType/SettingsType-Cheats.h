@@ -55,7 +55,11 @@ protected:
     static CIniFile * m_CheatIniFile;
     static stdstr   * m_SectionIdent;
     const char * const m_PostFix;
+    static stdstr GetGameSpecificCheatFilePath(const stdstr& extension);
     static void GameChanged ( void * /*Data */ );
+
+public:
+    static stdstr SanitizeRomNameForFilename(const stdstr& romName);
 
 private:
     CSettingTypeCheats(void);                                   // Disable default constructor

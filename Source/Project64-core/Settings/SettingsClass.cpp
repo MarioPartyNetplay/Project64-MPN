@@ -93,19 +93,19 @@ void CSettings::AddHowToHandleSetting(const char * BaseDirectory)
 
     //Support Files
     AddHandler(SupportFile_Settings, new CSettingTypeApplicationPath("", "ConfigFile", SupportFile_SettingsDefault));
-    AddHandler(SupportFile_SettingsDefault, new CSettingTypeRelativePath("Config", "Project64.cfg"));
+    AddHandler(SupportFile_SettingsDefault, new CSettingTypeRelativePath("User", "Project64.cfg"));
     AddHandler(SupportFile_RomDatabase, new CSettingTypeApplicationPath("", "RomDatabase", SupportFile_RomDatabaseDefault));
-    AddHandler(SupportFile_RomDatabaseDefault, new CSettingTypeRelativePath("Config", "Project64.rdb"));
+    AddHandler(SupportFile_RomDatabaseDefault, new CSettingTypeRelativePath("User", "Project64.rdb"));
     AddHandler(SupportFile_Glide64RDB, new CSettingTypeApplicationPath("", "Glide64RDB", SupportFile_Glide64RDBDefault));
-    AddHandler(SupportFile_Glide64RDBDefault, new CSettingTypeRelativePath("Config", "Glide64.rdb"));
+    AddHandler(SupportFile_Glide64RDBDefault, new CSettingTypeRelativePath("User", "Glide64.rdb"));
     AddHandler(SupportFile_Cheats, new CSettingTypeApplicationPath("", "Cheats", SupportFile_CheatsDefault));
-    AddHandler(SupportFile_CheatsDefault, new CSettingTypeRelativePath("Config", "Project64.cht"));
+    AddHandler(SupportFile_CheatsDefault, new CSettingTypeRelativePath("User/Cheats", "Project64.cht"));
     AddHandler(SupportFile_CheatsEnabled, new CSettingTypeApplicationPath("", "CheatsEnabled", SupportFile_CheatsEnabledDefault));
-    AddHandler(SupportFile_CheatsEnabledDefault, new CSettingTypeRelativePath("Config", "Project64.cht_enabled"));
+    AddHandler(SupportFile_CheatsEnabledDefault, new CSettingTypeRelativePath("User/Cheats", "Project64.cht_enabled"));
     AddHandler(SupportFile_Notes, new CSettingTypeApplicationPath("", "Notes", SupportFile_NotesDefault));
-    AddHandler(SupportFile_NotesDefault, new CSettingTypeRelativePath("Config", "Project64.rdn"));
+    AddHandler(SupportFile_NotesDefault, new CSettingTypeRelativePath("User", "Project64.rdn"));
     AddHandler(SupportFile_ExtInfo, new CSettingTypeApplicationPath("", "ExtInfo", SupportFile_ExtInfoDefault));
-    AddHandler(SupportFile_ExtInfoDefault, new CSettingTypeRelativePath("Config", "Project64.rdx"));
+    AddHandler(SupportFile_ExtInfoDefault, new CSettingTypeRelativePath("User", "Project64.rdx"));
 
     //Settings location
     AddHandler(Setting_ApplicationName, new CSettingTypeTempString(""));
@@ -260,31 +260,31 @@ void CSettings::AddHowToHandleSetting(const char * BaseDirectory)
     AddHandler(Directory_PluginSync, new CSettingTypeSelectedDirectory("Dir:SyncPlugin", Directory_PluginSyncInitial, Directory_PluginSyncSelected, Directory_PluginSyncUseSelected, Directory_PluginSync));
 
     AddHandler(Directory_SnapShot, new CSettingTypeSelectedDirectory("Dir:Snapshot", Directory_SnapShotInitial, Directory_SnapShotSelected, Directory_SnapShotUseSelected, Directory_SnapShot));
-    AddHandler(Directory_SnapShotInitial, new CSettingTypeRelativePath("Screenshots", ""));
+    AddHandler(Directory_SnapShotInitial, new CSettingTypeRelativePath("User/Screenshots", ""));
     AddHandler(Directory_SnapShotSelected, new CSettingTypeApplicationPath("Snap Shot Directory", "Directory", Directory_SnapShotInitial));
     AddHandler(Directory_SnapShotUseSelected, new CSettingTypeApplication("Snap Shot Directory", "Use Selected", false));
 
     AddHandler(Directory_NativeSave, new CSettingTypeSelectedDirectory("Dir:NativeSave", Directory_NativeSaveInitial, Directory_NativeSaveSelected, Directory_NativeSaveUseSelected, Directory_NativeSave));
-    AddHandler(Directory_NativeSaveInitial, new CSettingTypeRelativePath("Save", ""));
+    AddHandler(Directory_NativeSaveInitial, new CSettingTypeRelativePath("User/Save", ""));
     AddHandler(Directory_NativeSaveSelected, new CSettingTypeApplicationPath("Native Save Directory", "Directory", Directory_NativeSaveInitial));
     AddHandler(Directory_NativeSaveUseSelected, new CSettingTypeApplication("Native Save Directory", "Use Selected", false));
 
     AddHandler(Directory_InstantSave, new CSettingTypeSelectedDirectory("Dir:InstantSave", Directory_InstantSaveInitial, Directory_InstantSaveSelected, Directory_InstantSaveUseSelected, Directory_InstantSave));
-    AddHandler(Directory_InstantSaveInitial, new CSettingTypeRelativePath("Save", ""));
+    AddHandler(Directory_InstantSaveInitial, new CSettingTypeRelativePath("User/Save", ""));
     AddHandler(Directory_InstantSaveSelected, new CSettingTypeApplicationPath("Instant Save Directory", "Directory", Directory_InstantSaveInitial));
     AddHandler(Directory_InstantSaveUseSelected, new CSettingTypeApplication("Instant Save Directory", "Use Selected", false));
 
     AddHandler(Directory_Texture, new CSettingTypeSelectedDirectory("Dir:Texture", Directory_TextureInitial, Directory_TextureSelected, Directory_TextureUseSelected, Directory_Texture));
-    AddHandler(Directory_TextureInitial, new CSettingTypeRelativePath("Textures", ""));
+    AddHandler(Directory_TextureInitial, new CSettingTypeRelativePath("User/Textures", ""));
     AddHandler(Directory_TextureSelected, new CSettingTypeApplicationPath("Texture Directory", "Directory", Directory_InstantSaveInitial));
     AddHandler(Directory_TextureUseSelected, new CSettingTypeApplication("Texture Directory", "Use Selected", false));
 
     AddHandler(Directory_Log, new CSettingTypeSelectedDirectory("Dir:Log", Directory_LogInitial, Directory_LogSelected, Directory_LogUseSelected, Directory_Log));
-    AddHandler(Directory_LogInitial, new CSettingTypeRelativePath("Logs", ""));
+    AddHandler(Directory_LogInitial, new CSettingTypeRelativePath("User/Logs", ""));
     AddHandler(Directory_LogSelected, new CSettingTypeApplicationPath("Log Directory", "Directory", Directory_InstantSaveInitial));
     AddHandler(Directory_LogUseSelected, new CSettingTypeApplication("Log Directory", "Use Selected", false));
 
-    AddHandler(RomList_RomListCacheDefault, new CSettingTypeRelativePath("Config", "Project64.cache3"));
+    AddHandler(RomList_RomListCacheDefault, new CSettingTypeRelativePath("User/Cache", "Project64.cache3"));
     AddHandler(RomList_RomListCache, new CSettingTypeApplicationPath("", "RomListCache", RomList_RomListCacheDefault));
     AddHandler(RomList_GameDir, new CSettingTypeSelectedDirectory("Dir:Game", RomList_GameDirInitial, RomList_GameDirSelected, RomList_GameDirUseSelected, RomList_GameDir));
     AddHandler(RomList_GameDirInitial, new CSettingTypeRelativePath("Game Directory", ""));
@@ -292,7 +292,7 @@ void CSettings::AddHowToHandleSetting(const char * BaseDirectory)
     AddHandler(RomList_GameDirUseSelected, new CSettingTypeApplication("Game Directory", "Use Selected", false));
     AddHandler(RomList_GameDirRecursive, new CSettingTypeApplication("Game Directory", "Recursive", false));
     AddHandler(RomList_7zipCache, new CSettingTypeApplicationPath("", "7zipCache", RomList_7zipCacheDefault));
-    AddHandler(RomList_7zipCacheDefault, new CSettingTypeRelativePath("Config", "Project64.zcache"));
+    AddHandler(RomList_7zipCacheDefault, new CSettingTypeRelativePath("User/Cache", "Project64.zcache"));
 
     AddHandler(GameRunning_LoadingInProgress, new CSettingTypeTempBool(false));
     AddHandler(GameRunning_CPU_Running, new CSettingTypeTempBool(false));

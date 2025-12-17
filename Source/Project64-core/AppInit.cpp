@@ -287,7 +287,7 @@ void FixDirectories(void)
 {
     WriteTrace(TraceAppInit, TraceDebug, "Starting");
     CPath Directory(g_Settings->LoadStringVal(Cmd_BaseDirectory).c_str(), "");
-    Directory.AppendDirectory("Config");
+    Directory.AppendDirectory("User/Config");
     if (!Directory.DirectoryExists())
     {
         WriteTrace(TraceAppInit, TraceDebug, "Creating %s", (const char *)Directory);
@@ -299,7 +299,7 @@ void FixDirectories(void)
     }
 
     Directory.UpDirectory();
-    Directory.AppendDirectory("Save");
+    Directory.AppendDirectory("User/Save");
     if (!Directory.DirectoryExists())
     {
         WriteTrace(TraceAppInit, TraceDebug, "Creating %s", (const char *)Directory);
@@ -311,7 +311,20 @@ void FixDirectories(void)
     }
 
     Directory.UpDirectory();
-    Directory.AppendDirectory("Screenshots");
+    Directory.AppendDirectory("User/Config");
+    if (!Directory.DirectoryExists())
+    {
+        WriteTrace(TraceAppInit, TraceDebug, "Creating %s", (const char *)Directory);
+        Directory.DirectoryCreate();
+    }
+    else
+    {
+        WriteTrace(TraceAppInit, TraceDebug, "%s already exists", (const char *)Directory);
+    }
+
+
+    Directory.UpDirectory();
+    Directory.AppendDirectory("User/Screenshots");
     if (!Directory.DirectoryExists())
     {
         WriteTrace(TraceAppInit, TraceDebug, "Creating %s", (const char *)Directory);
@@ -323,7 +336,7 @@ void FixDirectories(void)
     }
 
     Directory.UpDirectory();
-    Directory.AppendDirectory("Textures");
+    Directory.AppendDirectory("User/Textures");
     if (!Directory.DirectoryExists())
     {
         WriteTrace(TraceAppInit, TraceDebug, "Creating %s", (const char *)Directory);

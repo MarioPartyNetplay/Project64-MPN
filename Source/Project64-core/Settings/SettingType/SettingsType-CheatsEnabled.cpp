@@ -10,6 +10,10 @@
 ****************************************************************************/
 #include "stdafx.h"
 #include "SettingsType-CheatsEnabled.h"
+#include "SettingsType-Cheats.h"
+#include <Common/path.h>
+#include <algorithm>
+#include <cctype>
 
 CIniFile * CSettingTypeCheatsEnabled::m_EnabledIniFile = NULL;
 stdstr   * CSettingTypeCheatsEnabled::m_SectionIdent = NULL;
@@ -24,12 +28,68 @@ CSettingTypeCheatsEnabled::~CSettingTypeCheatsEnabled(void)
 {
 }
 
+stdstr CSettingTypeCheatsEnabled::GetGameSpecificCheatEnabledFilePath(void)
+{
+    stdstr romName = g_Settings->LoadStringVal(Game_GameName);
+    stdstr cheatFileName;
+    
+    if (!romName.empty())
+    {
+        stdstr sanitized = CSettingTypeCheats::SanitizeRomNameForFilename(romName);
+        if (!sanitized.empty() && sanitized != "Unknown")
+        {
+            cheatFileName = sanitized + ".cht";
+        }
+    }
+    
+    // If we still don't have a valid filename, try game identifier
+    if (cheatFileName.empty())
+    {
+        stdstr gameId = g_Settings->LoadStringVal(Game_IniKey);
+        if (!gameId.empty())
+        {
+            // Sanitize gameId as well to ensure it's safe for filenames
+            stdstr sanitizedGameId = CSettingTypeCheats::SanitizeRomNameForFilename(gameId);
+            if (!sanitizedGameId.empty() && sanitizedGameId != "Unknown")
+            {
+                cheatFileName = sanitizedGameId + ".cht";
+            }
+        }
+    }
+    
+    // Final fallback if both are empty or invalid
+    if (cheatFileName.empty() || cheatFileName == ".cht")
+    {
+        cheatFileName = "Unknown.cht";
+    }
+    
+    // Get base directory and construct full path in User/Cheats/ subdirectory
+    CPath BaseDir(g_Settings->LoadStringVal(Cmd_BaseDirectory).c_str(), "");
+    CPath CheatFile(BaseDir);
+    CheatFile.AppendDirectory("User");
+    CheatFile.AppendDirectory("Cheats");
+    CheatFile.SetNameExtension(cheatFileName.c_str());
+    
+    // Ensure the Cheats directory exists
+    if (!CheatFile.DirectoryExists())
+    {
+        CheatFile.DirectoryCreate();
+    }
+    
+    return (const std::string &)CheatFile;
+}
+
 void CSettingTypeCheatsEnabled::Initialize(void)
 {
     WriteTrace(TraceAppInit, TraceDebug, "Start");
-    m_EnabledIniFile = new CIniFile(g_Settings->LoadStringVal(SupportFile_CheatsEnabled).c_str());
+    
+    // Use game-specific cheat enabled file path
+    stdstr enabledFilePath = GetGameSpecificCheatEnabledFilePath();
+    m_EnabledIniFile = new CIniFile(enabledFilePath.c_str());
     m_EnabledIniFile->SetAutoFlush(false);
+    
     g_Settings->RegisterChangeCB(Game_IniKey, NULL, GameChanged);
+    g_Settings->RegisterChangeCB(Game_GameName, NULL, GameChanged);
     m_SectionIdent = new stdstr(g_Settings->LoadStringVal(Game_IniKey));
     GameChanged(NULL);
     WriteTrace(TraceAppInit, TraceDebug, "Done");
@@ -37,6 +97,9 @@ void CSettingTypeCheatsEnabled::Initialize(void)
 
 void CSettingTypeCheatsEnabled::CleanUp(void)
 {
+    g_Settings->UnregisterChangeCB(Game_GameName, NULL, GameChanged);
+    g_Settings->UnregisterChangeCB(Game_IniKey, NULL, GameChanged);
+    
     if (m_EnabledIniFile)
     {
         m_EnabledIniFile->SetAutoFlush(true);
@@ -60,7 +123,39 @@ void CSettingTypeCheatsEnabled::FlushChanges(void)
 
 void CSettingTypeCheatsEnabled::GameChanged(void * /*Data */)
 {
+    if (m_EnabledIniFile == NULL) return;
+    
+    // Update section identifier
     *m_SectionIdent = g_Settings->LoadStringVal(Game_IniKey);
+    
+    // Get new game-specific cheat enabled file path
+    stdstr newEnabledFilePath = GetGameSpecificCheatEnabledFilePath();
+    stdstr currentEnabledFilePath = m_EnabledIniFile->GetFileName();
+    
+    // Normalize paths for comparison (convert to lowercase and normalize separators)
+    stdstr currentLower = currentEnabledFilePath;
+    stdstr newLower = newEnabledFilePath;
+    std::transform(currentLower.begin(), currentLower.end(), currentLower.begin(), ::tolower);
+    std::transform(newLower.begin(), newLower.end(), newLower.begin(), ::tolower);
+    
+    // Replace backslashes with forward slashes for comparison
+    std::replace(currentLower.begin(), currentLower.end(), '\\', '/');
+    std::replace(newLower.begin(), newLower.end(), '\\', '/');
+    
+    // If the file path changed, close old file and open new one
+    if (currentLower != newLower)
+    {
+        WriteTrace(TraceAppInit, TraceDebug, "Switching cheat enabled file from %s to %s", currentEnabledFilePath.c_str(), newEnabledFilePath.c_str());
+        
+        // Flush and close old file
+        m_EnabledIniFile->SetAutoFlush(true);
+        m_EnabledIniFile->FlushChanges();
+        delete m_EnabledIniFile;
+        
+        // Open new game-specific file
+        m_EnabledIniFile = new CIniFile(newEnabledFilePath.c_str());
+        m_EnabledIniFile->SetAutoFlush(false);
+    }
 }
 
 bool CSettingTypeCheatsEnabled::IsSettingSet(void) const

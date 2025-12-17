@@ -53,6 +53,7 @@ protected:
     static stdstr   * m_SectionIdent;
     const char * const m_PostFix;
     const bool m_DefaultValue;
+    static stdstr GetGameSpecificCheatEnabledFilePath(void);
     static void GameChanged ( void * /*Data */ );
 
 private:

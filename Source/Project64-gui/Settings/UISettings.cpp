@@ -25,7 +25,7 @@ void RegisterUISettings (void)
 
     //Support Files
     g_Settings->AddHandler((SettingID)(FirstUISettings + SupportFile_ShortCuts), new CSettingTypeApplicationPath("", "ShortCuts", (SettingID)(FirstUISettings + SupportFile_ShortCutsDefault)));
-    g_Settings->AddHandler((SettingID)(FirstUISettings + SupportFile_ShortCutsDefault), new CSettingTypeRelativePath("Config", "Project64.sc3"));
+    g_Settings->AddHandler((SettingID)(FirstUISettings + SupportFile_ShortCutsDefault), new CSettingTypeRelativePath("User/Config", "Project64.sc3"));
 
     //Settings location
     g_Settings->AddHandler((SettingID)(FirstUISettings + Setting_PluginPageFirst), new CSettingTypeApplication("", "Plugin Page First", false));
