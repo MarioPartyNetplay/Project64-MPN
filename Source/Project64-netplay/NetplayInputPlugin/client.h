@@ -105,9 +105,12 @@ class client: public service_wrapper, public connection {
         void update_save_info();
         void compare_all_players_save_hashes();
         void compare_all_players_cheat_file_hashes();
+        void compare_all_players_state_hashes();
+        void update_state_hash();
         std::vector<std::string> find_rom_save_files(const std::string& path);
         std::string sha1_save_info(const save_info& saveInfo);
         std::string calculate_cheat_file_hash();
+        std::string calculate_state_hash();
         std::string slurp(const std::string& file);
         std::string slurp2(const std::string& file);
         bool replace_save_file(const save_info& save_data);

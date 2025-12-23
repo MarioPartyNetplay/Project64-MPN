@@ -85,5 +85,11 @@ extern "C" __declspec(dllexport) void TriggerSoftResetForNetplay(void);
 // Export from main executable so plugin can use GetProcAddress
 extern "C" __declspec(dllexport) void ApplyCheatsDirectlyForNetplay(const char * cheat_file_content, const char * enabled_file_content, const char * game_identifier);
 
+// Function to get emulator state hash for desync detection (for netplay)
+// Export from main executable so plugin can use GetProcAddress
+// Returns SHA256 hash of critical emulator state (RDRAM, CPU registers, RSP memory)
+// Caller must provide a buffer of at least 65 bytes (64 hex chars + null terminator)
+extern "C" __declspec(dllexport) bool GetEmulatorStateHashForNetplay(char * hash_buffer, size_t buffer_size);
+
 class CMempak;
 extern CMempak       * g_Mempak;
