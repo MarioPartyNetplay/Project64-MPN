@@ -780,6 +780,7 @@ int CALLBACK CCheatsUI::CheatsCodeExProc(HWND hDlg, uint32_t uMsg, uint32_t wPar
             SendMessage(GetDlgItem(hDlg, IDC_CHEAT_LIST), LB_GETTEXT, index, (LPARAM)CheatExten);
 
             g_Settings->SaveStringIndex(Cheat_Extension, item.lParam, CheatExten);
+            CSettingTypeCheats::FlushChanges();
             if (g_BaseSystem)
             {
                 g_BaseSystem->SetCheatsSlectionChanged(true);
@@ -893,6 +894,7 @@ int CALLBACK CCheatsUI::CheatsCodeQuantProc(HWND hDlg, uint32_t uMsg, uint32_t w
             sprintf(CheatExten, "$%X", Value);
 
             g_Settings->SaveStringIndex(Cheat_Extension, item.lParam, CheatExten);
+            CSettingTypeCheats::FlushChanges();
             if (g_BaseSystem)
             {
                 g_BaseSystem->SetCheatsSlectionChanged(true);
@@ -1153,6 +1155,10 @@ stdstr CCheatsUI::GetCheatName(int CheatNo, bool AddExtension) const
     if (AddExtension && CheatUsesCodeExtensions(LineEntry))
     {
         stdstr CheatValue(g_Settings->LoadStringIndex(Cheat_Extension, CheatNo));
+        if (CheatValue.empty())
+        {
+            CheatValue = "??? - Not Set";
+        }
         Name.Format("%s (=>%s)", Name.c_str(), CheatValue.c_str());
     }
 

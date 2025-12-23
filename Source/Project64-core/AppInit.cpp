@@ -287,7 +287,7 @@ void FixDirectories(void)
 {
     WriteTrace(TraceAppInit, TraceDebug, "Starting");
     CPath Directory(g_Settings->LoadStringVal(Cmd_BaseDirectory).c_str(), "");
-    Directory.AppendDirectory("User/Config");
+    Directory.AppendDirectory("User/");
     if (!Directory.DirectoryExists())
     {
         WriteTrace(TraceAppInit, TraceDebug, "Creating %s", (const char *)Directory);
@@ -309,19 +309,6 @@ void FixDirectories(void)
     {
         WriteTrace(TraceAppInit, TraceDebug, "%s already exists", (const char *)Directory);
     }
-
-    Directory.UpDirectory();
-    Directory.AppendDirectory("User/Config");
-    if (!Directory.DirectoryExists())
-    {
-        WriteTrace(TraceAppInit, TraceDebug, "Creating %s", (const char *)Directory);
-        Directory.DirectoryCreate();
-    }
-    else
-    {
-        WriteTrace(TraceAppInit, TraceDebug, "%s already exists", (const char *)Directory);
-    }
-
 
     Directory.UpDirectory();
     Directory.AppendDirectory("User/Screenshots");
