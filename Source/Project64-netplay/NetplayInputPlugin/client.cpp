@@ -833,6 +833,9 @@ void client::update_save_info()
         save_info.save_data = save_info.save_name.empty() ? "" : slurp2(save_path + save_info.save_name);
         save_info.sha1_data = save_info.save_name.empty() ? "" : sha1_save_info(save_info);
     }
+    
+    // Calculate cheat file hash
+    me->cheat_file_hash = calculate_cheat_file_hash();
 }
 
 
@@ -846,6 +849,29 @@ string client::sha1_save_info(const save_info& saveInfo)
             new CryptoPP::StringSink(digest)))
     );
     return digest;
+}
+
+string client::calculate_cheat_file_hash()
+{
+    std::string cheat_file = get_cheat_file_path();
+    std::wstring wcheat_file = utf8_to_wstring(cheat_file);
+    
+    // Check if cheat file exists
+    if (GetFileAttributes(wcheat_file.c_str()) == INVALID_FILE_ATTRIBUTES) {
+        return ""; // No cheat file, return empty hash
+    }
+    
+    try {
+        CryptoPP::SHA256 hash;
+        string digest;
+        CryptoPP::FileSource file(cheat_file.c_str(), true, new CryptoPP::HashFilter(hash,
+            new CryptoPP::HexEncoder(
+                new CryptoPP::StringSink(digest)))
+        );
+        return digest;
+    } catch (...) {
+        return ""; // Error reading file, return empty hash
+    }
 }
 
 void client::on_receive(packet& p, bool udp) {
@@ -868,6 +894,7 @@ void client::on_receive(packet& p, bool udp) {
             update_user_list();
             // Compare all players' save hashes when a new player joins
             compare_all_players_save_hashes();
+            compare_all_players_cheat_file_hashes();
             break;
         }
 
@@ -882,6 +909,7 @@ void client::on_receive(packet& p, bool udp) {
 
             // Compare all players' save hashes when save info is updated
             compare_all_players_save_hashes();
+            compare_all_players_cheat_file_hashes();
             break;
         }
 
@@ -1037,6 +1065,7 @@ void client::on_receive(packet& p, bool udp) {
             }
             // Compare all players' save hashes after accepting into room
             compare_all_players_save_hashes();
+            compare_all_players_cheat_file_hashes();
             break;
         }
 
@@ -1383,6 +1412,69 @@ void client::compare_all_players_save_hashes() {
         }
         // If hash_to_players is empty, all saves are empty (no mismatch, nothing to report)
     }
+}
+
+void client::compare_all_players_cheat_file_hashes() {
+    if (user_list.size() < 2) {
+        return; // Need at least 2 players to compare
+    }
+    
+    std::map<std::string, std::vector<std::string>> hash_to_players; // hash -> list of player names
+    int players_with_cheats = 0;
+    
+    // Collect all players' cheat file hashes
+    for (size_t i = 0; i < user_list.size(); i++) {
+        if (!user_list[i]) continue;
+        
+        const auto& user = user_list[i];
+        std::string hash = user->cheat_file_hash;
+        std::string player_name = user->name;
+        
+        // Skip empty cheat files (no hash)
+        if (hash.empty()) {
+            continue;
+        }
+        
+        players_with_cheats++;
+        hash_to_players[hash].push_back(player_name);
+    }
+    
+    // Only compare if we have at least 2 players with cheat files
+    if (players_with_cheats < 2) {
+        return; // Not enough players with cheat files to compare
+    }
+    
+    // Check if all non-empty cheat files have the same hash
+    if (hash_to_players.size() > 1) {
+        // Multiple different hashes found - mismatch!
+        std::string game_name = me->rom.name.empty() ? "current game" : me->rom.name;
+        std::string cheat_file_name = game_name + ".cht";
+        std::string mismatch_msg = "Cheat file hash mismatch detected for " + cheat_file_name + ":\r\n";
+        mismatch_msg += "Players have different cheat files. To fix this:\r\n";
+        mismatch_msg += "1. Copy User/Cheats/" + cheat_file_name + " from the host player\r\n";
+        mismatch_msg += "2. Paste it to User/Cheats/ on other players' computers\r\n";
+        mismatch_msg += "3. Restart the netplay session\r\n\r\n";
+        mismatch_msg += "Player groups with different hashes:";
+        for (const auto& hash_group : hash_to_players) {
+            std::string players_str;
+            for (size_t j = 0; j < hash_group.second.size(); j++) {
+                if (j > 0) players_str += ", ";
+                players_str += hash_group.second[j];
+            }
+            mismatch_msg += "\r\n  " + hash_group.first.substr(0, 16) + "... (" + players_str + ")";
+        }
+        my_dialog->error(mismatch_msg);
+    } else if (hash_to_players.size() == 1) {
+        // All players with cheat files have matching hashes
+        std::string players_str;
+        const auto& players = hash_to_players.begin()->second;
+        for (size_t j = 0; j < players.size(); j++) {
+            if (j > 0) players_str += ", ";
+            players_str += players[j];
+        }
+        my_dialog->info("Cheat file verified: all players match (" + players_str + ")");
+    }
+    // If hash_to_players is empty, all cheat files are empty (no mismatch, nothing to report)
 }
 
 void client::send_savesync() {
