@@ -165,7 +165,7 @@ bool CSettingTypeCheatsEnabled::IsSettingSet(void) const
         return false;
     }
     uint32_t Value;
-    stdstr_f Key("Cheat%d%s", 0, m_PostFix);
+    stdstr_f Key("Cheat%d_S%s", 0, m_PostFix);
     return m_EnabledIniFile->GetNumber(m_SectionIdent->c_str(), Key.c_str(), 0, Value);
 }
 
@@ -177,7 +177,7 @@ bool CSettingTypeCheatsEnabled::Load(int Index, bool & Value) const
         return false;
     }
     uint32_t IntValue;
-    stdstr_f Key("Cheat%d%s", Index, m_PostFix);
+    stdstr_f Key("Cheat%d_S%s", Index, m_PostFix);
     bool Found = m_EnabledIniFile->GetNumber(m_SectionIdent->c_str(), Key.c_str(), m_DefaultValue ? 1 : 0, IntValue);
     Value = (IntValue != 0);
     return Found;
@@ -226,7 +226,7 @@ void CSettingTypeCheatsEnabled::Save(int Index, bool Value)
 {
     if (m_EnabledIniFile == NULL) { return; }
 
-    stdstr_f Key("Cheat%d%s", Index, m_PostFix);
+    stdstr_f Key("Cheat%d_S%s", Index, m_PostFix);
     m_EnabledIniFile->SaveNumber(m_SectionIdent->c_str(), Key.c_str(), Value ? 1 : 0);
 }
 
@@ -234,7 +234,7 @@ void CSettingTypeCheatsEnabled::Save(int Index, uint32_t Value)
 {
     if (m_EnabledIniFile == NULL) { return; }
 
-    stdstr_f Key("Cheat%d%s", Index, m_PostFix);
+    stdstr_f Key("Cheat%d_S%s", Index, m_PostFix);
     m_EnabledIniFile->SaveNumber(m_SectionIdent->c_str(), Key.c_str(), Value);
 }
 
@@ -256,6 +256,6 @@ void CSettingTypeCheatsEnabled::Save(int Index, const char * Value)
 
 void CSettingTypeCheatsEnabled::Delete(int Index)
 {
-    stdstr_f Key("Cheat%d%s", Index, m_PostFix);
+    stdstr_f Key("Cheat%d_S%s", Index, m_PostFix);
     m_EnabledIniFile->SaveString(m_SectionIdent->c_str(), Key.c_str(), NULL);
 }

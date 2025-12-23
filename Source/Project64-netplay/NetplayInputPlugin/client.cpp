@@ -1575,7 +1575,7 @@ void client::restore_leftover_backups() {
 std::string client::get_config_path() const {
     std::string config_path = save_path;
     // Remove "Save\" from the end
-    if (config_path.length() >= 5 && config_path.substr(config_path.length() - 5) == "Save\\") {
+    if (config_path.length() >= 5 && config_path.substr(config_path.length() - 5) == "User\\Save\\") {
         config_path = config_path.substr(0, config_path.length() - 5);
     }
     config_path += "User\\";

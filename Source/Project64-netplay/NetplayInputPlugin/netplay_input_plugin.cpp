@@ -78,7 +78,7 @@ void load() {
     my_input_location += "Input\\";
 
     my_project64_location = get_parent_directory(my_plugins_location).append("\\");
-    my_saves_location = my_project64_location.append("Save\\");
+    my_saves_location = my_project64_location.append("User\\Save\\");
 
     my_settings = make_shared<settings>(my_location + "netplay.ini");
 

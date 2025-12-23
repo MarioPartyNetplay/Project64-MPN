@@ -71,6 +71,7 @@ stdstr CSettingTypeCheats::GetGameSpecificCheatFilePath(const stdstr& extension)
     stdstr romName = g_Settings->LoadStringVal(Game_GameName);
     stdstr cheatFileName;
     
+    // Only use internal ROM name (Game_GameName), never fall back to CRC-based Game_IniKey
     if (!romName.empty())
     {
         stdstr sanitized = SanitizeRomNameForFilename(romName);
@@ -80,25 +81,10 @@ stdstr CSettingTypeCheats::GetGameSpecificCheatFilePath(const stdstr& extension)
         }
     }
     
-    // If we still don't have a valid filename, try game identifier
-    if (cheatFileName.empty())
-    {
-        stdstr gameId = g_Settings->LoadStringVal(Game_IniKey);
-        if (!gameId.empty())
-        {
-            // Sanitize gameId as well to ensure it's safe for filenames
-            stdstr sanitizedGameId = SanitizeRomNameForFilename(gameId);
-            if (!sanitizedGameId.empty() && sanitizedGameId != "Unknown")
-            {
-                cheatFileName = sanitizedGameId + extension;
-            }
-        }
-    }
-    
-    // Final fallback if both are empty or invalid
+    // If we don't have a valid internal name, return empty path (don't create Unknown.cht or CRC-based files)
     if (cheatFileName.empty() || cheatFileName == extension)
     {
-        cheatFileName = "Unknown" + extension;
+        return "";
     }
     
     // Get base directory and construct full path in User/Cheats/ subdirectory
