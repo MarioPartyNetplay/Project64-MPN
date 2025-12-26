@@ -933,6 +933,8 @@ void client::on_receive(packet& p, bool udp) {
             user_map.push_back(u);
             user_list.push_back(u);
             update_user_list();
+            // Log cheat information for the joining player
+            log_player_cheat_info(u);
             // Compare all players' save hashes when a new player joins
             compare_all_players_save_hashes();
             compare_all_players_cheat_file_hashes();
@@ -1103,6 +1105,12 @@ void client::on_receive(packet& p, bool udp) {
                 set_host_status(true);
             } else {
                 set_host_status(false);
+            }
+            // Log cheat information for all players in the room
+            for (auto& user : user_list) {
+                if (user) {
+                    log_player_cheat_info(user);
+                }
             }
             // Compare all players' save hashes after accepting into room
             compare_all_players_save_hashes();
@@ -1527,6 +1535,26 @@ void client::compare_all_players_cheat_file_hashes() {
     // If hash_to_players is empty, all cheat files are empty (no mismatch, nothing to report)
 }
 
+void client::log_player_cheat_info(std::shared_ptr<user_info> user) {
+    if (!user) return;
+    
+    std::string player_name = user->name;
+    std::string cheat_hash = user->cheat_file_hash;
+    
+    // Log cheat file hash for the player
+    if (cheat_hash.empty()) {
+        my_dialog->info(player_name + " cheat info: No cheat file");
+    } else {
+        std::string hash_short = cheat_hash.substr(0, 16) + "...";
+        my_dialog->info(player_name + " cheat file hash: " + hash_short);
+    }
+    
+    // If this is us (me), also load and log our enabled cheats
+    if (user == me || user->id == me->id) {
+        std::vector<cheat_info> cheats = load_cheats();
+    }
+}
+
 void client::compare_all_players_state_hashes() {
     if (user_list.size() < 2) {
         return; // Need at least 2 players to compare
@@ -1772,11 +1800,20 @@ void client::restore_leftover_backups() {
 
 std::string client::get_config_path() const {
     std::string config_path = save_path;
-    // Remove "Save\" from the end
-    if (config_path.length() >= 5 && config_path.substr(config_path.length() - 5) == "User\\Save\\") {
-        config_path = config_path.substr(0, config_path.length() - 5);
+    if (config_path.length() >= 5) {
+        std::string last_five = config_path.substr(config_path.length() - 5);
+        if (last_five == "Save\\") {
+            config_path = config_path.substr(0, config_path.length() - 5);
+        }
     }
-    config_path += "User\\";
+    if (config_path.length() >= 5) {
+        std::string last_five = config_path.substr(config_path.length() - 5);
+        if (last_five != "User\\") {
+            config_path += "User\\";
+        }
+    } else {
+        config_path += "User\\";
+    }
     return config_path;
 }
 
@@ -1902,9 +1939,6 @@ std::vector<cheat_info> client::load_cheats() {
         std::string game_id = get_game_identifier();
         std::wstring wcheat_file = utf8_to_wstring(cheat_file);
         std::wstring wgame_id = utf8_to_wstring(game_id);
-
-        // Debug: Log the cheat file path
-        my_dialog->info("Loading cheats from: " + cheat_file);
 
         // Check if cheat file exists
         if (GetFileAttributes(wcheat_file.c_str()) == INVALID_FILE_ATTRIBUTES) {
