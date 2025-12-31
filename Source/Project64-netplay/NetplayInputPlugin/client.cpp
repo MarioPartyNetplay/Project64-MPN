@@ -115,7 +115,7 @@ void client::load_public_server_list() {
     // Original server
     public_servers["us-east.marioparty.online:9065|Buffalo (New York)"] = SERVER_STATUS_PENDING;
     public_servers["germany.marioparty.online:9050|Frankfurt (Germany)"] = SERVER_STATUS_PENDING;
-    public_servers["brazil.marioparty.online:9050|São Paulo (Brazil)"] = SERVER_STATUS_PENDING;
+    public_servers["brazil.marioparty.online:9000|São Paulo (Brazil)"] = SERVER_STATUS_PENDING;
 
     my_dialog->update_server_list(public_servers);
     ping_public_server_list();
