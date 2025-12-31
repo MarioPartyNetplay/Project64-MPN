@@ -32,7 +32,7 @@ jobs:
       run: msbuild "D:\a\project64-mpn-src\project64-mpn-src\Project64-MPN.sln" /verbosity:minimal /property:Configuration=Release  /property:Platform=Win32
     # Upload Artifact
     - name: Upload Build Artifact
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: PJ64Netplay-dev
         path: D:\a\project64-mpn-src\project64-mpn-src\Bin\
