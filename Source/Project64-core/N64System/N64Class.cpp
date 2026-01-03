@@ -34,7 +34,8 @@
 #include <hex.h>
 #include <files.h>
 #include <filters.h>
-#include <cryptlib.h>  // for byte type
+#include <cryptlib.h>
+#include <algorithm>
 #include <fstream>
 #include <vector>
 #include <Project64-core/N64System/Mips/TLBClass.h>
