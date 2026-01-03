@@ -7,7 +7,6 @@
 #include "input_plugin.h"
 #include "client.h"
 #include "util.h"
-#include "version.h"
 
 using namespace std;
 
@@ -121,9 +120,6 @@ EXPORT void CALL ControllerCommand( int Control, BYTE * Command) {
 
 EXPORT void CALL DllAbout ( HWND hParent ) {
     load();
-
-    string message = string(APP_NAME) + "\n\nVersion: " + string(APP_VERSION) + "\n\nAuthor: @CoderTimZ (aka AQZ)\n\nWebsite: www.play64.com";
-
     MessageBox(hParent, utf8_to_wstring(message).c_str(), L"About", MB_OK | MB_ICONINFORMATION);
 }
 
@@ -183,7 +179,7 @@ EXPORT void CALL GetDllInfo ( PLUGIN_INFO * PluginInfo ) {
     PluginInfo->Version = 0x0101;
     PluginInfo->Type = PLUGIN_TYPE_CONTROLLER;
 
-    strncpy(PluginInfo->Name, APP_NAME_AND_VERSION, sizeof PLUGIN_INFO::Name);
+    strncpy(PluginInfo->Name, "NetPlay", sizeof PLUGIN_INFO::Name);
 }
 
 EXPORT void CALL GetKeys(int Control, BUTTONS* Keys) {

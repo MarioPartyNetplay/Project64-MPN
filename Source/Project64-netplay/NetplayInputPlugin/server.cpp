@@ -241,7 +241,7 @@ int main(int argc, char* argv[]) {
     signal(SIGSEGV, handle);
 #endif
 #endif
-    log(APP_NAME_AND_VERSION);
+    log("NetPlay");
 
     try {
         uint16_t port = argc >= 2 ? stoi(argv[1]) : 6400;
