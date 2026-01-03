@@ -1151,13 +1151,6 @@ void client::on_receive(packet& p, bool udp) {
 
             for (int i = 0; i < me->saves.size(); i++) {
                 try {
-                    // Check if we have enough data left in the packet for a save_info
-                    if (p.available() < sizeof(save_info)) {
-                        my_dialog->error("Not enough data in save sync packet for save slot " + std::to_string(i));
-                        error_count++;
-                        continue;
-                    }
-
                     auto save_data = p.read<save_info>();
                     auto my_save = me->saves[i];
                     
