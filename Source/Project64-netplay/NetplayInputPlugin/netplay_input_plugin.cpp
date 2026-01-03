@@ -120,6 +120,8 @@ EXPORT void CALL ControllerCommand( int Control, BYTE * Command) {
 
 EXPORT void CALL DllAbout ( HWND hParent ) {
     load();
+    std::string message = "Project64 NetPlay Input Plugin\n\n"
+                          "This plugin enables online multiplayer netplay for Project64.";
     MessageBox(hParent, utf8_to_wstring(message).c_str(), L"About", MB_OK | MB_ICONINFORMATION);
 }
 
