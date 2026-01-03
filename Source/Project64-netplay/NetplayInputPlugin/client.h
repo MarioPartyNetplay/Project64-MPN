@@ -38,6 +38,7 @@ class client: public service_wrapper, public connection {
         client_dialog& get_dialog();
         virtual void on_receive(packet& packet, bool udp);
         virtual void on_error(const std::error_code& error);
+        void handle_desync_detection(const char* hash);
     private:
         constexpr static uint32_t MARIO_GOLF_MASK = 0xFFFFF0F0;
         bool is_host() const;
@@ -112,7 +113,6 @@ class client: public service_wrapper, public connection {
         void compare_all_players_desync_hashes();
         void log_player_cheat_info(std::shared_ptr<user_info> user);
         void update_state_hash();
-        void handle_desync_detection(const char* hash);
         std::vector<std::string> find_rom_save_files(const std::string& path);
         std::string sha1_save_info(const save_info& saveInfo);
         std::string calculate_cheat_file_hash();
