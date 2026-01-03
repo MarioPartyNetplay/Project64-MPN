@@ -2375,6 +2375,37 @@ void client::apply_cheats(const std::string& cheat_file_content, const std::stri
     });
 }
 
+// Helper functions using SEH for function pointer calls
+namespace {
+    bool SafeApplyCheatsDirectly(void(__cdecl* func)(const char*, const char*, const char*), 
+                                  const char* cheat_content, const char* enabled_content, const char* game_id) {
+        __try {
+            func(cheat_content, enabled_content, game_id);
+            return true;
+        } __except(EXCEPTION_EXECUTE_HANDLER) {
+            return false;
+        }
+    }
+
+    bool SafeCloseCheatFile(void(__cdecl* func)(void)) {
+        __try {
+            func();
+            return true;
+        } __except(EXCEPTION_EXECUTE_HANDLER) {
+            return false;
+        }
+    }
+
+    bool SafeTriggerCheatReload(void(__cdecl* func)(void)) {
+        __try {
+            func();
+            return true;
+        } __except(EXCEPTION_EXECUTE_HANDLER) {
+            return false;
+        }
+    }
+}
+
 void client::apply_cheats_async(const std::string& cheat_file_content, const std::string& enabled_file_content) {
     HMODULE hModule = GetModuleHandle(NULL);
 
@@ -2388,21 +2419,13 @@ void client::apply_cheats_async(const std::string& cheat_file_content, const std
             typedef void(__cdecl* ApplyCheatsDirectlyFunc)(const char*, const char*, const char*);
             ApplyCheatsDirectlyFunc applyCheatsDirectly = (ApplyCheatsDirectlyFunc)GetProcAddress(hModule, "ApplyCheatsDirectlyForNetplay");
             if (applyCheatsDirectly) {
-                // Validate function pointer before calling to prevent crashes
-                bool success = false;
-                __try {
-                    // Try to apply cheats directly to memory - they'll be loaded into m_Codes and applied every frame automatically
-                    applyCheatsDirectly(cheat_file_content.c_str(), enabled_file_content.c_str(), game_id.c_str());
-                    success = true;
-                } __except(EXCEPTION_EXECUTE_HANDLER) {
-                    my_dialog->error("Exception occurred while applying cheats directly, falling back to file sync");
-                    // Fall through to file sync
-                }
-                
-                // Only return if we successfully applied cheats without exception
-                if (success) {
+                // Use SEH helper to safely call function pointer
+                if (SafeApplyCheatsDirectly(applyCheatsDirectly, cheat_file_content.c_str(), enabled_file_content.c_str(), game_id.c_str())) {
                     my_dialog->info("Cheats applied directly to memory from host (" + std::to_string(cheat_file_content.length()) + " bytes cheat data)");
                     return;
+                } else {
+                    my_dialog->error("Exception occurred while applying cheats directly, falling back to file sync");
+                    // Fall through to file sync
                 }
             } else {
                 my_dialog->info("ApplyCheatsDirectlyForNetplay function not found, falling back to file method");
@@ -2416,12 +2439,11 @@ void client::apply_cheats_async(const std::string& cheat_file_content, const std
         typedef void(__cdecl* CloseCheatFileFunc)(void);
         CloseCheatFileFunc closeCheatFile = (CloseCheatFileFunc)GetProcAddress(hModule, "CloseCheatFileForNetplay");
         if (closeCheatFile) {
-            __try {
-                closeCheatFile();
+            if (!SafeCloseCheatFile(closeCheatFile)) {
+                my_dialog->error("Exception occurred while closing cheat file handle");
+            } else {
                 // Reduced sleep time to minimize blocking
                 Sleep(50);
-            } __except(EXCEPTION_EXECUTE_HANDLER) {
-                my_dialog->error("Exception occurred while closing cheat file handle");
             }
         }
     }
@@ -2483,19 +2505,18 @@ void client::apply_cheats_async(const std::string& cheat_file_content, const std
             typedef void(__cdecl* TriggerForceCheatReloadFunc)(void);
             TriggerForceCheatReloadFunc triggerForceCheatReload = (TriggerForceCheatReloadFunc)GetProcAddress(hModule, "TriggerForceCheatReloadForNetplay");
             if (triggerForceCheatReload) {
-                __try {
-                    triggerForceCheatReload();
+                // Use SEH helper to safely call function pointer
+                if (SafeTriggerCheatReload(triggerForceCheatReload)) {
                     my_dialog->info("Triggered force cheat reload after writing files");
-                } __except(EXCEPTION_EXECUTE_HANDLER) {
+                } else {
                     my_dialog->error("Exception occurred while triggering force cheat reload, trying fallback");
                     // Try fallback
                     typedef void(__cdecl* TriggerCheatReloadFunc)(void);
                     TriggerCheatReloadFunc triggerCheatReload = (TriggerCheatReloadFunc)GetProcAddress(hModule, "TriggerCheatReloadForNetplay");
                     if (triggerCheatReload) {
-                        __try {
-                            triggerCheatReload();
+                        if (SafeTriggerCheatReload(triggerCheatReload)) {
                             my_dialog->info("Triggered cheat reload after writing files (fallback)");
-                        } __except(EXCEPTION_EXECUTE_HANDLER) {
+                        } else {
                             my_dialog->error("Exception occurred while triggering cheat reload");
                         }
                     } else {
@@ -2507,10 +2528,9 @@ void client::apply_cheats_async(const std::string& cheat_file_content, const std
                 typedef void(__cdecl* TriggerCheatReloadFunc)(void);
                 TriggerCheatReloadFunc triggerCheatReload = (TriggerCheatReloadFunc)GetProcAddress(hModule, "TriggerCheatReloadForNetplay");
                 if (triggerCheatReload) {
-                    __try {
-                        triggerCheatReload();
+                    if (SafeTriggerCheatReload(triggerCheatReload)) {
                         my_dialog->info("Triggered cheat reload after writing files (fallback)");
-                    } __except(EXCEPTION_EXECUTE_HANDLER) {
+                    } else {
                         my_dialog->error("Exception occurred while triggering cheat reload");
                     }
                 } else {
