@@ -106,37 +106,37 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <OutDir>$(SolutionDir)bin/$(Configuration)\Plugin\NetPlay</OutDir>
+    <OutDir>$(SolutionDir)Bin/$(Configuration)\Plugin\NetPlay</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug (Server)|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <TargetName>netplay_server</TargetName>
-    <OutDir>$(SolutionDir)bin/$(Configuration)\Plugin\NetPlay</OutDir>
+    <OutDir>$(SolutionDir)Bin/$(Configuration)\Plugin\NetPlay</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <OutDir>$(SolutionDir)bin/$(Configuration)\Plugin\NetPlay</OutDir>
+    <OutDir>$(SolutionDir)Bin/$(Configuration)\Plugin\NetPlay</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug (Server)|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <OutDir>$(SolutionDir)bin/$(Configuration)\Plugin\NetPlay</OutDir>
+    <OutDir>$(SolutionDir)Bin/$(Configuration)\Plugin\NetPlay</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'">
     <LinkIncremental>false</LinkIncremental>
-    <OutDir>$(SolutionDir)bin/$(Configuration)\Plugin\NetPlay</OutDir>
+    <OutDir>$(SolutionDir)Bin/$(Configuration)\Plugin\NetPlay</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release (Server)|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <TargetName>netplay_server</TargetName>
-    <OutDir>$(SolutionDir)bin/$(Configuration)\Plugin\NetPlay</OutDir>
+    <OutDir>$(SolutionDir)Bin/$(Configuration)\Plugin\NetPlay</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <OutDir>$(SolutionDir)bin/$(Configuration)\Plugin\NetPlay</OutDir>
+    <OutDir>$(SolutionDir)Bin/$(Configuration)\Plugin\NetPlay</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release (Server)|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <OutDir>$(SolutionDir)bin/$(Configuration)\Plugin\NetPlay</OutDir>
+    <OutDir>$(SolutionDir)Bin/$(Configuration)\Plugin\NetPlay</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
