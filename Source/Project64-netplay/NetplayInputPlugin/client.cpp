@@ -1138,6 +1138,12 @@ void client::on_receive(packet& p, bool udp) {
         }
 
         case SAVE_SYNC: {
+            // Validate me pointer before proceeding
+            if (!me) {
+                my_dialog->error("Save sync error: invalid user info");
+                break;
+            }
+
             // Non-hosts backup their original saves BEFORE replacing them with host's saves
             // Host doesn't need backup since their save is the one being synced
             if (!is_host()) {
@@ -1148,9 +1154,15 @@ void client::on_receive(packet& p, bool udp) {
             int skipped_count = 0;
             int error_count = 0;
 
-
+            // Read saves from packet - each save is preceded by a boolean flag indicating if it's valid
             for (int i = 0; i < me->saves.size(); i++) {
                 try {
+                    // Check if we have data available for the save
+                    if (p.available() == 0) {
+                        // No more saves in packet, but we still have slots - skip remaining slots
+                        break;
+                    }
+
                     auto save_data = p.read<save_info>();
                     auto my_save = me->saves[i];
                     
@@ -1228,10 +1240,12 @@ void client::on_receive(packet& p, bool udp) {
 
                     // Update local client's save data in user_map for hash tracking
                     // Only update the local player (me) in the user_map
-                    for (auto& user : user_map) {
-                        if (user && user.get() == me.get()) {
-                            user->saves[i] = save_data;
-                            break;
+                    if (me) {
+                        for (auto& user : user_map) {
+                            if (user && me && user.get() == me.get()) {
+                                user->saves[i] = save_data;
+                                break;
+                            }
                         }
                     }
                 } catch (const std::exception& e) {
@@ -1247,24 +1261,34 @@ void client::on_receive(packet& p, bool udp) {
             // Process cheat files (only for non-host clients)
             if (!is_host()) {
                 try {
-                    std::string cheat_file_content = p.read<std::string>();
-                    std::string enabled_file_content = p.read<std::string>();
+                    // Check if there's enough data in the packet before reading
+                    if (p.available() > 0) {
+                        std::string cheat_file_content = p.read<std::string>();
+                        std::string enabled_file_content = "";
+                        
+                        // Check again before reading second string
+                        if (p.available() > 0) {
+                            enabled_file_content = p.read<std::string>();
+                        }
 
-                    if (!cheat_file_content.empty()) {
-                        apply_cheats(cheat_file_content, enabled_file_content);
+                        if (!cheat_file_content.empty() || !enabled_file_content.empty()) {
+                            apply_cheats(cheat_file_content, enabled_file_content);
+                        }
                     }
                 } catch (const std::out_of_range& e) {
                     my_dialog->error("Cheat file parsing error (invalid data): " + std::string(e.what()));
                 } catch (const std::exception& e) {
                     my_dialog->error("Error processing cheat files: " + std::string(e.what()));
+                } catch (...) {
+                    my_dialog->error("Unknown error processing cheat files");
                 }
             }
-            } catch (const std::exception& e) {
-                my_dialog->error("Error processing cheat files: " + std::string(e.what()));
-            }
 
-            update_save_info();
-            send_save_info();
+            // Only update save info if me is still valid
+            if (me) {
+                update_save_info();
+                send_save_info();
+            }
             break;
         }
 
@@ -2364,10 +2388,22 @@ void client::apply_cheats_async(const std::string& cheat_file_content, const std
             typedef void(__cdecl* ApplyCheatsDirectlyFunc)(const char*, const char*, const char*);
             ApplyCheatsDirectlyFunc applyCheatsDirectly = (ApplyCheatsDirectlyFunc)GetProcAddress(hModule, "ApplyCheatsDirectlyForNetplay");
             if (applyCheatsDirectly) {
-                // Try to apply cheats directly to memory - they'll be loaded into m_Codes and applied every frame automatically
-                applyCheatsDirectly(cheat_file_content.c_str(), enabled_file_content.c_str(), game_id.c_str());
-                my_dialog->info("Cheats applied directly to memory from host (" + std::to_string(cheat_file_content.length()) + " bytes cheat data)");
-                return;
+                // Validate function pointer before calling to prevent crashes
+                bool success = false;
+                __try {
+                    // Try to apply cheats directly to memory - they'll be loaded into m_Codes and applied every frame automatically
+                    applyCheatsDirectly(cheat_file_content.c_str(), enabled_file_content.c_str(), game_id.c_str());
+                    success = true;
+                } __except(EXCEPTION_EXECUTE_HANDLER) {
+                    my_dialog->error("Exception occurred while applying cheats directly, falling back to file sync");
+                    // Fall through to file sync
+                }
+                
+                // Only return if we successfully applied cheats without exception
+                if (success) {
+                    my_dialog->info("Cheats applied directly to memory from host (" + std::to_string(cheat_file_content.length()) + " bytes cheat data)");
+                    return;
+                }
             } else {
                 my_dialog->info("ApplyCheatsDirectlyForNetplay function not found, falling back to file method");
             }
@@ -2380,9 +2416,13 @@ void client::apply_cheats_async(const std::string& cheat_file_content, const std
         typedef void(__cdecl* CloseCheatFileFunc)(void);
         CloseCheatFileFunc closeCheatFile = (CloseCheatFileFunc)GetProcAddress(hModule, "CloseCheatFileForNetplay");
         if (closeCheatFile) {
-            closeCheatFile();
-            // Reduced sleep time to minimize blocking
-            Sleep(50);
+            __try {
+                closeCheatFile();
+                // Reduced sleep time to minimize blocking
+                Sleep(50);
+            } __except(EXCEPTION_EXECUTE_HANDLER) {
+                my_dialog->error("Exception occurred while closing cheat file handle");
+            }
         }
     }
 
@@ -2443,15 +2483,36 @@ void client::apply_cheats_async(const std::string& cheat_file_content, const std
             typedef void(__cdecl* TriggerForceCheatReloadFunc)(void);
             TriggerForceCheatReloadFunc triggerForceCheatReload = (TriggerForceCheatReloadFunc)GetProcAddress(hModule, "TriggerForceCheatReloadForNetplay");
             if (triggerForceCheatReload) {
-                triggerForceCheatReload();
-                my_dialog->info("Triggered force cheat reload after writing files");
+                __try {
+                    triggerForceCheatReload();
+                    my_dialog->info("Triggered force cheat reload after writing files");
+                } __except(EXCEPTION_EXECUTE_HANDLER) {
+                    my_dialog->error("Exception occurred while triggering force cheat reload, trying fallback");
+                    // Try fallback
+                    typedef void(__cdecl* TriggerCheatReloadFunc)(void);
+                    TriggerCheatReloadFunc triggerCheatReload = (TriggerCheatReloadFunc)GetProcAddress(hModule, "TriggerCheatReloadForNetplay");
+                    if (triggerCheatReload) {
+                        __try {
+                            triggerCheatReload();
+                            my_dialog->info("Triggered cheat reload after writing files (fallback)");
+                        } __except(EXCEPTION_EXECUTE_HANDLER) {
+                            my_dialog->error("Exception occurred while triggering cheat reload");
+                        }
+                    } else {
+                        my_dialog->info("Could not find cheat reload function (cheats may need manual refresh)");
+                    }
+                }
             } else {
                 // Fallback to regular reload
                 typedef void(__cdecl* TriggerCheatReloadFunc)(void);
                 TriggerCheatReloadFunc triggerCheatReload = (TriggerCheatReloadFunc)GetProcAddress(hModule, "TriggerCheatReloadForNetplay");
                 if (triggerCheatReload) {
-                    triggerCheatReload();
-                    my_dialog->info("Triggered cheat reload after writing files (fallback)");
+                    __try {
+                        triggerCheatReload();
+                        my_dialog->info("Triggered cheat reload after writing files (fallback)");
+                    } __except(EXCEPTION_EXECUTE_HANDLER) {
+                        my_dialog->error("Exception occurred while triggering cheat reload");
+                    }
                 } else {
                     my_dialog->info("Could not find cheat reload function (cheats may need manual refresh)");
                 }
