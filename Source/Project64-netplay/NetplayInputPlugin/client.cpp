@@ -115,7 +115,7 @@ bool client::input_detected(const input_data& input, uint32_t mask) {
 void client::load_public_server_list() {
     // Original server
     public_servers["us-east.marioparty.online:9065|Buffalo (New York)"] = SERVER_STATUS_PENDING;
-    public_servers["germany.marioparty.online:9050|Frankfurt (Germany)"] = SERVER_STATUS_PENDING;
+    public_servers["germany.marioparty.online:9051|Frankfurt (Germany)"] = SERVER_STATUS_PENDING;
     public_servers["brazil.marioparty.online:9000|São Paulo (Brazil)"] = SERVER_STATUS_PENDING;
 
     my_dialog->update_server_list(public_servers);
@@ -976,6 +976,13 @@ void client::on_receive(packet& p, bool udp) {
 
             for (int i = 0; i < me->saves.size(); i++) {
                 try {
+                    // Check if we have enough data left in the packet for a save_info
+                    if (p.available() < sizeof(save_info)) {
+                        my_dialog->error("Not enough data in save sync packet for save slot " + std::to_string(i));
+                        error_count++;
+                        continue;
+                    }
+
                     auto save_data = p.read<save_info>();
                     auto my_save = me->saves[i];
                     
@@ -986,6 +993,15 @@ void client::on_receive(packet& p, bool udp) {
                         continue;
                     }
                     
+                    // Check for oversized save files that could cause crashes
+                    const size_t MAX_SAVE_SIZE = 2 * 1024 * 1024; // 2MB limit
+                    if (save_data.save_data.size() > MAX_SAVE_SIZE) {
+                        my_dialog->error("Save file too large for sync: " + save_data.save_name +
+                                       " (" + std::to_string(save_data.save_data.size()) + " bytes), skipping");
+                        error_count++;
+                        continue;
+                    }
+
                     // Always sync if hashes differ, or if one is empty and the other isn't
                     bool needs_sync = (my_save.sha1_data != save_data.sha1_data);
                     bool my_save_empty = my_save.save_name.empty() || my_save.save_data.empty();
@@ -1009,6 +1025,8 @@ void client::on_receive(packet& p, bool udp) {
                             if (std::filesystem::exists(original_path) && !std::filesystem::exists(backup_path)) {
                                 try {
                                     std::filesystem::create_directories(original_dir);
+                                    // Add a small delay to avoid potential race conditions with directory creation
+                                    Sleep(10);
                                     std::filesystem::copy(original_path, backup_path, std::filesystem::copy_options::overwrite_existing);
                                     my_dialog->info("Backed up save: " + my_save.save_name);
                                 } catch (const std::filesystem::filesystem_error& e) {
@@ -1047,11 +1065,13 @@ void client::on_receive(packet& p, bool udp) {
                         skipped_count++;
                     }
 
-                    // Update user map with synced save data
+                    // Update local client's save data in user_map for hash tracking
+                    // Only update the local player (me) in the user_map
                     for (auto& user : user_map) {
-                        if (user->saves[i].sha1_data == save_data.sha1_data)
-                            continue;
-                        user->saves[i] = save_data;
+                        if (user && user.get() == me.get()) {
+                            user->saves[i] = save_data;
+                            break;
+                        }
                     }
                 } catch (const std::exception& e) {
                     my_dialog->error("Error processing save slot " + std::to_string(i) + ": " + std::string(e.what()));
@@ -1075,13 +1095,24 @@ void client::on_receive(packet& p, bool udp) {
 
             // Process cheat files
             try {
-                std::string cheat_file_content = p.read<std::string>();
-                std::string enabled_file_content = p.read<std::string>();
+                if (p.available() >= sizeof(uint32_t)) {  // Check if we have at least a string length
+                    std::string cheat_file_content = p.read<std::string>();
+                    my_dialog->info("Read cheat file content: " + std::to_string(cheat_file_content.length()) + " bytes");
 
-                if (!cheat_file_content.empty() || !enabled_file_content.empty()) {
-                    apply_cheats(cheat_file_content, enabled_file_content);
+                    if (p.available() >= sizeof(uint32_t)) {  // Check if we have the enabled file string
+                        std::string enabled_file_content = p.read<std::string>();
+                        my_dialog->info("Read enabled file content: " + std::to_string(enabled_file_content.length()) + " bytes");
+
+                        if (!cheat_file_content.empty() || !enabled_file_content.empty()) {
+                            apply_cheats(cheat_file_content, enabled_file_content);
+                        } else {
+                            my_dialog->info("No cheat files to sync (empty)");
+                        }
+                    } else {
+                        my_dialog->error("Missing enabled file content in save sync packet");
+                    }
                 } else {
-                    my_dialog->info("No cheat files to sync (empty)");
+                    my_dialog->error("Missing cheat file content in save sync packet");
                 }
             } catch (const std::exception& e) {
                 my_dialog->error("Error processing cheat files: " + std::string(e.what()));
@@ -1643,6 +1674,16 @@ void client::send_savesync() {
 
     int save_count = 0;
     for (auto& save : host_user->saves) {
+        // Skip saves that are too large for the packet
+        if (save.save_data.size() > (packet::MAX_SIZE / 2)) {  // Leave room for other packet data
+            my_dialog->error("Save file too large for network sync: " + save.save_name +
+                           " (" + std::to_string(save.save_data.size()) + " bytes), skipping");
+            // Send empty save to maintain packet structure
+            save_info empty_save;
+            p << empty_save;
+            continue;
+        }
+
         p << save; // Send the host's saves
         if (!save.save_name.empty() && !save.save_data.empty()) {
             save_count++;
@@ -1683,6 +1724,9 @@ void client::send_savesync() {
 
     p << cheat_file_content;
     p << enabled_file_content;
+
+    my_dialog->info("Cheat file content size: " + std::to_string(cheat_file_content.length()) + " bytes");
+    my_dialog->info("Enabled file content size: " + std::to_string(enabled_file_content.length()) + " bytes");
 
     if (save_count > 0) {
         my_dialog->info("Sending " + std::to_string(save_count) + " save file(s) and cheat files to clients");

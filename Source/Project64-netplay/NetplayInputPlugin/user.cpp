@@ -104,6 +104,7 @@ void user::on_receive(packet& p, bool udp) {
             info.saves = new_saves;
 
             bool no_syncs = true;
+            int sync_count = 0;
             for (auto& user : my_room->user_list) {
                 bool send_sync = false;
 
@@ -117,8 +118,13 @@ void user::on_receive(packet& p, bool udp) {
                 }
 
                 if (send_sync) {
+                    // Add delay between sending syncs to different clients to prevent overwhelming
+                    if (sync_count > 0) {
+                        Sleep(300);  // 300ms delay between clients
+                    }
                     user->send_save_sync(new_saves);
                     no_syncs = false;
+                    sync_count++;
                 }
             }
             if (no_syncs)
