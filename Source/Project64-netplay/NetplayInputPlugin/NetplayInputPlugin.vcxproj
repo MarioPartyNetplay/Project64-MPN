@@ -121,7 +121,7 @@
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)Bin/$(Configuration)\Plugin\NetPlay</OutDir>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)Bin/$(Configuration)\Plugin\NetPlay</OutDir>
   </PropertyGroup>
@@ -132,7 +132,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <OutDir>$(SolutionDir)Bin/$(Configuration)\Plugin\NetPlay</OutDir>
+    <OutDir>$(SolutionDir)Bin/Release64\Plugin\NetPlay</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release (Server)|x64'">
     <LinkIncremental>false</LinkIncremental>
