@@ -130,7 +130,7 @@ void client::fetch_server_list_from_web() {
         try {
             fetch_servers_from_github();
             fetched_from_web = true;
-        } catch (const std::exception& e) {
+        } catch (const std::exception&) {
             // Silently fall back to local file
         }
 
@@ -155,25 +155,33 @@ void client::fetch_servers_from_github() {
         std::string path = "/Project64-MPN/Project64-MPN/main/servers.txt";
 
         // Resolve hostname
-        tcp::resolver resolver(service);
-        auto endpoints = resolver.resolve(host, "80");
+        ip::tcp::resolver resolver(service);
+        std::error_code resolve_error;
+        auto endpoints = resolver.resolve(host, "80", resolve_error);
+        if (resolve_error) {
+            throw std::runtime_error("Failed to resolve hostname: " + resolve_error.message());
+        }
 
         // Create socket and connect
-        tcp::socket socket(service);
+        auto socket = std::make_shared<ip::tcp::socket>(service);
         auto connect_timer = std::make_shared<asio::steady_timer>(service);
         connect_timer->expires_after(std::chrono::seconds(10)); // 10 second timeout
 
         // Set up timeout handler
-        connect_timer->async_wait([&socket](const std::error_code& error) {
+        connect_timer->async_wait([socket](const std::error_code& error) {
             if (!error) {
                 // Timer expired, close socket to cancel connection
                 std::error_code ec;
-                socket.close(ec);
+                socket->close(ec);
             }
         });
 
         // Connect with timeout
-        asio::connect(socket, endpoints);
+        std::error_code connect_error;
+        asio::connect(*socket, endpoints, connect_error);
+        if (connect_error) {
+            throw std::runtime_error("Failed to connect: " + connect_error.message());
+        }
 
         // Send HTTP GET request
         std::string request =
@@ -183,7 +191,7 @@ void client::fetch_servers_from_github() {
             "User-Agent: Project64-Netplay\r\n"
             "\r\n";
 
-        asio::write(socket, asio::buffer(request));
+        asio::write(*socket, asio::buffer(request));
 
         // Read response
         std::string response;
@@ -191,7 +199,7 @@ void client::fetch_servers_from_github() {
         std::error_code error;
 
         while (true) {
-            size_t bytes_read = socket.read_some(asio::buffer(buffer), error);
+            size_t bytes_read = socket->read_some(asio::buffer(buffer), error);
             if (error == std::errc::connection_reset || error == std::errc::connection_aborted) {
                 break; // Connection closed
             } else if (error) {
@@ -200,7 +208,7 @@ void client::fetch_servers_from_github() {
             response.append(buffer.data(), bytes_read);
         }
 
-        socket.close();
+        socket->close();
 
         // Parse HTTP response
         size_t header_end = response.find("\r\n\r\n");
@@ -1683,6 +1691,7 @@ void client::compare_all_players_cheat_file_hashes() {
         // Multiple different hashes found - mismatch!
         std::string game_name = me->rom.name.empty() ? "current game" : me->rom.name;
         std::string cheat_file_name = game_name + ".cht";
+        std::string mismatch_msg = "Cheat file hash mismatch for " + cheat_file_name + ":";
         for (const auto& hash_group : hash_to_players) {
             std::string players_str;
             for (size_t j = 0; j < hash_group.second.size(); j++) {
