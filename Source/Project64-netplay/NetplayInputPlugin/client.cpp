@@ -18,6 +18,7 @@
 #include <regex>
 #include <algorithm>
 #include <sstream>
+#include <boost/system/error_code.hpp>
 
 using namespace std;
 using namespace asio;
@@ -113,13 +114,163 @@ bool client::input_detected(const input_data& input, uint32_t mask) {
 }
 
 void client::load_public_server_list() {
-    // Original server
-    public_servers["us-east.marioparty.online:9065|Buffalo (New York)"] = SERVER_STATUS_PENDING;
-    public_servers["germany.marioparty.online:9051|Frankfurt (Germany)"] = SERVER_STATUS_PENDING;
-    public_servers["brazil.marioparty.online:9000|São Paulo (Brazil)"] = SERVER_STATUS_PENDING;
+    // Fetch server list from GitHub repository
+    fetch_server_list_from_web();
 
     my_dialog->update_server_list(public_servers);
     ping_public_server_list();
+}
+
+void client::fetch_server_list_from_web() {
+    try {
+        // Clear existing servers
+        public_servers.clear();
+
+        // Try to fetch from GitHub first
+        bool fetched_from_web = false;
+        try {
+            fetch_servers_from_github();
+            fetched_from_web = true;
+        } catch (const std::exception& e) {
+            my_dialog->info("Failed to fetch servers from web, using local file: " + std::string(e.what()));
+        }
+
+        // If web fetch failed or returned no servers, try local file
+        if (!fetched_from_web || public_servers.empty()) {
+            load_servers_from_file();
+        }
+
+    } catch (const std::exception& e) {
+        my_dialog->error("Failed to load server list: " + std::string(e.what()));
+        // Fallback to hardcoded servers if everything fails
+        public_servers["us-east.marioparty.online:9065|Buffalo (New York)"] = SERVER_STATUS_PENDING;
+        public_servers["germany.marioparty.online:9051|Frankfurt (Germany)"] = SERVER_STATUS_PENDING;
+        public_servers["brazil.marioparty.online:9000|São Paulo (Brazil)"] = SERVER_STATUS_PENDING;
+    }
+}
+
+void client::fetch_servers_from_github() {
+    try {
+        // GitHub raw content URL for servers.txt
+        std::string host = "raw.githubusercontent.com";
+        std::string path = "/Project64-MPN/Project64-MPN/master/servers.txt";
+
+        // Resolve hostname
+        tcp::resolver resolver(service);
+        auto endpoints = resolver.resolve(host, "80");
+
+        // Create socket and connect
+        tcp::socket socket(service);
+        asio::connect(socket, endpoints);
+
+        // Send HTTP GET request
+        std::string request =
+            "GET " + path + " HTTP/1.1\r\n"
+            "Host: " + host + "\r\n"
+            "Connection: close\r\n"
+            "User-Agent: Project64-Netplay\r\n"
+            "\r\n";
+
+        asio::write(socket, asio::buffer(request));
+
+        // Read response
+        std::string response;
+        char buffer[1024];
+        boost::system::error_code error;
+
+        while (true) {
+            size_t bytes_read = socket.read_some(asio::buffer(buffer), error);
+            if (error == asio::error::eof) {
+                break; // Connection closed cleanly
+            } else if (error) {
+                throw std::runtime_error("Network error: " + error.message());
+            }
+            response.append(buffer, bytes_read);
+        }
+
+        socket.close();
+
+        // Parse HTTP response
+        size_t header_end = response.find("\r\n\r\n");
+        if (header_end == std::string::npos) {
+            throw std::runtime_error("Invalid HTTP response");
+        }
+
+        std::string body = response.substr(header_end + 4);
+
+        // Check for HTTP 200 OK
+        if (response.find("HTTP/1.1 200 OK") == std::string::npos &&
+            response.find("HTTP/1.0 200 OK") == std::string::npos) {
+            throw std::runtime_error("HTTP request failed: " + response.substr(0, response.find("\r\n")));
+        }
+
+        // Parse server list from body
+        std::istringstream stream(body);
+        std::string line;
+        bool found_servers = false;
+
+        while (std::getline(stream, line)) {
+            // Remove carriage return if present
+            if (!line.empty() && line.back() == '\r') {
+                line.pop_back();
+            }
+
+            // Skip empty lines and comments
+            if (line.empty() || line[0] == '#') {
+                continue;
+            }
+
+            // Parse server entry: host:port|description
+            size_t pipe_pos = line.find('|');
+            if (pipe_pos != std::string::npos) {
+                std::string server_info = line;
+                public_servers[server_info] = SERVER_STATUS_PENDING;
+                found_servers = true;
+            }
+        }
+
+        if (!found_servers) {
+            throw std::runtime_error("No valid servers found in response");
+        }
+
+        my_dialog->info("Loaded " + std::to_string(public_servers.size()) + " servers from GitHub");
+
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Error fetching servers from GitHub: " + std::string(e.what()));
+    }
+}
+
+void client::load_servers_from_file() {
+    try {
+        std::ifstream file("servers.txt");
+        if (!file.is_open()) {
+            throw std::runtime_error("Could not open servers.txt file");
+        }
+
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            if (line.empty() || line[0] == '#') {
+                continue;
+            }
+
+            // Parse server entry: host:port|description
+            size_t pipe_pos = line.find('|');
+            if (pipe_pos != std::string::npos) {
+                std::string server_info = line;
+                public_servers[server_info] = SERVER_STATUS_PENDING;
+            }
+        }
+
+        file.close();
+
+        if (public_servers.empty()) {
+            throw std::runtime_error("No valid servers found in servers.txt");
+        }
+
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Error loading servers from file: " + std::string(e.what()));
+    }
 }
 
 void client::ping_public_server_list() {
