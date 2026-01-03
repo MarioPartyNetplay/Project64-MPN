@@ -86,6 +86,15 @@ extern "C" void TriggerForceCheatReloadForNetplay(void)
     }
 }
 
+extern "C" void TriggerDeferredCheatLoadForNetplay(void)
+{
+    if (g_BaseSystem)
+    {
+        // Load cheats now that they have been synchronized
+        g_BaseSystem->m_Cheats.LoadCheats(false, g_BaseSystem->GetPlugins());
+    }
+}
+
 extern "C" void TriggerSoftResetForNetplay(void)
 {
     if (g_BaseSystem)

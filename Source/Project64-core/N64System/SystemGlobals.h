@@ -77,6 +77,10 @@ extern "C" __declspec(dllexport) void TriggerCheatReloadForNetplay(void);
 // Export from main executable so plugin can use GetProcAddress
 extern "C" __declspec(dllexport) void TriggerForceCheatReloadForNetplay(void);
 
+// Function to trigger deferred cheat loading after synchronization (for netplay)
+// Export from main executable so plugin can use GetProcAddress
+extern "C" __declspec(dllexport) void TriggerDeferredCheatLoadForNetplay(void);
+
 // Function to trigger soft reset (for netplay cheat syncing)
 // Export from main executable so plugin can use GetProcAddress
 extern "C" __declspec(dllexport) void TriggerSoftResetForNetplay(void);

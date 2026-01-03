@@ -197,12 +197,21 @@ EXPORT void CALL GetKeys(int Control, BUTTONS* Keys) {
     bool just_started = my_client->wait_until_start();
     
     if (just_started && !plugin_opened && my_plugin) {
-        // Game just started, now open the plugin (cheats should be synced by now)
+        // Game just started, now load cheats that have been synchronized
+        HMODULE hModule = GetModuleHandle(NULL);
+        if (hModule) {
+            typedef void(__cdecl* TriggerDeferredCheatLoadFunc)(void);
+            TriggerDeferredCheatLoadFunc triggerDeferredCheatLoad = (TriggerDeferredCheatLoadFunc)GetProcAddress(hModule, "TriggerDeferredCheatLoadForNetplay");
+            if (triggerDeferredCheatLoad) {
+                triggerDeferredCheatLoad();
+            }
+        }
+
+        // Now open the plugin (cheats should be synced by now)
         my_plugin->RomOpen();
         plugin_opened = true;
-        
-        // Reload cheats to ensure they're loaded
-        HMODULE hModule = GetModuleHandle(NULL);
+
+        // Reload cheats to ensure they're loaded from the synchronized file
         if (hModule) {
             typedef void(__cdecl* TriggerCheatReloadFunc)(void);
             TriggerCheatReloadFunc triggerCheatReload = (TriggerCheatReloadFunc)GetProcAddress(hModule, "TriggerCheatReloadForNetplay");
@@ -210,7 +219,7 @@ EXPORT void CALL GetKeys(int Control, BUTTONS* Keys) {
                 triggerCheatReload();
             }
         }
-        
+
         my_client->set_src_controllers(my_plugin->controls);
     }
     
