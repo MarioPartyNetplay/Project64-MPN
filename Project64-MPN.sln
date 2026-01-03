@@ -32,10 +32,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "osal", "Source\GLideN64\pro
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libGLideNHQ", "Source\GLideN64\projects\msvc\libGLideNHQ.vcxproj", "{DA965BCF-2219-47AF-ACE7-EAF76D5D4756}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "GLideN64", "GLideN64", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GLideNUI-wtl", "Source\GLideN64\projects\msvc\GLideNUI-wtl.vcxproj", "{9E05B70F-A294-44A9-A151-B2CC95AA884E}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug (Server)|Win32 = Debug (Server)|Win32
