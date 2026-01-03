@@ -152,7 +152,7 @@ void client::fetch_servers_from_github() {
     try {
         // GitHub raw content URL for servers.txt
         std::string host = "raw.githubusercontent.com";
-        std::string path = "/Project64-MPN/Project64-MPN/main/servers.txt";
+        std::string path = "/MarioPartyNetplay/Project64-MPN/refs/heads/master/servers.txt";
 
         // Resolve hostname
         ip::tcp::resolver resolver(service);
