@@ -7,7 +7,6 @@
 //
 // Generated from the TEXTINCLUDE 2 resource.
 //
-#include "version.h"
 #include <winres.h>
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
@@ -152,7 +151,6 @@ END
 
 2 TEXTINCLUDE 
 BEGIN
-    "#include ""version.h""\r\n"
     "#include <winres.h>\0"
 END
 
