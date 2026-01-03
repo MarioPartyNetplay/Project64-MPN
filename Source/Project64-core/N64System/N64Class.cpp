@@ -34,8 +34,10 @@
 #include <hex.h>
 #include <files.h>
 #include <filters.h>
+#include <cryptlib.h>  // for byte type
 #include <fstream>
 #include <vector>
+#include <Project64-core/N64System/Mips/TLBClass.h>
 
 #pragma warning(disable:4355) // Disable 'this' : used in base member initializer list
 
@@ -2840,6 +2842,15 @@ void CN64System::TLB_Changed()
 
 std::string CN64System::GenerateDesyncSaveStateHash()
 {
+    // Create a save state and hash stable memory regions to detect desync.
+    // We avoid timing-dependent data and focus on:
+    // - CPU registers (GPR, FPR, COP0)
+    // - RDRAM starting from offset 0x10000 (skipping game-specific state)
+    // - RSP memory (DMEM/IMEM)
+    // - TLB entries
+    //
+    // This provides reliable desync detection without false positives from timing variations.
+
     // Create a temporary save state file path
     char tempPath[MAX_PATH];
     if (!GetTempPathA(MAX_PATH, tempPath))
@@ -2855,8 +2866,7 @@ std::string CN64System::GenerateDesyncSaveStateHash()
         return "";
     }
 
-    // Read the first 1024 bytes (or less if file is smaller) and hash them
-    const size_t HASH_BYTES = 1024;
+    std::string hashResult;
     std::ifstream file(tempFile, std::ios::binary);
     if (!file.is_open())
     {
@@ -2864,29 +2874,109 @@ std::string CN64System::GenerateDesyncSaveStateHash()
         return "";
     }
 
-    // Read first HASH_BYTES bytes
-    std::vector<char> buffer(HASH_BYTES);
-    file.read(buffer.data(), HASH_BYTES);
-    size_t bytesRead = file.gcount();
+    // Hash stable memory regions instead of just the first 1024 bytes
+    CryptoPP::SHA256 hash;
+    std::vector<char> buffer;
+
+    try {
+        // Skip the save state header (SaveID + RdramSize + ROM header = 72 bytes)
+        file.seekg(72, std::ios::beg);
+
+        // Skip NextViTimer (4 bytes) - timing dependent!
+        file.seekg(4, std::ios::cur);
+
+        // Hash Program Counter (8 bytes) - should be stable
+        buffer.resize(8);
+        file.read(buffer.data(), buffer.size());
+        if (file.gcount() > 0) {
+            hash.Update((const byte*)buffer.data(), file.gcount());
+        }
+
+        // Hash CPU registers (GPR, FPR, COP0) - should be very stable
+        buffer.resize(256 + 256 + 128); // GPR + FPR + COP0
+        file.read(buffer.data(), buffer.size());
+        if (file.gcount() > 0) {
+            hash.Update((const byte*)buffer.data(), file.gcount());
+        }
+
+        // Hash HI and LO registers (16 bytes)
+        buffer.resize(16);
+        file.read(buffer.data(), buffer.size());
+        if (file.gcount() > 0) {
+            hash.Update((const byte*)buffer.data(), file.gcount());
+        }
+
+        // Skip peripheral registers (RDRAM, SI, DISPLAY, MIPS, VIDEO, AUDIO, PERIPHERAL, RDRAM interfaces)
+        // These can contain timing-dependent data
+        file.seekg(10*4 + 10*4 + 10*4 + 4*4 + 14*4 + 6*4 + 13*4 + 8*4, std::ios::cur);
+
+        // Skip SerialInterface registers (4*4 = 16 bytes)
+        file.seekg(16, std::ios::cur);
+
+        // Hash TLB entries - should be stable (32 entries * sizeof(TLB_ENTRY))
+        // Note: We can't directly access g_TLB here, but the save state format includes TLB data
+        // The TLB data comes after the SerialInterface registers in the save state
+        buffer.resize(32 * sizeof(CTLB::TLB_ENTRY));
+        file.read(buffer.data(), buffer.size());
+        if (file.gcount() > 0) {
+            hash.Update((const byte*)buffer.data(), file.gcount());
+        }
+
+        // Skip PIF RAM (64 bytes)
+        file.seekg(64, std::ios::cur);
+
+        // Hash RDRAM starting from offset 0x10000 (64KB) to avoid game-specific state at the beginning
+        // This skips things like frame counters, RNG seeds, etc. that might legitimately vary
+        const uint32_t RDRAM_OFFSET = 0x10000;
+        const uint32_t RDRAM_HASH_SIZE = 2 * 1024 * 1024; // Hash 2MB of RDRAM (half of typical 4MB)
+
+        file.seekg(RDRAM_OFFSET, std::ios::cur);
+        buffer.resize(64 * 1024); // Read in 64KB chunks
+
+        size_t totalRDRAMHashed = 0;
+        while (totalRDRAMHashed < RDRAM_HASH_SIZE && file.good()) {
+            size_t toRead = std::min(buffer.size(), RDRAM_HASH_SIZE - totalRDRAMHashed);
+            file.read(buffer.data(), toRead);
+            size_t bytesRead = file.gcount();
+            if (bytesRead > 0) {
+                hash.Update((const byte*)buffer.data(), bytesRead);
+                totalRDRAMHashed += bytesRead;
+            } else {
+                break;
+            }
+        }
+
+        // Hash DMEM and IMEM (RSP memory) - should be stable
+        buffer.resize(0x2000); // 8KB total for DMEM+IMEM
+        file.read(buffer.data(), buffer.size());
+        if (file.gcount() > 0) {
+            hash.Update((const byte*)buffer.data(), file.gcount());
+        }
+
+        // Finalize hash
+        byte digest[CryptoPP::SHA256::DIGESTSIZE];
+        hash.Final(digest);
+
+        // Convert to hex string
+        CryptoPP::HexEncoder encoder;
+        std::string hexDigest;
+        encoder.Attach(new CryptoPP::StringSink(hexDigest));
+        encoder.Put(digest, sizeof(digest));
+        encoder.MessageEnd();
+
+        hashResult = hexDigest;
+    }
+    catch (...) {
+        // If anything goes wrong, return empty string
+        hashResult = "";
+    }
+
     file.close();
 
     // Clean up temporary file
     DeleteFileA(tempFile.c_str());
 
-    if (bytesRead == 0)
-    {
-        return "";
-    }
-
-    // Hash the data using CryptoPP
-    CryptoPP::SHA256 hash;
-    std::string digest;
-    CryptoPP::StringSource ss(std::string(buffer.data(), bytesRead), true,
-        new CryptoPP::HashFilter(hash,
-            new CryptoPP::HexEncoder(
-                new CryptoPP::StringSink(digest))));
-
-    return digest;
+    return hashResult;
 }
 
 void CN64System::HandleDesyncDetection()

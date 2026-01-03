@@ -347,7 +347,7 @@ struct user_info {
     std::array<save_info, 5> saves;
     std::string cheat_file_hash;
     std::string state_hash;  // SHA256 hash of emulator state (RDRAM, CPU registers, RSP memory) for desync detection
-    std::string desync_hash;  // SHA256 hash of first 1024 bytes of save state for desync detection
+    std::string desync_hash;  // SHA256 hash of stable memory regions (CPU regs + RDRAM + RSP mem + TLB) for desync detection
     uint8_t lag = 5;
     double latency = NAN;
     std::array<controller, 4> controllers;
