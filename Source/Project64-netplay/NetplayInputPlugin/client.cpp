@@ -132,12 +132,16 @@ void client::fetch_server_list_from_web() {
             fetch_servers_from_github();
             fetched_from_web = true;
         } catch (const std::exception& e) {
-            my_dialog->info("Failed to fetch servers...: " + std::string(e.what()));
+            // Silently fall back to local file
         }
 
         // If web fetch failed or returned no servers, try local file
         if (!fetched_from_web || public_servers.empty()) {
             load_servers_from_file();
+        }
+
+        if (!public_servers.empty()) {
+            my_dialog->info("Loaded " + std::to_string(public_servers.size()) + " servers");
         }
 
     } catch (const std::exception& e) {
@@ -645,7 +649,6 @@ void client::on_message(string message) {
                 if (!is_host()) {
                     my_dialog->info("Only the host can start the game...");
                 } else {
-                    my_dialog->info("Starting game...");
                     Sleep(1000);
                     send_savesync();
                     Sleep(250);
@@ -713,11 +716,9 @@ void client::on_message(string message) {
                     change_input_authority(user_id, authority_id);
 
                     if (user_id == authority_id) {
-                        my_dialog->info("Input authority has been restored");
-                        my_dialog->info("Please enable your frame rate limit.");
+                        my_dialog->info("Input authority restored - enable frame rate limit");
                     } else {
-                        my_dialog->info("Input authority has been delegated to " + user_map[authority_id]->name);
-                        my_dialog->info("Please disable your frame rate limit");
+                        my_dialog->info("Input authority delegated to " + user_map[authority_id]->name);
                     }
                 }
             } else {
@@ -1149,7 +1150,6 @@ void client::on_receive(packet& p, bool udp) {
             int skipped_count = 0;
             int error_count = 0;
 
-            my_dialog->info("Processing save sync...");
 
             for (int i = 0; i < me->saves.size(); i++) {
                 try {
@@ -1205,7 +1205,6 @@ void client::on_receive(packet& p, bool udp) {
                                     // Add a small delay to avoid potential race conditions with directory creation
                                     Sleep(10);
                                     std::filesystem::copy(original_path, backup_path, std::filesystem::copy_options::overwrite_existing);
-                                    my_dialog->info("Backed up save: " + my_save.save_name);
                                 } catch (const std::filesystem::filesystem_error& e) {
                                     my_dialog->error("Failed to backup save " + my_save.save_name + ": " + std::string(e.what()));
                                     error_count++;
@@ -1218,9 +1217,7 @@ void client::on_receive(packet& p, bool udp) {
                         if (incoming_empty && !my_save.save_name.empty()) {
                             std::string existing_path = save_path + my_save.save_name;
                             if (std::filesystem::exists(existing_path)) {
-                                if (DeleteFileA(existing_path.c_str())) {
-                                    my_dialog->info("Deleted save file (empty save received): " + my_save.save_name);
-                                } else {
+                                if (!DeleteFileA(existing_path.c_str())) {
                                     DWORD error = GetLastError();
                                     my_dialog->error("Failed to delete save file " + my_save.save_name + " (Error: " + std::to_string(error) + ")");
                                     error_count++;
@@ -1231,12 +1228,8 @@ void client::on_receive(packet& p, bool udp) {
                         // Update local save and replace file
                         // This will write the new save or skip if empty (already deleted above)
                         me->saves[i] = save_data;
-                        if (!incoming_empty) {
-                            if (!replace_save_file(save_data)) {
-                                error_count++;
-                            } else if (!save_data.save_name.empty()) {
-                                my_dialog->info("Synced save: " + save_data.save_name + " (" + std::to_string(save_data.save_data.size()) + " bytes)");
-                            }
+                        if (!incoming_empty && !replace_save_file(save_data)) {
+                            error_count++;
                         }
                     } else {
                         skipped_count++;
@@ -1256,40 +1249,17 @@ void client::on_receive(packet& p, bool udp) {
                 }
             }
 
-            // Log summary
-            std::string summary = "Save sync complete: ";
-            if (synced_count > 0) {
-                summary += std::to_string(synced_count) + " synced";
-            }
-            if (skipped_count > 0) {
-                if (synced_count > 0) summary += ", ";
-                summary += std::to_string(skipped_count) + " already in sync";
-            }
             if (error_count > 0) {
-                summary += ", " + std::to_string(error_count) + " error(s)";
+                my_dialog->error("Save sync completed with " + std::to_string(error_count) + " error(s)");
             }
-            my_dialog->info(summary);
 
             // Process cheat files
             try {
-                if (p.available() >= sizeof(uint32_t)) {  // Check if we have at least a string length
-                    std::string cheat_file_content = p.read<std::string>();
-                    my_dialog->info("Read cheat file content: " + std::to_string(cheat_file_content.length()) + " bytes");
+                std::string cheat_file_content = p.read<std::string>();
+                std::string enabled_file_content = p.read<std::string>();
 
-                    if (p.available() >= sizeof(uint32_t)) {  // Check if we have the enabled file string
-                        std::string enabled_file_content = p.read<std::string>();
-                        my_dialog->info("Read enabled file content: " + std::to_string(enabled_file_content.length()) + " bytes");
-
-                        if (!cheat_file_content.empty() || !enabled_file_content.empty()) {
-                            apply_cheats(cheat_file_content, enabled_file_content);
-                        } else {
-                            my_dialog->info("No cheat files to sync (empty)");
-                        }
-                    } else {
-                        my_dialog->error("Missing enabled file content in save sync packet");
-                    }
-                } else {
-                    my_dialog->error("Missing cheat file content in save sync packet");
+                if (!cheat_file_content.empty() || !enabled_file_content.empty()) {
+                    apply_cheats(cheat_file_content, enabled_file_content);
                 }
             } catch (const std::exception& e) {
                 my_dialog->error("Error processing cheat files: " + std::string(e.what()));
@@ -1693,7 +1663,6 @@ void client::compare_all_players_save_hashes() {
                 if (j > 0) players_str += ", ";
                 players_str += players[j];
             }
-            my_dialog->info("Save slot " + std::to_string(slot) + " verified: all players match (" + players_str + ")");
         }
         // If hash_to_players is empty, all saves are empty (no mismatch, nothing to report)
     }
@@ -1751,7 +1720,6 @@ void client::compare_all_players_cheat_file_hashes() {
             if (j > 0) players_str += ", ";
             players_str += players[j];
         }
-        my_dialog->info("Cheat file verified: all players match (" + players_str + ")");
     }
     // If hash_to_players is empty, all cheat files are empty (no mismatch, nothing to report)
 }
@@ -1761,14 +1729,6 @@ void client::log_player_cheat_info(std::shared_ptr<user_info> user) {
     
     std::string player_name = user->name;
     std::string cheat_hash = user->cheat_file_hash;
-    
-    // Log cheat file hash for the player
-    if (cheat_hash.empty()) {
-        my_dialog->info(player_name + " cheat info: No cheat file");
-    } else {
-        std::string hash_short = cheat_hash.substr(0, 16) + "...";
-        my_dialog->info(player_name + " cheat file hash: " + hash_short);
-    }
     
     // If this is us (me), also load and log our enabled cheats
     if (user == me || user->id == me->id) {
@@ -1843,7 +1803,7 @@ void client::send_savesync() {
         return;
     }
 
-    my_dialog->info("Initiating save and cheat sync to all clients...");
+    my_dialog->info("Syncing saves...");
 
     packet p;
     p << SAVE_SYNC;
@@ -1902,14 +1862,7 @@ void client::send_savesync() {
     p << cheat_file_content;
     p << enabled_file_content;
 
-    my_dialog->info("Cheat file content size: " + std::to_string(cheat_file_content.length()) + " bytes");
-    my_dialog->info("Enabled file content size: " + std::to_string(enabled_file_content.length()) + " bytes");
 
-    if (save_count > 0) {
-        my_dialog->info("Sending " + std::to_string(save_count) + " save file(s) and cheat files to clients");
-    } else {
-        my_dialog->info("No save files to sync (all empty), sending cheat files to clients");
-    }
 
     send(p);
 }
@@ -2352,9 +2305,7 @@ void client::apply_cheats(const std::string& cheat_file_content, const std::stri
             if (applyCheatsDirectly) {
                 // Try to apply cheats - they'll be loaded into m_Codes and applied every frame automatically
                 applyCheatsDirectly(cheat_file_content.c_str(), enabled_file_content.c_str(), game_id.c_str());
-                
-                // Log success - cheats are now in m_Codes and will be applied every frame
-                my_dialog->info("Loaded cheats directly to memory (p2-4 mode, " + std::to_string(cheat_file_content.length()) + " bytes). Cheats will be applied every frame automatically.");
+
                 return;
             } else {
                 my_dialog->error("Could not find ApplyCheatsDirectlyForNetplay function, falling back to file sync");
