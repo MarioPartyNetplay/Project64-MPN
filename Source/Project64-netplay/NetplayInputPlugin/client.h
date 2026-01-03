@@ -16,6 +16,9 @@ class client: public service_wrapper, public connection {
         client(std::shared_ptr<client_dialog> dialog);
         ~client();
         void load_public_server_list();
+        void fetch_server_list_from_web();
+        void fetch_servers_from_github();
+        void load_servers_from_file();
         void get_external_address();
         std::string get_name();
         void set_name(const std::string& name);
