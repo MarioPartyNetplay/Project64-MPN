@@ -27,6 +27,7 @@
 #if defined(ANDROID)
 #include <utime.h>
 #endif
+#define NOMINMAX
 #include <ShlDisp.h>
 #include <shellapi.h>
 #include <3rdParty/mario_party_netplay.h>
@@ -2936,7 +2937,7 @@ std::string CN64System::GenerateDesyncSaveStateHash()
 
         size_t totalRDRAMHashed = 0;
         while (totalRDRAMHashed < RDRAM_HASH_SIZE && file.good()) {
-            size_t toRead = std::min(buffer.size(), RDRAM_HASH_SIZE - totalRDRAMHashed);
+            size_t toRead = (buffer.size() < (RDRAM_HASH_SIZE - totalRDRAMHashed)) ? buffer.size() : (RDRAM_HASH_SIZE - totalRDRAMHashed);
             file.read(buffer.data(), toRead);
             size_t bytesRead = file.gcount();
             if (bytesRead > 0) {
