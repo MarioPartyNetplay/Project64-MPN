@@ -13,6 +13,7 @@
 
 #include <commctrl.h>
 #include <Project64-core/Settings/SettingType/SettingsType-Application.h>
+#include <Project64-core/Version.h>
 
 #include "Discord.h"
 #include "DarkModeUtils.h"
@@ -154,7 +155,7 @@ void CMainGui::SetWindowCaption(const wchar_t * title)
     static const size_t TITLE_SIZE = 256;
     wchar_t WinTitle[TITLE_SIZE];
 
-    _snwprintf(WinTitle, TITLE_SIZE, L"%s - %s", title, stdstr(g_Settings->LoadStringVal(Setting_ApplicationName)).ToUTF16().c_str());
+    _snwprintf(WinTitle, TITLE_SIZE, L"%s - %s (%s)", title, stdstr(g_Settings->LoadStringVal(Setting_ApplicationName)).ToUTF16().c_str(), stdstr(GIT_HASH).ToUTF16().c_str());
     WinTitle[TITLE_SIZE - 1] = 0;
     Caption(WinTitle);
 }

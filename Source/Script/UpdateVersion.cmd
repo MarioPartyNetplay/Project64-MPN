@@ -18,13 +18,43 @@ if %SED% == "" (
 SETLOCAL EnableDelayedExpansion
 FOR /F "tokens=1 delims=" %%A in ('git describe --tags --long') do SET current_tag=%%A
 FOR /F "tokens=1 delims=" %%A in ('echo !current_tag! ^| !sed! "s/v[0-9]*\.[0-9]*\.[0-9]*-\([0-9]*\).*/\1/"') do SET commits_since_tag=%%A
+FOR /F "tokens=1 delims=" %%A in ('git rev-parse --short=7 HEAD') do SET git_hash=%%A
 
 call :setVersion "%base_dir%\Source\Project64-core\version.h" !commits_since_tag!
 call :setVersion "%base_dir%\Source\nragev20\version.h" !commits_since_tag!
 call :setVersion "%base_dir%\Source\RSP\version.h" !commits_since_tag!
 call :setVersion "%base_dir%\Source\Glide64\version.h" !commits_since_tag!
 
+call :setGitHash "%base_dir%\Source\Project64-core\version.h" !git_hash!
+
 ENDLOCAL
+
+goto :eof
+
+:setGitHash
+set version_file=%~1
+set out_file=%~1.out
+set git_hash=%~2
+
+if exist "%out_file%" del "%out_file%"
+
+SETLOCAL DisableDelayedExpansion
+FOR /F "usebackq delims=" %%a in (`"findstr /n ^^ "%version_file%""`) do (
+    set "line=%%a"
+    SETLOCAL EnableDelayedExpansion
+    set "line=!line:GIT_HASH_PLACEHOLDER=%git_hash%!"
+    set "line=!line:*:=!"
+    echo(!line!>>!out_file!
+    ENDLOCAL
+)
+ENDLOCAL
+
+if exist "%out_file%" (
+	if exist "%version_file%" (
+		del "%version_file%"
+		move "%out_file%" "%version_file%"
+	)
+)
 
 goto :eof
 

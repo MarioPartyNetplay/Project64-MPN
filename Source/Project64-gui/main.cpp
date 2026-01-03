@@ -7,6 +7,7 @@
 #include <Project64-core/Notification.h>
 #include <Project64-core/N64System/SystemGlobals.h>
 #include <Common/Util.h>
+#include <Project64-core/Version.h>
 
 extern bool DarkModeEnter(DWORD reason);
 
@@ -25,7 +26,7 @@ int WINAPI WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR /
         }
         //Create the main window with Menu
         WriteTrace(TraceUserInterface, TraceDebug, "Create Main Window");
-        CMainGui  MainWindow(true, stdstr_f("Project64 MPN").c_str()), HiddenWindow(false);
+        CMainGui  MainWindow(true, stdstr_f("Project64 MPN (%s)", GIT_HASH).c_str()), HiddenWindow(false);
         CMainMenu MainMenu(&MainWindow);
         g_Plugins->SetRenderWindows(&MainWindow, &HiddenWindow);
         Notify().SetMainWindow(&MainWindow);
