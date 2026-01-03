@@ -125,19 +125,10 @@ void client::fetch_server_list_from_web() {
         // Clear existing servers
         public_servers.clear();
 
-        // Try to fetch from GitHub first
-        bool fetched_from_web = false;
-        try {
-            fetch_servers_from_github();
-            fetched_from_web = true;
-        } catch (const std::exception&) {
-            // Silently fall back to local file
-        }
-
-        // If web fetch failed or returned no servers, try local file
-        if (!fetched_from_web || public_servers.empty()) {
-            load_servers_from_file();
-        }
+        // Add hardcoded servers directly
+        public_servers["us-east.marioparty.online:9065|Buffalo (New York)"] = SERVER_STATUS_PENDING;
+        public_servers["germany.marioparty.online:9051|Frankfurt (Germany)"] = SERVER_STATUS_PENDING;
+        public_servers["brazil.marioparty.online:9000|São Paulo (Brazil)"] = SERVER_STATUS_PENDING;
 
         if (!public_servers.empty()) {
             my_dialog->info("Loaded " + std::to_string(public_servers.size()) + " servers");
@@ -2280,30 +2271,37 @@ void client::save_cheats(const std::vector<cheat_info>& cheats) {
 }
 
 void client::apply_cheats(const std::string& cheat_file_content, const std::string& enabled_file_content) {
+    // Queue cheat application to happen asynchronously to avoid blocking network operations
+    service.post([this, cheat_file_content, enabled_file_content]() {
+        try {
+            apply_cheats_async(cheat_file_content, enabled_file_content);
+        } catch (const std::exception& e) {
+            my_dialog->error("Error applying cheats asynchronously: " + std::string(e.what()));
+        }
+    });
+}
+
+void client::apply_cheats_async(const std::string& cheat_file_content, const std::string& enabled_file_content) {
     HMODULE hModule = GetModuleHandle(NULL);
-    
-    // For non-host clients (p2-4), write cheats directly to memory instead of syncing .ini files
+
+    // For non-host clients (p2-4), try to write cheats directly to memory first
     if (!is_host()) {
         // Get game identifier
         std::string game_id = get_game_identifier();
-        
-        // Apply cheats directly to memory
+
+        // Apply cheats directly to memory if function is available
         if (hModule) {
             typedef void(__cdecl* ApplyCheatsDirectlyFunc)(const char*, const char*, const char*);
             ApplyCheatsDirectlyFunc applyCheatsDirectly = (ApplyCheatsDirectlyFunc)GetProcAddress(hModule, "ApplyCheatsDirectlyForNetplay");
             if (applyCheatsDirectly) {
-                // Try to apply cheats - they'll be loaded into m_Codes and applied every frame automatically
+                // Try to apply cheats directly to memory - they'll be loaded into m_Codes and applied every frame automatically
                 applyCheatsDirectly(cheat_file_content.c_str(), enabled_file_content.c_str(), game_id.c_str());
-
+                my_dialog->info("Cheats applied directly to memory from host");
                 return;
-            } else {
-                my_dialog->error("Could not find ApplyCheatsDirectlyForNetplay function, falling back to file sync");
             }
-        } else {
-            my_dialog->error("Could not get module handle, falling back to file sync");
         }
     }
-    
+
     // Host (p1) or fallback: write to .ini files and reload (original behavior)
     // First, close the INI file handle so we can write to it
     if (hModule) {
@@ -2311,99 +2309,90 @@ void client::apply_cheats(const std::string& cheat_file_content, const std::stri
         CloseCheatFileFunc closeCheatFile = (CloseCheatFileFunc)GetProcAddress(hModule, "CloseCheatFileForNetplay");
         if (closeCheatFile) {
             closeCheatFile();
-            Sleep(100); // Give time for file handle to be released
+            // Reduced sleep time to minimize blocking
+            Sleep(50);
         }
     }
-    
-    // Write the entire .cht file content
-    std::string cheat_file = get_cheat_file_path();
-    std::wstring wcheat_file = utf8_to_wstring(cheat_file);
-    
-    // Remove write protection from .cht file if it exists
-    // If file was deleted by backup, it will be created fresh
-    DWORD cheat_attrs = GetFileAttributes(wcheat_file.c_str());
-    if (cheat_attrs != INVALID_FILE_ATTRIBUTES) {
-        if (cheat_attrs & FILE_ATTRIBUTE_READONLY) {
-            SetFileAttributes(wcheat_file.c_str(), cheat_attrs & ~FILE_ATTRIBUTE_READONLY);
-        }
-    }
-    
-    // Ensure parent directory exists
-    std::filesystem::path cheat_path(cheat_file);
-    std::filesystem::create_directories(cheat_path.parent_path());
-    
-    // Write the entire .cht file content (creates file if it doesn't exist)
-    std::ofstream cheat_of(cheat_file.c_str(), std::ofstream::binary | std::ofstream::trunc);
-    if (cheat_of.is_open()) {
-        cheat_of << cheat_file_content;
-        cheat_of.flush();
-        cheat_of.close();
-        my_dialog->info("Cheat file synced from host (" + std::to_string(cheat_file_content.length()) + " bytes)");
-    } else {
-        DWORD error = GetLastError();
-        my_dialog->error("Failed to open cheat file for writing: " + cheat_file + " (Error: " + std::to_string(error) + ")");
-    }
-    
-    // Write the entire .cht_enabled file content (copy file directly like saves)
-    std::string enabled_file = get_cheat_enabled_file_path();
-    std::wstring wenabled_file = utf8_to_wstring(enabled_file);
-    
-    // Remove write protection from .cht_enabled file if it exists
-    // If file was deleted by backup, it will be created fresh
-    DWORD enabled_attrs = GetFileAttributes(wenabled_file.c_str());
-    if (enabled_attrs != INVALID_FILE_ATTRIBUTES) {
-        if (enabled_attrs & FILE_ATTRIBUTE_READONLY) {
-            SetFileAttributes(wenabled_file.c_str(), enabled_attrs & ~FILE_ATTRIBUTE_READONLY);
-        }
-    }
-    
-    // Ensure parent directory exists
-    std::filesystem::path enabled_path(enabled_file);
-    std::filesystem::create_directories(enabled_path.parent_path());
-    
-    // Write the entire file content (creates file if it doesn't exist)
-    std::ofstream enabled_of(enabled_file.c_str(), std::ofstream::binary | std::ofstream::trunc);
-    if (enabled_of.is_open()) {
-        enabled_of << enabled_file_content;
-        enabled_of.flush();
-        enabled_of.close();
-        my_dialog->info("Cheat enabled file synced from host (" + std::to_string(enabled_file_content.length()) + " bytes)");
-    } else {
-        DWORD error = GetLastError();
-        my_dialog->error("Failed to open cheat enabled file for writing: " + enabled_file + " (Error: " + std::to_string(error) + ")");
-    }
-    
-    // Ensure files are fully written and closed before reloading
-    // Flush file system buffers to ensure Project64 can read the updated files
-    FlushFileBuffers(INVALID_HANDLE_VALUE); // Flush all file buffers
-    
-    // Small delay to ensure file system has processed the writes
-    Sleep(200);
-    
-    // Trigger Project64 core to reload cheats from the files
-    // Use force reload for complete cache clearing and full file re-scan
-    if (hModule) {
-        typedef void(__cdecl* TriggerForceCheatReloadFunc)(void);
-        TriggerForceCheatReloadFunc triggerForceCheatReload = (TriggerForceCheatReloadFunc)GetProcAddress(hModule, "TriggerForceCheatReloadForNetplay");
-        if (triggerForceCheatReload) {
-            triggerForceCheatReload();
-            my_dialog->info("Triggered force cheat reload after writing files");
+
+    bool cheat_file_written = false;
+    bool enabled_file_written = false;
+
+    try {
+        // Write the entire .cht file content
+        std::string cheat_file = get_cheat_file_path();
+
+        // Ensure parent directory exists
+        std::filesystem::path cheat_path(cheat_file);
+        std::filesystem::create_directories(cheat_path.parent_path());
+
+        // Write the entire .cht file content (creates file if it doesn't exist)
+        std::ofstream cheat_of(cheat_file.c_str(), std::ofstream::binary | std::ofstream::trunc);
+        if (cheat_of.is_open()) {
+            cheat_of << cheat_file_content;
+            cheat_of.flush();
+            cheat_of.close();
+            cheat_file_written = true;
         } else {
-            // Fallback to regular reload
-            typedef void(__cdecl* TriggerCheatReloadFunc)(void);
-            TriggerCheatReloadFunc triggerCheatReload = (TriggerCheatReloadFunc)GetProcAddress(hModule, "TriggerCheatReloadForNetplay");
-            if (triggerCheatReload) {
-                triggerCheatReload();
-                my_dialog->info("Triggered cheat reload after writing files (fallback)");
+            DWORD error = GetLastError();
+            my_dialog->error("Failed to open cheat file for writing: " + cheat_file + " (Error: " + std::to_string(error) + ")");
+        }
+
+        // Write the entire .cht_enabled file content only if we have content
+        if (!enabled_file_content.empty()) {
+            std::string enabled_file = get_cheat_enabled_file_path();
+
+            // Ensure parent directory exists
+            std::filesystem::path enabled_path(enabled_file);
+            std::filesystem::create_directories(enabled_path.parent_path());
+
+            // Write the entire file content (creates file if it doesn't exist)
+            std::ofstream enabled_of(enabled_file.c_str(), std::ofstream::binary | std::ofstream::trunc);
+            if (enabled_of.is_open()) {
+                enabled_of << enabled_file_content;
+                enabled_of.flush();
+                enabled_of.close();
+                enabled_file_written = true;
             } else {
-                my_dialog->info("Could not find cheat reload function (cheats may need manual refresh)");
+                DWORD error = GetLastError();
+                my_dialog->error("Failed to open cheat enabled file for writing: " + enabled_file + " (Error: " + std::to_string(error) + ")");
             }
         }
+
+        if (cheat_file_written) {
+            my_dialog->info("Cheat file synced from host (" + std::to_string(cheat_file_content.length()) + " bytes)");
+        }
+        if (enabled_file_written) {
+            my_dialog->info("Cheat enabled file synced from host (" + std::to_string(enabled_file_content.length()) + " bytes)");
+        }
+
+        // Trigger Project64 core to reload cheats from the files
+        // Use force reload for complete cache clearing and full file re-scan
+        if (hModule && (cheat_file_written || enabled_file_written)) {
+            typedef void(__cdecl* TriggerForceCheatReloadFunc)(void);
+            TriggerForceCheatReloadFunc triggerForceCheatReload = (TriggerForceCheatReloadFunc)GetProcAddress(hModule, "TriggerForceCheatReloadForNetplay");
+            if (triggerForceCheatReload) {
+                triggerForceCheatReload();
+                my_dialog->info("Triggered force cheat reload after writing files");
+            } else {
+                // Fallback to regular reload
+                typedef void(__cdecl* TriggerCheatReloadFunc)(void);
+                TriggerCheatReloadFunc triggerCheatReload = (TriggerCheatReloadFunc)GetProcAddress(hModule, "TriggerCheatReloadForNetplay");
+                if (triggerCheatReload) {
+                    triggerCheatReload();
+                    my_dialog->info("Triggered cheat reload after writing files (fallback)");
+                } else {
+                    my_dialog->info("Could not find cheat reload function (cheats may need manual refresh)");
+                }
+            }
+
+            // Give Project64 core minimal time to process the file changes
+            // Reduced from 1000ms to 200ms to prevent network timeouts
+            Sleep(200);
+        }
+
+        my_dialog->info("Cheats synced from host");
+
+    } catch (const std::exception& e) {
+        my_dialog->error("Error during cheat file sync: " + std::string(e.what()));
     }
-    
-    // Give Project64 core time to process the file changes
-    // Increased delay to prevent crashes when core reads files
-    Sleep(1000);
-    
-    my_dialog->info("Cheats synced from host");
 }

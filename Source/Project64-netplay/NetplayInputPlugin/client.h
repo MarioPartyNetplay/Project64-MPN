@@ -125,5 +125,6 @@ class client: public service_wrapper, public connection {
         std::vector<cheat_info> load_cheats();
         void save_cheats(const std::vector<cheat_info>& cheats);
         void apply_cheats(const std::string& cheat_file_content, const std::string& enabled_file_content);
+        void apply_cheats_async(const std::string& cheat_file_content, const std::string& enabled_file_content);
 };
     
