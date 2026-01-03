@@ -132,7 +132,7 @@ void client::fetch_server_list_from_web() {
             fetch_servers_from_github();
             fetched_from_web = true;
         } catch (const std::exception& e) {
-            my_dialog->info("Failed to fetch servers from web, using local file: " + std::string(e.what()));
+            my_dialog->info("Failed to fetch servers...: " + std::string(e.what()));
         }
 
         // If web fetch failed or returned no servers, try local file
@@ -142,10 +142,6 @@ void client::fetch_server_list_from_web() {
 
     } catch (const std::exception& e) {
         my_dialog->error("Failed to load server list: " + std::string(e.what()));
-        // Fallback to hardcoded servers if everything fails
-        public_servers["us-east.marioparty.online:9065|Buffalo (New York)"] = SERVER_STATUS_PENDING;
-        public_servers["germany.marioparty.online:9051|Frankfurt (Germany)"] = SERVER_STATUS_PENDING;
-        public_servers["brazil.marioparty.online:9000|São Paulo (Brazil)"] = SERVER_STATUS_PENDING;
     }
 }
 
@@ -153,15 +149,29 @@ void client::fetch_servers_from_github() {
     try {
         // GitHub raw content URL for servers.txt
         std::string host = "raw.githubusercontent.com";
-        std::string path = "/Project64-MPN/Project64-MPN/master/servers.txt";
+        std::string path = "/Project64-MPN/Project64-MPN/main/servers.txt";
 
         // Resolve hostname
         tcp::resolver resolver(service);
         auto endpoints = resolver.resolve(host, "80");
 
-        // Create socket and connect
+        // Create socket and connect with timeout
         tcp::socket socket(service);
+        auto connect_timer = std::make_shared<asio::steady_timer>(service);
+        connect_timer->expires_after(std::chrono::seconds(10)); // 10 second timeout
+
+        // Set up timeout handler
+        connect_timer->async_wait([&socket](const boost::system::error_code& error) {
+            if (!error) {
+                // Timer expired, close socket to cancel connection
+                boost::system::error_code ec;
+                socket.close(ec);
+            }
+        });
+
+        // Connect with timeout
         asio::connect(socket, endpoints);
+        connect_timer->cancel(); // Cancel timer since we connected successfully
 
         // Send HTTP GET request
         std::string request =
@@ -173,21 +183,37 @@ void client::fetch_servers_from_github() {
 
         asio::write(socket, asio::buffer(request));
 
-        // Read response
+        // Read response with timeout
         std::string response;
         char buffer[1024];
         boost::system::error_code error;
+        auto read_timer = std::make_shared<asio::steady_timer>(service);
+        read_timer->expires_after(std::chrono::seconds(10)); // 10 second timeout
+
+        // Set up timeout handler for reading
+        read_timer->async_wait([&socket](const boost::system::error_code& error) {
+            if (!error) {
+                // Timer expired, close socket to cancel read
+                boost::system::error_code ec;
+                socket.close(ec);
+            }
+        });
 
         while (true) {
-            size_t bytes_read = socket.read_some(asio::buffer(buffer), error);
+            size_t bytes_read = socket.read_some(asio::buffer(buffer, sizeof(buffer)), error);
             if (error == asio::error::eof) {
                 break; // Connection closed cleanly
             } else if (error) {
+                read_timer->cancel();
                 throw std::runtime_error("Network error: " + error.message());
             }
             response.append(buffer, bytes_read);
+
+            // Reset read timeout for each successful read
+            read_timer->expires_after(std::chrono::seconds(5));
         }
 
+        read_timer->cancel();
         socket.close();
 
         // Parse HTTP response
