@@ -2359,8 +2359,10 @@ void client::apply_cheats_async(const std::string& cheat_file_content, const std
             if (applyCheatsDirectly) {
                 // Try to apply cheats directly to memory - they'll be loaded into m_Codes and applied every frame automatically
                 applyCheatsDirectly(cheat_file_content.c_str(), enabled_file_content.c_str(), game_id.c_str());
-                my_dialog->info("Cheats applied directly to memory from host");
+                my_dialog->info("Cheats applied directly to memory from host (" + std::to_string(cheat_file_content.length()) + " bytes cheat data)");
                 return;
+            } else {
+                my_dialog->info("ApplyCheatsDirectlyForNetplay function not found, falling back to file method");
             }
         }
     }

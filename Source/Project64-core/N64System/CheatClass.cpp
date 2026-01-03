@@ -188,6 +188,10 @@ void CCheats::LoadCheatsFromData(const char * cheat_file_content, const char * e
         return;
     }
 
+    // Debug logging
+    OutputDebugStringA("LoadCheatsFromData: loading cheats for game ");
+    OutputDebugStringA(game_identifier);
+
     // Parse enabled file to get active cheat status
     std::map<int, bool> active_cheats;
     if (enabled_file_content)
@@ -357,6 +361,9 @@ void CCheats::LoadCheatsFromData(const char * cheat_file_content, const char * e
             // This is OK - some cheats require extensions which we don't support for p2-4
         }
     }
+
+    // Debug logging
+    OutputDebugStringA("LoadCheatsFromData: finished loading cheats");
 }
 
 /********************************************************************************************

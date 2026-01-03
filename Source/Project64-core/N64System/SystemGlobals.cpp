@@ -112,16 +112,15 @@ extern "C" void ApplyCheatsDirectlyForNetplay(const char * cheat_file_content, c
         // This loads cheats into m_Codes, which will be applied every frame automatically
         g_BaseSystem->m_Cheats.LoadCheatsFromData(cheat_file_content, enabled_file_content, game_identifier, g_BaseSystem->GetPlugins());
 
-        // Set the cheat selection changed flag so the system knows cheats have been updated
-        // This will trigger UI updates and other notifications without clearing m_Codes
-        g_BaseSystem->SetCheatsSlectionChanged(true);
-        
         // Apply cheats immediately to memory if MMU is ready
         // (They'll also be applied every frame automatically in the VI handler)
         if (g_MMU)
         {
             g_BaseSystem->m_Cheats.ApplyCheats(g_MMU);
         }
+
+        // Debug logging
+        OutputDebugStringA("ApplyCheatsDirectlyForNetplay: loaded cheats successfully");
     }
 }
 
