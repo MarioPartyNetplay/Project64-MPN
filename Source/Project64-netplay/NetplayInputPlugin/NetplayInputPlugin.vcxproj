@@ -146,7 +146,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;WIN32;_DEBUG;NETPLAYINPUTPLUGIN_EXPORTS;_WINDOWS;_USRDLL;WIN32_LEAN_AND_MEAN;_WIN32_WINNT=0x0600;ASIO_STANDALONE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)Source\3rdParty\asio\asio\include;$(SolutionDir)Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)Source\3rdParty\dirent\include;$(SolutionDir)Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.;$(SolutionDir)Source\3rdParty\asio\asio\include;$(SolutionDir)Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)Source\3rdParty\dirent\include;$(SolutionDir)Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <DebugInformationFormat>None</DebugInformationFormat>
     </ClCompile>
@@ -167,7 +167,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;WIN32;_DEBUG;NETPLAYINPUTPLUGIN_EXPORTS;_WINDOWS;_USRDLL;WIN32_LEAN_AND_MEAN;_WIN32_WINNT=0x0600;ASIO_STANDALONE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)Source\3rdParty\asio\asio\include;$(SolutionDir)Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)Source\3rdParty\dirent\include;$(SolutionDir)Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.;$(SolutionDir)Source\3rdParty\asio\asio\include;$(SolutionDir)Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)Source\3rdParty\dirent\include;$(SolutionDir)Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <DebugInformationFormat>None</DebugInformationFormat>
     </ClCompile>
@@ -188,7 +188,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;_DEBUG;NETPLAYINPUTPLUGIN_EXPORTS;_WINDOWS;_USRDLL;WIN32_LEAN_AND_MEAN;_WIN32_WINNT=0x0600;ASIO_STANDALONE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)Source\3rdParty\asio\asio\include;$(SolutionDir)Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)Source\3rdParty\dirent\include;$(SolutionDir)Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.;$(SolutionDir)Source\3rdParty\asio\asio\include;$(SolutionDir)Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)Source\3rdParty\dirent\include;$(SolutionDir)Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <DebugInformationFormat>None</DebugInformationFormat>
     </ClCompile>
@@ -209,7 +209,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;_DEBUG;NETPLAYINPUTPLUGIN_EXPORTS;_WINDOWS;_USRDLL;WIN32_LEAN_AND_MEAN;_WIN32_WINNT=0x0600;ASIO_STANDALONE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)Source\3rdParty\asio\asio\include;$(SolutionDir)Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)Source\3rdParty\dirent\include;$(SolutionDir)Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.;$(SolutionDir)Source\3rdParty\asio\asio\include;$(SolutionDir)Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)Source\3rdParty\dirent\include;$(SolutionDir)Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <DebugInformationFormat>None</DebugInformationFormat>
     </ClCompile>
@@ -232,7 +232,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;WIN32;NDEBUG;NETPLAYINPUTPLUGIN_EXPORTS;_WINDOWS;_USRDLL;WIN32_LEAN_AND_MEAN;_WIN32_WINNT=0x0600;ASIO_STANDALONE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)Source\3rdParty\asio\asio\include;$(SolutionDir)Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)Source\3rdParty\dirent\include;$(SolutionDir)Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.;$(SolutionDir)Source\3rdParty\asio\asio\include;$(SolutionDir)Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)Source\3rdParty\dirent\include;$(SolutionDir)Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -259,7 +259,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;WIN32;NDEBUG;NETPLAYINPUTPLUGIN_EXPORTS;_WINDOWS;_USRDLL;WIN32_LEAN_AND_MEAN;_WIN32_WINNT=0x0600;ASIO_STANDALONE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)Source\3rdParty\asio\asio\include;$(SolutionDir)Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)Source\3rdParty\dirent\include;$(SolutionDir)Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.;$(SolutionDir)Source\3rdParty\asio\asio\include;$(SolutionDir)Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)Source\3rdParty\dirent\include;$(SolutionDir)Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <DebugInformationFormat>None</DebugInformationFormat>
@@ -285,7 +285,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;NDEBUG;NETPLAYINPUTPLUGIN_EXPORTS;_WINDOWS;_USRDLL;WIN32_LEAN_AND_MEAN;_WIN32_WINNT=0x0600;ASIO_STANDALONE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)Source\3rdParty\asio\asio\include;$(SolutionDir)Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)Source\3rdParty\dirent\include;$(SolutionDir)Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.;$(SolutionDir)Source\3rdParty\asio\asio\include;$(SolutionDir)Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)Source\3rdParty\dirent\include;$(SolutionDir)Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <DebugInformationFormat>None</DebugInformationFormat>
     </ClCompile>
@@ -310,7 +310,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;NDEBUG;NETPLAYINPUTPLUGIN_EXPORTS;_WINDOWS;_USRDLL;WIN32_LEAN_AND_MEAN;_WIN32_WINNT=0x0600;ASIO_STANDALONE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)Source\3rdParty\asio\asio\include;$(SolutionDir)Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)Source\3rdParty\dirent\include;$(SolutionDir)Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.;$(SolutionDir)Source\3rdParty\asio\asio\include;$(SolutionDir)Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)Source\3rdParty\dirent\include;$(SolutionDir)Source\3rdParty\dirent;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <DebugInformationFormat>None</DebugInformationFormat>
     </ClCompile>

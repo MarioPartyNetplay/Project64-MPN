@@ -29,7 +29,7 @@ void room::check_save_data() {
     bool run_once = true;
     for (auto& u : user_list) {
         if (run_once) {
-            for (int i = 0; i < u->info.saves.size(); i++) {
+            for (size_t i = 0; i < u->info.saves.size(); i++) {
                 auto& save = u->info.saves[i];
                 first_hashes[i] = save.sha1_data;
             }
@@ -37,7 +37,7 @@ void room::check_save_data() {
         }
 
 
-        for (int i = 0; i < u->info.saves.size(); i++) {
+        for (size_t i = 0; i < u->info.saves.size(); i++) {
             auto& save_data = u->info.saves[i];
             auto& hash = first_hashes[i];
             if (save_data.sha1_data != hash) {

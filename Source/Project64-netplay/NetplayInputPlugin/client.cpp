@@ -18,7 +18,6 @@
 #include <regex>
 #include <algorithm>
 #include <sstream>
-#include <boost/system/error_code.hpp>
 
 using namespace std;
 using namespace asio;
@@ -159,23 +158,22 @@ void client::fetch_servers_from_github() {
         tcp::resolver resolver(service);
         auto endpoints = resolver.resolve(host, "80");
 
-        // Create socket and connect with timeout
+        // Create socket and connect
         tcp::socket socket(service);
         auto connect_timer = std::make_shared<asio::steady_timer>(service);
         connect_timer->expires_after(std::chrono::seconds(10)); // 10 second timeout
 
         // Set up timeout handler
-        connect_timer->async_wait([&socket](const boost::system::error_code& error) {
+        connect_timer->async_wait([&socket](const std::error_code& error) {
             if (!error) {
                 // Timer expired, close socket to cancel connection
-                boost::system::error_code ec;
+                std::error_code ec;
                 socket.close(ec);
             }
         });
 
         // Connect with timeout
         asio::connect(socket, endpoints);
-        connect_timer->cancel(); // Cancel timer since we connected successfully
 
         // Send HTTP GET request
         std::string request =
@@ -187,37 +185,21 @@ void client::fetch_servers_from_github() {
 
         asio::write(socket, asio::buffer(request));
 
-        // Read response with timeout
+        // Read response
         std::string response;
-        char buffer[1024];
-        boost::system::error_code error;
-        auto read_timer = std::make_shared<asio::steady_timer>(service);
-        read_timer->expires_after(std::chrono::seconds(10)); // 10 second timeout
-
-        // Set up timeout handler for reading
-        read_timer->async_wait([&socket](const boost::system::error_code& error) {
-            if (!error) {
-                // Timer expired, close socket to cancel read
-                boost::system::error_code ec;
-                socket.close(ec);
-            }
-        });
+        std::array<char, 1024> buffer;
+        std::error_code error;
 
         while (true) {
-            size_t bytes_read = socket.read_some(asio::buffer(buffer, sizeof(buffer)), error);
-            if (error == asio::error::eof) {
-                break; // Connection closed cleanly
+            size_t bytes_read = socket.read_some(asio::buffer(buffer), error);
+            if (error == std::errc::connection_reset || error == std::errc::connection_aborted) {
+                break; // Connection closed
             } else if (error) {
-                read_timer->cancel();
                 throw std::runtime_error("Network error: " + error.message());
             }
-            response.append(buffer, bytes_read);
-
-            // Reset read timeout for each successful read
-            read_timer->expires_after(std::chrono::seconds(5));
+            response.append(buffer.data(), bytes_read);
         }
 
-        read_timer->cancel();
         socket.close();
 
         // Parse HTTP response
@@ -231,7 +213,7 @@ void client::fetch_servers_from_github() {
         // Check for HTTP 200 OK
         if (response.find("HTTP/1.1 200 OK") == std::string::npos &&
             response.find("HTTP/1.0 200 OK") == std::string::npos) {
-            throw std::runtime_error("HTTP request failed: " + response.substr(0, response.find("\r\n")));
+            throw std::runtime_error("HTTP request failed");
         }
 
         // Parse server list from body
@@ -262,8 +244,6 @@ void client::fetch_servers_from_github() {
         if (!found_servers) {
             throw std::runtime_error("No valid servers found in response");
         }
-
-        my_dialog->info("Loaded " + std::to_string(public_servers.size()) + " servers from GitHub");
 
     } catch (const std::exception& e) {
         throw std::runtime_error("Error fetching servers from GitHub: " + std::string(e.what()));

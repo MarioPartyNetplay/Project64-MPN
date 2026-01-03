@@ -96,7 +96,7 @@ void user::on_receive(packet& p, bool udp) {
             std::array<save_info, 5> original_saves = info.saves; // Store original saves
 
             std::array<save_info, 5> new_saves;
-            for (int i = 0; i < info.saves.size(); i++) {
+            for (size_t i = 0; i < info.saves.size(); i++) {
                 auto save = p.read<save_info>();
                 new_saves[i] = save;
             }
@@ -108,7 +108,7 @@ void user::on_receive(packet& p, bool udp) {
             for (auto& user : my_room->user_list) {
                 bool send_sync = false;
 
-                for (int i = 0; i < info.saves.size(); i++) {
+                for (size_t i = 0; i < info.saves.size(); i++) {
                     auto& save = user->info.saves[i];
                     auto& upstream_save = new_saves[i];
                     if (save.sha1_data != upstream_save.sha1_data) {
