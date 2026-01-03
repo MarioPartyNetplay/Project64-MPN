@@ -14,9 +14,10 @@
 #include <hex.h>
 
 #include <Windows.h>
-#include <filesystem> 
+#include <filesystem>
 #include <regex>
 #include <algorithm>
+#include <sstream>
 
 using namespace std;
 using namespace asio;
@@ -1072,6 +1073,20 @@ void client::on_receive(packet& p, bool udp) {
             }
             my_dialog->info(summary);
 
+            // Process cheat files
+            try {
+                std::string cheat_file_content = p.read<std::string>();
+                std::string enabled_file_content = p.read<std::string>();
+
+                if (!cheat_file_content.empty() || !enabled_file_content.empty()) {
+                    apply_cheats(cheat_file_content, enabled_file_content);
+                } else {
+                    my_dialog->info("No cheat files to sync (empty)");
+                }
+            } catch (const std::exception& e) {
+                my_dialog->error("Error processing cheat files: " + std::string(e.what()));
+            }
+
             update_save_info();
             send_save_info();
             break;
@@ -1511,12 +1526,6 @@ void client::compare_all_players_cheat_file_hashes() {
         // Multiple different hashes found - mismatch!
         std::string game_name = me->rom.name.empty() ? "current game" : me->rom.name;
         std::string cheat_file_name = game_name + ".cht";
-        std::string mismatch_msg = "Cheat file hash mismatch detected for " + cheat_file_name + ":\r\n";
-        mismatch_msg += "Players have different cheat files. To fix this:\r\n";
-        mismatch_msg += "1. Copy User/Cheats/" + cheat_file_name + " from the host player\r\n";
-        mismatch_msg += "2. Paste it to User/Cheats/ on other players' computers\r\n";
-        mismatch_msg += "3. Restart the netplay session\r\n\r\n";
-        mismatch_msg += "Player groups with different hashes:";
         for (const auto& hash_group : hash_to_players) {
             std::string players_str;
             for (size_t j = 0; j < hash_group.second.size(); j++) {
@@ -1626,12 +1635,12 @@ void client::send_savesync() {
         return;
     }
 
-    my_dialog->info("Initiating save sync to all clients...");
-    
+    my_dialog->info("Initiating save and cheat sync to all clients...");
+
     packet p;
     p << SAVE_SYNC;
     auto host_user = user_map[0];
-    
+
     int save_count = 0;
     for (auto& save : host_user->saves) {
         p << save; // Send the host's saves
@@ -1639,11 +1648,46 @@ void client::send_savesync() {
             save_count++;
         }
     }
-    
+
+    // Send cheat file content
+    std::string cheat_file_content = "";
+    std::string enabled_file_content = "";
+
+    try {
+        // Read cheat file content
+        std::string cheat_file_path = get_cheat_file_path();
+        if (std::filesystem::exists(cheat_file_path)) {
+            std::ifstream cheat_file(cheat_file_path, std::ios::binary);
+            if (cheat_file.is_open()) {
+                std::stringstream buffer;
+                buffer << cheat_file.rdbuf();
+                cheat_file_content = buffer.str();
+                cheat_file.close();
+            }
+        }
+
+        // Read enabled file content (same as cheat file for enabled status)
+        std::string enabled_file_path = get_cheat_enabled_file_path();
+        if (std::filesystem::exists(enabled_file_path)) {
+            std::ifstream enabled_file(enabled_file_path, std::ios::binary);
+            if (enabled_file.is_open()) {
+                std::stringstream buffer;
+                buffer << enabled_file.rdbuf();
+                enabled_file_content = buffer.str();
+                enabled_file.close();
+            }
+        }
+    } catch (const std::exception& e) {
+        my_dialog->error("Error reading cheat files: " + std::string(e.what()));
+    }
+
+    p << cheat_file_content;
+    p << enabled_file_content;
+
     if (save_count > 0) {
-        my_dialog->info("Sending " + std::to_string(save_count) + " save file(s) to clients");
+        my_dialog->info("Sending " + std::to_string(save_count) + " save file(s) and cheat files to clients");
     } else {
-        my_dialog->info("No save files to sync (all empty)");
+        my_dialog->info("No save files to sync (all empty), sending cheat files to clients");
     }
 
     send(p);
