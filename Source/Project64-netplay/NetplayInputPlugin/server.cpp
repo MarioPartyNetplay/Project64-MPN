@@ -3,7 +3,6 @@
 #include "server.h"
 #include "room.h"
 #include "user.h"
-#include "version.h"
 
 using namespace std;
 using namespace asio;
