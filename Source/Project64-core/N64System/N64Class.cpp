@@ -30,6 +30,12 @@
 #include <ShlDisp.h>
 #include <shellapi.h>
 #include <3rdParty/mario_party_netplay.h>
+#include <sha.h>
+#include <hex.h>
+#include <files.h>
+#include <filters.h>
+#include <fstream>
+#include <vector>
 
 #pragma warning(disable:4355) // Disable 'this' : used in base member initializer list
 
@@ -61,6 +67,7 @@ m_thread(NULL),
 m_hPauseEvent(true),
 m_CheatsSlectionChanged(false),
 m_HasAutosaved(false),
+m_DesyncFrameCounter(0),
 m_SyncCpu(SyncSystem)
 {
     WriteTrace(TraceN64System, TraceDebug, "Start");
@@ -2789,6 +2796,9 @@ void CN64System::RefreshScreen()
         m_CPU_Usage.ShowCPU_Usage();
         m_CPU_Usage.StartTimer(CPU_UsageAddr != Timer_None ? CPU_UsageAddr : Timer_R4300);
     }
+
+    // Handle netplay desync detection (every 1800 frames = 1 minute at 30 FPS)
+    HandleDesyncDetection();
     if ((m_Reg.STATUS_REGISTER & STATUS_IE) != 0)
     {
         if (HasCheatsSlectionChanged())
@@ -2825,5 +2835,94 @@ void CN64System::TLB_Changed()
     if (g_Debugger)
     {
         g_Debugger->TLBChanged();
+    }
+}
+
+std::string CN64System::GenerateDesyncSaveStateHash()
+{
+    // Create a temporary save state file path
+    char tempPath[MAX_PATH];
+    if (!GetTempPathA(MAX_PATH, tempPath))
+    {
+        return "";
+    }
+
+    std::string tempFile = std::string(tempPath) + "pj64_desync_check.pj";
+
+    // Create save state to temporary file
+    if (!SaveStateToFile(tempFile.c_str()))
+    {
+        return "";
+    }
+
+    // Read the first 1024 bytes (or less if file is smaller) and hash them
+    const size_t HASH_BYTES = 1024;
+    std::ifstream file(tempFile, std::ios::binary);
+    if (!file.is_open())
+    {
+        DeleteFileA(tempFile.c_str()); // Clean up
+        return "";
+    }
+
+    // Read first HASH_BYTES bytes
+    std::vector<char> buffer(HASH_BYTES);
+    file.read(buffer.data(), HASH_BYTES);
+    size_t bytesRead = file.gcount();
+    file.close();
+
+    // Clean up temporary file
+    DeleteFileA(tempFile.c_str());
+
+    if (bytesRead == 0)
+    {
+        return "";
+    }
+
+    // Hash the data using CryptoPP
+    CryptoPP::SHA256 hash;
+    std::string digest;
+    CryptoPP::StringSource ss(std::string(buffer.data(), bytesRead), true,
+        new CryptoPP::HashFilter(hash,
+            new CryptoPP::HexEncoder(
+                new CryptoPP::StringSink(digest))));
+
+    return digest;
+}
+
+void CN64System::HandleDesyncDetection()
+{
+    // Increment frame counter
+    m_DesyncFrameCounter++;
+
+    // Check if 1800 frames have passed (30 FPS * 60 seconds = 1 minute)
+    const uint32_t DESYNC_CHECK_INTERVAL = 1800;
+    if (m_DesyncFrameCounter >= DESYNC_CHECK_INTERVAL)
+    {
+        // Reset counter
+        m_DesyncFrameCounter = 0;
+
+        // Check if netplay is active
+        bool isNetplayActive = false;
+        if (m_Plugins && m_Plugins->Control())
+        {
+            const char* pluginName = m_Plugins->Control()->PluginName();
+            isNetplayActive = (pluginName != NULL && strstr(pluginName, "NetPlay") != NULL);
+        }
+
+        if (isNetplayActive)
+        {
+            // Create temporary save state and get hash for desync detection
+            std::string desyncHash = GenerateDesyncSaveStateHash();
+            if (!desyncHash.empty())
+            {
+                // Call netplay function to handle desync detection
+                typedef void(__cdecl* HandleDesyncDetectionFunc)(const char* hash);
+                HandleDesyncDetectionFunc handleDesync = (HandleDesyncDetectionFunc)GetProcAddress(GetModuleHandle(NULL), "HandleNetplayDesyncDetection");
+                if (handleDesync)
+                {
+                    handleDesync(desyncHash.c_str());
+                }
+            }
+        }
     }
 }

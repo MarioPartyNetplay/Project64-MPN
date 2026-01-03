@@ -347,6 +347,7 @@ struct user_info {
     std::array<save_info, 5> saves;
     std::string cheat_file_hash;
     std::string state_hash;  // SHA256 hash of emulator state (RDRAM, CPU registers, RSP memory) for desync detection
+    std::string desync_hash;  // SHA256 hash of first 1024 bytes of save state for desync detection
     uint8_t lag = 5;
     double latency = NAN;
     std::array<controller, 4> controllers;
@@ -384,6 +385,7 @@ inline packet& packet::write<user_info>(const user_info& info) {
     write(info.saves[4]);
     write(info.cheat_file_hash);
     write(info.state_hash);
+    write(info.desync_hash);
     write(info.lag);
     write(info.latency);
     write(info.controllers[0]);
@@ -409,6 +411,7 @@ inline user_info packet::read<user_info>() {
     info.saves[4] = read<save_info>();
     info.cheat_file_hash = read<std::string>();
     info.state_hash = read<std::string>();
+    info.desync_hash = read<std::string>();
     info.lag = read<uint8_t>();
     info.latency = read<double>();
     info.controllers[0] = read<controller>();

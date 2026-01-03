@@ -122,6 +122,8 @@ private:
     void   RefreshScreen();
     void   DumpSyncErrors(CN64System * SecondCPU);
     void   StartEmulation2(bool NewThread);
+    void   HandleDesyncDetection();
+    std::string GenerateDesyncSaveStateHash();
     bool   SetActiveSystem(bool bActive = true);
     void   InitRegisters(bool bPostPif, CMipsMemoryVM & MMU);
     void   DisplayRSPListCount();
@@ -185,6 +187,9 @@ private:
     FUNC_CALLS m_FunctionCalls;
        
     bool m_HasAutosaved;
+
+    // Netplay desync detection
+    uint32_t m_DesyncFrameCounter;
 
     char* m_DiscordApplicationId;
     uint8_t m_DiscordCurrentPlayers;

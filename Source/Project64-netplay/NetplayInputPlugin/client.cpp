@@ -1067,14 +1067,33 @@ void client::update_state_hash()
     if (!started) {
         return; // Game not started yet
     }
-    
+
     me->state_hash = calculate_state_hash();
-    
+
     // Send state hash update to other players
     if (!me->state_hash.empty() && is_open()) {
         // State hash is automatically included in user_info when sent
         // For now, we'll rely on periodic user_info updates or add a dedicated packet type if needed
     }
+}
+
+void client::handle_desync_detection(const char* hash)
+{
+    if (!started || !hash || !hash[0]) {
+        return; // Game not started or invalid hash
+    }
+
+    // Store the save state hash for desync detection
+    me->desync_hash = hash;
+
+    // Send desync hash update to other players
+    if (is_open()) {
+        // For now, we'll rely on periodic user_info updates or add a dedicated packet type if needed
+        // The desync hash is automatically included in user_info when sent
+    }
+
+    // Compare desync hashes with other players immediately
+    compare_all_players_desync_hashes();
 }
 
 void client::on_receive(packet& p, bool udp) {
@@ -1548,14 +1567,8 @@ void client::on_tick() {
         send_udp_ping();
     }
     
-    // Update state hash periodically (every ~5 seconds) for desync detection
-    static auto last_state_hash_update = std::chrono::steady_clock::now();
-    auto now = std::chrono::steady_clock::now();
-    if (started && std::chrono::duration_cast<std::chrono::seconds>(now - last_state_hash_update).count() >= 5) {
-        update_state_hash();
-        compare_all_players_state_hashes();
-        last_state_hash_update = now;
-    }
+    // Note: Desync detection now uses save state hashing every 1800 frames (1 minute at 30 FPS)
+    // This is handled by the core emulator calling HandleNetplayDesyncDetection()
 
     timer.expires_after(500ms);
     auto self(weak_from_this());
@@ -1770,6 +1783,63 @@ void client::compare_all_players_state_hashes() {
     }
     // If hash_to_players.size() == 1, all players are in sync (good!)
     // If hash_to_players is empty, no players have state hashes yet (game not started)
+}
+
+void client::compare_all_players_desync_hashes()
+{
+    if (user_list.size() < 2) {
+        return; // Need at least 2 players to compare
+    }
+
+    std::map<std::string, std::vector<std::string>> hash_to_players; // hash -> list of player names
+    int players_with_desync_hash = 0;
+
+    // Collect all players' desync hashes
+    for (size_t i = 0; i < user_list.size(); i++) {
+        if (!user_list[i]) continue;
+
+        std::shared_ptr<user_info> user = user_list[i];
+        std::string hash = user->desync_hash;
+        std::string player_name = user->name;
+
+        // Skip empty desync hashes (not calculated yet)
+        if (hash.empty()) {
+            continue;
+        }
+
+        players_with_desync_hash++;
+        hash_to_players[hash].push_back(player_name);
+    }
+
+    // Only compare if we have at least 2 players with desync hashes
+    if (players_with_desync_hash < 2) {
+        return; // Not enough players with desync hashes to compare
+    }
+
+    // Check if all non-empty desync hashes have the same hash
+    if (hash_to_players.size() > 1) {
+        // Multiple different hashes found - DESYNC DETECTED!
+        std::string mismatch_msg = "DESYNC DETECTED! Save state hashes do not match:\r\n";
+        mismatch_msg += "Players have diverged and are no longer synchronized.\r\n";
+        mismatch_msg += "This usually indicates:\r\n";
+        mismatch_msg += "- Different inputs were processed\r\n";
+        mismatch_msg += "- Different timing or lag\r\n";
+        mismatch_msg += "- Emulator state corruption\r\n";
+
+        for (const auto& hash_group : hash_to_players) {
+            std::string players_str;
+            for (size_t j = 0; j < hash_group.second.size(); j++) {
+                if (j > 0) players_str += ", ";
+                players_str += hash_group.second[j];
+            }
+            mismatch_msg += "\r\n  " + hash_group.first.substr(0, 16) + "... (" + players_str + ")";
+        }
+        mismatch_msg += "\r\n\r\nYou may need to restart the netplay session.";
+        my_dialog->error(mismatch_msg);
+
+    }
+    // If hash_to_players.size() == 1, all players are in sync (good!)
+    // If hash_to_players is empty, no players have desync hashes yet
 }
 
 void client::send_savesync() {

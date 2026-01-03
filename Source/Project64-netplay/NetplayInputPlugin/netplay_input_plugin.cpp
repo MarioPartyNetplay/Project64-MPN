@@ -360,6 +360,15 @@ EXPORT void CALL WM_KeyUp( WPARAM wParam, LPARAM lParam ) {
     }
 }
 
+EXPORT void CALL HandleNetplayDesyncDetection(const char* hash)
+{
+    load();
+
+    if (my_client) {
+        my_client->handle_desync_detection(hash);
+    }
+}
+
 #if defined(__cplusplus)
 }
 #endif
