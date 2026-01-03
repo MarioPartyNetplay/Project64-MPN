@@ -1259,28 +1259,36 @@ void client::on_receive(packet& p, bool udp) {
             }
 
             // Process cheat files (only for non-host clients)
+            // Always try to read cheat files - host always sends them (even if empty)
             if (!is_host()) {
+                std::string cheat_file_content = "";
+                std::string enabled_file_content = "";
+                
                 try {
-                    // Check if there's enough data in the packet before reading
-                    if (p.available() > 0) {
-                        std::string cheat_file_content = p.read<std::string>();
-                        std::string enabled_file_content = "";
-                        
-                        // Check again before reading second string
-                        if (p.available() > 0) {
-                            enabled_file_content = p.read<std::string>();
-                        }
-
-                        if (!cheat_file_content.empty() || !enabled_file_content.empty()) {
-                            apply_cheats(cheat_file_content, enabled_file_content);
-                        }
-                    }
-                } catch (const std::out_of_range& e) {
-                    my_dialog->error("Cheat file parsing error (invalid data): " + std::string(e.what()));
+                    // Always try to read cheat file content (host always sends it)
+                    cheat_file_content = p.read<std::string>();
+                    my_dialog->info("Received cheat file content (" + std::to_string(cheat_file_content.length()) + " bytes)");
                 } catch (const std::exception& e) {
-                    my_dialog->error("Error processing cheat files: " + std::string(e.what()));
-                } catch (...) {
-                    my_dialog->error("Unknown error processing cheat files");
+                    my_dialog->error("Error reading cheat file content from packet: " + std::string(e.what()));
+                    cheat_file_content = "";
+                }
+                
+                try {
+                    // Always try to read enabled file content (host always sends it)
+                    enabled_file_content = p.read<std::string>();
+                    my_dialog->info("Received cheat enabled file content (" + std::to_string(enabled_file_content.length()) + " bytes)");
+                } catch (const std::exception& e) {
+                    my_dialog->error("Error reading cheat enabled file content from packet: " + std::string(e.what()));
+                    enabled_file_content = "";
+                }
+
+                // Apply cheats even if one is empty (host might have only one file)
+                // This ensures cheats are synced even if enabled file doesn't exist
+                if (!cheat_file_content.empty() || !enabled_file_content.empty()) {
+                    my_dialog->info("Applying cheats from host...");
+                    apply_cheats(cheat_file_content, enabled_file_content);
+                } else {
+                    my_dialog->info("No cheat files to sync (both files empty)");
                 }
             }
 
@@ -1902,6 +1910,7 @@ void client::send_savesync() {
     }
 
     // Send cheat file content
+    // Always send cheat files, even if empty, to maintain packet structure
     std::string cheat_file_content = "";
     std::string enabled_file_content = "";
 
@@ -1915,10 +1924,15 @@ void client::send_savesync() {
                 buffer << cheat_file.rdbuf();
                 cheat_file_content = buffer.str();
                 cheat_file.close();
+                my_dialog->info("Loaded cheat file (" + std::to_string(cheat_file_content.length()) + " bytes)");
+            } else {
+                my_dialog->error("Failed to open cheat file for reading: " + cheat_file_path);
             }
+        } else {
+            my_dialog->info("Cheat file does not exist: " + cheat_file_path);
         }
 
-        // Read enabled file content (same as cheat file for enabled status)
+        // Read enabled file content
         std::string enabled_file_path = get_cheat_enabled_file_path();
         if (std::filesystem::exists(enabled_file_path)) {
             std::ifstream enabled_file(enabled_file_path, std::ios::binary);
@@ -1927,14 +1941,23 @@ void client::send_savesync() {
                 buffer << enabled_file.rdbuf();
                 enabled_file_content = buffer.str();
                 enabled_file.close();
+                my_dialog->info("Loaded cheat enabled file (" + std::to_string(enabled_file_content.length()) + " bytes)");
+            } else {
+                my_dialog->error("Failed to open cheat enabled file for reading: " + enabled_file_path);
             }
+        } else {
+            my_dialog->info("Cheat enabled file does not exist: " + enabled_file_path);
         }
     } catch (const std::exception& e) {
         my_dialog->error("Error reading cheat files: " + std::string(e.what()));
     }
 
+    // Always send both strings, even if empty, to maintain consistent packet structure
     p << cheat_file_content;
     p << enabled_file_content;
+    
+    my_dialog->info("Sending cheat files to clients (cheat: " + std::to_string(cheat_file_content.length()) + 
+                   " bytes, enabled: " + std::to_string(enabled_file_content.length()) + " bytes)");
 
 
 
@@ -2366,11 +2389,16 @@ void client::save_cheats(const std::vector<cheat_info>& cheats) {
 
 void client::apply_cheats(const std::string& cheat_file_content, const std::string& enabled_file_content) {
     // Queue cheat application to happen asynchronously to avoid blocking network operations
+    my_dialog->info("Queueing cheat application (cheat: " + std::to_string(cheat_file_content.length()) + 
+                   " bytes, enabled: " + std::to_string(enabled_file_content.length()) + " bytes)");
+    
     service.post([this, cheat_file_content, enabled_file_content]() {
         try {
             apply_cheats_async(cheat_file_content, enabled_file_content);
         } catch (const std::exception& e) {
             my_dialog->error("Error applying cheats asynchronously: " + std::string(e.what()));
+        } catch (...) {
+            my_dialog->error("Unknown error applying cheats asynchronously");
         }
     });
 }
