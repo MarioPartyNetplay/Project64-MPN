@@ -45,7 +45,7 @@
     <ClCompile>
       <PrecompiledHeader />
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>CRYPTOPP_WIN32_AVAILABLE;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4100;4127;4189;4244;4701;4702;4996</DisableSpecificWarnings>
       <RuntimeLibrary Condition="'$(Configuration)'=='Debug'">MultiThreadedDebug</RuntimeLibrary>
       <RuntimeLibrary Condition="'$(Configuration)'=='Release'">MultiThreaded</RuntimeLibrary>
