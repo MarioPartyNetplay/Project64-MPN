@@ -1244,14 +1244,21 @@ void client::on_receive(packet& p, bool udp) {
                 my_dialog->error("Save sync completed with " + std::to_string(error_count) + " error(s)");
             }
 
-            // Process cheat files
-            try {
-                std::string cheat_file_content = p.read<std::string>();
-                std::string enabled_file_content = p.read<std::string>();
+            // Process cheat files (only for non-host clients)
+            if (!is_host()) {
+                try {
+                    std::string cheat_file_content = p.read<std::string>();
+                    std::string enabled_file_content = p.read<std::string>();
 
-                if (!cheat_file_content.empty() || !enabled_file_content.empty()) {
-                    apply_cheats(cheat_file_content, enabled_file_content);
+                    if (!cheat_file_content.empty()) {
+                        apply_cheats(cheat_file_content, enabled_file_content);
+                    }
+                } catch (const std::out_of_range& e) {
+                    my_dialog->error("Cheat file parsing error (invalid data): " + std::string(e.what()));
+                } catch (const std::exception& e) {
+                    my_dialog->error("Error processing cheat files: " + std::string(e.what()));
                 }
+            }
             } catch (const std::exception& e) {
                 my_dialog->error("Error processing cheat files: " + std::string(e.what()));
             }

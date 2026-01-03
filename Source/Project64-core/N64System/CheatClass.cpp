@@ -39,9 +39,10 @@ bool CCheats::LoadCode(int CheatNo, const char * CheatString)
     }
 
     const char * ReadPos = CheatString;
+    size_t remaining_length = strlen(CheatString);
 
     CODES Code;
-    while (ReadPos)
+    while (ReadPos && remaining_length > 0)
     {
         GAMESHARK_CODE CodeEntry;
 
@@ -49,15 +50,16 @@ bool CCheats::LoadCode(int CheatNo, const char * CheatString)
         ReadPos = strchr(ReadPos, ' ');
         if (ReadPos == NULL) { break; }
         ReadPos += 1;
+        remaining_length = strlen(ReadPos);
 
-        if (strncmp(ReadPos, "????", 4) == 0)
+        if (remaining_length >= 4 && strncmp(ReadPos, "????", 4) == 0)
         {
             if (CheatNo < 0 || CheatNo > MaxCheats) { return false; }
             stdstr CheatExt = g_Settings->LoadStringIndex(Cheat_Extension, CheatNo);
-            if (CheatExt.empty()) { return false; }
+            if (CheatExt.empty() || CheatExt.length() < 2) { return false; }
             CodeEntry.Value = CheatExt[0] == '$' ? (uint16_t)strtoul(&CheatExt.c_str()[1], 0, 16) : (uint16_t)atol(CheatExt.c_str());
         }
-        else if (strncmp(ReadPos, "??", 2) == 0)
+        else if (remaining_length >= 2 && strncmp(ReadPos, "??", 2) == 0)
         {
             if (CheatNo < 0 || CheatNo > MaxCheats) { return false; }
             stdstr CheatExt = g_Settings->LoadStringIndex(Cheat_Extension, CheatNo);
@@ -65,7 +67,7 @@ bool CCheats::LoadCode(int CheatNo, const char * CheatString)
             CodeEntry.Value = (uint8_t)(strtoul(ReadPos, 0, 16));
             CodeEntry.Value |= (CheatExt[0] == '$' ? (uint8_t)strtoul(&CheatExt.c_str()[1], 0, 16) : (uint8_t)atol(CheatExt.c_str())) << 16;
         }
-        else if (strncmp(&ReadPos[2], "??", 2) == 0)
+        else if (remaining_length >= 4 && strncmp(&ReadPos[2], "??", 2) == 0)
         {
             if (CheatNo < 0 || CheatNo > MaxCheats) { return false; }
             stdstr CheatExt = g_Settings->LoadStringIndex(Cheat_Extension, CheatNo);
@@ -75,18 +77,19 @@ bool CCheats::LoadCode(int CheatNo, const char * CheatString)
         }
         else
         {
-            CodeEntry.Value = (uint16_t)strtoul(ReadPos, 0, 16);
+            CodeEntry.Value = remaining_length >= 4 ? (uint16_t)strtoul(ReadPos, 0, 16) : 0;
         }
         Code.push_back(CodeEntry);
 
         ReadPos = strchr(ReadPos, ',');
         if (ReadPos == NULL)
         {
-            continue;
+            break;
         }
         ReadPos++;
+        remaining_length = strlen(ReadPos);
     }
-    if (Code.size() == 0)
+    if (Code.size() == 0 || Code.size() > MaxGSEntries)
     {
         return false;
     }
@@ -215,6 +218,10 @@ void CCheats::LoadCheatsFromData(const char * cheat_file_content, const char * e
                 continue;
             }
             size_t end = line.find_last_not_of(" \t");
+            if (end == std::string::npos || end < start)
+            {
+                continue; // Malformed line
+            }
             line = line.substr(start, end - start + 1);
             
             // Check for section header
@@ -232,11 +239,11 @@ void CCheats::LoadCheatsFromData(const char * cheat_file_content, const char * e
             
             // Parse key=value
             size_t eq_pos = line.find('=');
-            if (eq_pos == std::string::npos)
+            if (eq_pos == std::string::npos || eq_pos == 0 || eq_pos >= line.length() - 1)
             {
                 continue;
             }
-            
+
             std::string key = line.substr(0, eq_pos);
             std::string value = line.substr(eq_pos + 1);
             
@@ -337,17 +344,20 @@ void CCheats::LoadCheatsFromData(const char * cheat_file_content, const char * e
         
         // Find the start and end of the name which is surrounded in ""
         size_t start_of_name = cheat_entry.find("\"");
-        if (start_of_name == std::string::npos) { continue; }
+        if (start_of_name == std::string::npos || start_of_name >= cheat_entry.length() - 2) { continue; }
         size_t end_of_name = cheat_entry.find("\"", start_of_name + 1);
-        if (end_of_name == std::string::npos) { continue; }
+        if (end_of_name == std::string::npos || end_of_name <= start_of_name || end_of_name >= cheat_entry.length()) { continue; }
         
         // Get the code part (after the closing quote and space)
         size_t code_start = end_of_name + 1;
+        if (code_start >= cheat_entry.length()) { continue; }
+
         while (code_start < cheat_entry.length() && (cheat_entry[code_start] == ' ' || cheat_entry[code_start] == '\t'))
         {
             code_start++;
         }
-        
+
+        if (code_start >= cheat_entry.length()) { continue; }
         std::string cheat_code = cheat_entry.substr(code_start);
         
         // Load the cheat code directly (use -1 for CheatNo since we're not using extensions)
@@ -552,7 +562,7 @@ bool CCheats::IsValid16BitCode(const char * CheatString)
 
 int CCheats::ApplyCheatEntry(CMipsMemoryVM * MMU, const CODES & CodeEntry, int CurrentEntry, bool Execute)
 {
-    if (CurrentEntry < 0 || CurrentEntry >= (int)CodeEntry.size())
+    if (CurrentEntry < 0 || CurrentEntry >= (int)CodeEntry.size() || CodeEntry.empty())
     {
         return 0;
     }
@@ -567,6 +577,11 @@ int CCheats::ApplyCheatEntry(CMipsMemoryVM * MMU, const CODES & CodeEntry, int C
     case 0x50000000:
     {
         if ((CurrentEntry + 1) >= (int)CodeEntry.size())
+        {
+            return 1;
+        }
+
+        if (CurrentEntry + 1 >= (int)CodeEntry.size()) // Double-check for safety
         {
             return 1;
         }

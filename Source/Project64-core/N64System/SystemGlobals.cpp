@@ -108,19 +108,27 @@ extern "C" void ApplyCheatsDirectlyForNetplay(const char * cheat_file_content, c
 {
     if (g_BaseSystem && cheat_file_content && game_identifier)
     {
-        // Load cheats directly from data without reading .ini files
-        // This loads cheats into m_Codes, which will be applied every frame automatically
-        g_BaseSystem->m_Cheats.LoadCheatsFromData(cheat_file_content, enabled_file_content, game_identifier, g_BaseSystem->GetPlugins());
-
-        // Apply cheats immediately to memory if MMU is ready
-        // (They'll also be applied every frame automatically in the VI handler)
-        if (g_MMU)
+        try
         {
-            g_BaseSystem->m_Cheats.ApplyCheats(g_MMU);
-        }
+            // Load cheats directly from data without reading .ini files
+            // This loads cheats into m_Codes, which will be applied every frame automatically
+            g_BaseSystem->m_Cheats.LoadCheatsFromData(cheat_file_content, enabled_file_content, game_identifier, g_BaseSystem->GetPlugins());
 
-        // Debug logging
-        OutputDebugStringA("ApplyCheatsDirectlyForNetplay: loaded cheats successfully");
+            // Apply cheats immediately to memory if MMU is ready
+            // (They'll also be applied every frame automatically in the VI handler)
+            if (g_MMU)
+            {
+                g_BaseSystem->m_Cheats.ApplyCheats(g_MMU);
+            }
+
+            // Debug logging
+            OutputDebugStringA("ApplyCheatsDirectlyForNetplay: loaded cheats successfully");
+        }
+        catch (const std::exception& e)
+        {
+            // Log error but don't crash
+            OutputDebugStringA("ApplyCheatsDirectlyForNetplay: error loading cheats");
+        }
     }
 }
 
