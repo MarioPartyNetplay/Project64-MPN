@@ -631,7 +631,8 @@ void client::on_message(string message) {
                     Sleep(1000);
                     send_savesync();
                     Sleep(250);
-                    Sleep(1000);
+                    send_cheatsync();
+                    Sleep(1250);
 
                     if (is_open()) {
                         send_start_game();
@@ -1258,23 +1259,33 @@ void client::on_receive(packet& p, bool udp) {
                 my_dialog->error("Save sync completed with " + std::to_string(error_count) + " error(s)");
             }
 
+            // Only update save info if me is still valid
+            if (me) {
+                update_save_info();
+                send_save_info();
+            }
+            break;
+        }
+
+        case CHEAT_SYNC: {
             // Process cheat files (only for non-host clients)
-            // Always try to read cheat files - host always sends them (even if empty)
             if (!is_host()) {
+                my_dialog->info("Processing cheat sync - packet size: " + std::to_string(p.size()) + ", pos: " + std::to_string(p.pos) + ", available: " + std::to_string(p.available()));
+
                 std::string cheat_file_content = "";
                 std::string enabled_file_content = "";
-                
+
                 try {
-                    // Always try to read cheat file content (host always sends it)
+                    // Read cheat file content
                     cheat_file_content = p.read<std::string>();
                     my_dialog->info("Received cheat file content (" + std::to_string(cheat_file_content.length()) + " bytes)");
                 } catch (const std::exception& e) {
                     my_dialog->error("Error reading cheat file content from packet: " + std::string(e.what()));
                     cheat_file_content = "";
                 }
-                
+
                 try {
-                    // Always try to read enabled file content (host always sends it)
+                    // Read enabled file content
                     enabled_file_content = p.read<std::string>();
                     my_dialog->info("Received cheat enabled file content (" + std::to_string(enabled_file_content.length()) + " bytes)");
                 } catch (const std::exception& e) {
@@ -1283,19 +1294,12 @@ void client::on_receive(packet& p, bool udp) {
                 }
 
                 // Apply cheats even if one is empty (host might have only one file)
-                // This ensures cheats are synced even if enabled file doesn't exist
                 if (!cheat_file_content.empty() || !enabled_file_content.empty()) {
                     my_dialog->info("Applying cheats from host...");
                     apply_cheats(cheat_file_content, enabled_file_content);
                 } else {
                     my_dialog->info("No cheat files to sync (both files empty)");
                 }
-            }
-
-            // Only update save info if me is still valid
-            if (me) {
-                update_save_info();
-                send_save_info();
             }
             break;
         }
@@ -1909,8 +1913,22 @@ void client::send_savesync() {
         }
     }
 
-    // Send cheat file content
-    // Always send cheat files, even if empty, to maintain packet structure
+    // Cheat sync moved to separate CHEAT_SYNC packets
+    send(p);
+}
+
+void client::send_cheatsync() {
+    if (!is_host()) {
+        my_dialog->error("Only the host can initiate cheat sync");
+        return;
+    }
+
+    my_dialog->info("Syncing cheats...");
+
+    packet p;
+    p << CHEAT_SYNC;
+
+    // Read cheat file content
     std::string cheat_file_content = "";
     std::string enabled_file_content = "";
 
@@ -1952,25 +1970,12 @@ void client::send_savesync() {
         my_dialog->error("Error reading cheat files: " + std::string(e.what()));
     }
 
-    // Always send both strings, even if empty, to maintain consistent packet structure
-    // But check if adding them would exceed packet size limit
-    size_t cheat_size = packet::var_size(cheat_file_content.length()) + cheat_file_content.length();
-    size_t enabled_size = packet::var_size(enabled_file_content.length()) + enabled_file_content.length();
-
-    if (p.size() + cheat_size + enabled_size > packet::MAX_SIZE) {
-        my_dialog->error("Cheat files too large for packet (" + std::to_string(cheat_size + enabled_size) + " bytes), skipping cheat sync");
-        // Send empty strings to maintain packet structure
-        p << std::string("");
-        p << std::string("");
-    } else {
-        p << cheat_file_content;
-        p << enabled_file_content;
-    }
+    // Send both strings, even if empty
+    p << cheat_file_content;
+    p << enabled_file_content;
 
     my_dialog->info("Sending cheat files to clients (cheat: " + std::to_string(cheat_file_content.length()) +
-                   " bytes, enabled: " + std::to_string(enabled_file_content.length()) + " bytes)");
-
-
+                   " bytes, enabled: " + std::to_string(enabled_file_content.length()) + " bytes, packet size: " + std::to_string(p.size()) + ")");
 
     send(p);
 }

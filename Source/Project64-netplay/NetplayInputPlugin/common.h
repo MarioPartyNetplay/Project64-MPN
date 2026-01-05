@@ -21,6 +21,7 @@ enum packet_type : uint8_t {
     MESSAGE,
     LAG,
     SAVE_SYNC,
+    CHEAT_SYNC,
     AUTOLAG,
     CONTROLLERS,
     START,

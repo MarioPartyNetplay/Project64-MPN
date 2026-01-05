@@ -106,6 +106,7 @@ class client: public service_wrapper, public connection {
         void send_request_authority(uint32_t user_id, uint32_t authority_id);
         void send_delegate_authority(uint32_t user_id, uint32_t authority_id);
         void send_savesync();
+        void send_cheatsync();
         void update_save_info();
         void compare_all_players_save_hashes();
         void compare_all_players_cheat_file_hashes();
