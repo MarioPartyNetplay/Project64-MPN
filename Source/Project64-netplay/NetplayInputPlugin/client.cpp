@@ -1953,10 +1953,21 @@ void client::send_savesync() {
     }
 
     // Always send both strings, even if empty, to maintain consistent packet structure
-    p << cheat_file_content;
-    p << enabled_file_content;
-    
-    my_dialog->info("Sending cheat files to clients (cheat: " + std::to_string(cheat_file_content.length()) + 
+    // But check if adding them would exceed packet size limit
+    size_t cheat_size = packet::var_size(cheat_file_content.length()) + cheat_file_content.length();
+    size_t enabled_size = packet::var_size(enabled_file_content.length()) + enabled_file_content.length();
+
+    if (p.size() + cheat_size + enabled_size > packet::MAX_SIZE) {
+        my_dialog->error("Cheat files too large for packet (" + std::to_string(cheat_size + enabled_size) + " bytes), skipping cheat sync");
+        // Send empty strings to maintain packet structure
+        p << std::string("");
+        p << std::string("");
+    } else {
+        p << cheat_file_content;
+        p << enabled_file_content;
+    }
+
+    my_dialog->info("Sending cheat files to clients (cheat: " + std::to_string(cheat_file_content.length()) +
                    " bytes, enabled: " + std::to_string(enabled_file_content.length()) + " bytes)");
 
 
