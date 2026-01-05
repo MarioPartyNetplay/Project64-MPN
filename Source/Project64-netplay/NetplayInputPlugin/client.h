@@ -107,6 +107,7 @@ class client: public service_wrapper, public connection {
         void send_delegate_authority(uint32_t user_id, uint32_t authority_id);
         void send_savesync();
         void send_cheatsync();
+        void send_file_in_chunks(const std::string& content, const std::string& file_type, size_t chunk_size);
         void update_save_info();
         void compare_all_players_save_hashes();
         void compare_all_players_cheat_file_hashes();
@@ -129,5 +130,12 @@ class client: public service_wrapper, public connection {
         void save_cheats(const std::vector<cheat_info>& cheats);
         void apply_cheats(const std::string& cheat_file_content, const std::string& enabled_file_content);
         void apply_cheats_async(const std::string& cheat_file_content, const std::string& enabled_file_content);
+        void store_cheat_chunk(const std::string& chunk_info, const std::string& content);
+        void process_collected_cheat_chunks();
+
+        // Chunk storage for large cheat files
+        std::map<std::string, std::string> cheat_chunks;
+        std::map<std::string, std::string> enabled_chunks;
+        std::map<std::string, int> chunk_counts;
 };
     
