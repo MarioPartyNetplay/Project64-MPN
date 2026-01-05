@@ -1289,10 +1289,12 @@ void client::on_receive(packet& p, bool udp) {
 
                 if (type_or_marker == "END") {
                     // End of chunks - process collected data
-                    my_dialog->info("Received end of cheat chunks, processing complete files");
+                    my_dialog->info("Received end of cheat chunks - collected cheat chunks: " + std::to_string(cheat_chunks.size()) +
+                                   ", enabled chunks: " + std::to_string(enabled_chunks.size()));
                     process_collected_cheat_chunks();
                 } else if (type_or_marker.find("_chunk_") != std::string::npos) {
                     // This is a chunk - store it
+                    my_dialog->info("Received cheat chunk: " + type_or_marker + " (" + std::to_string(content.length()) + " bytes)");
                     store_cheat_chunk(type_or_marker, content);
                 } else {
                     // Single packet with complete files (for small files)
@@ -1939,7 +1941,7 @@ void client::send_file_in_chunks(const std::string& content, const std::string& 
         send(chunk_p);
 
         // Small delay between chunks to prevent overwhelming the network
-        Sleep(50);
+        Sleep(100);
     }
 }
 
@@ -2032,7 +2034,9 @@ void client::process_collected_cheat_chunks() {
     chunk_counts.clear();
 
     // Apply the complete files
+    my_dialog->info("Applying reassembled cheats...");
     apply_cheats(complete_cheat, complete_enabled);
+    my_dialog->info("Cheat sync completed successfully");
 }
 
 void client::send_cheatsync() {
@@ -2117,6 +2121,9 @@ void client::send_cheatsync() {
             send_file_in_chunks(enabled_file_content, "enabled", MAX_CHUNK_SIZE);
         }
 
+        // Small delay before completion marker
+        Sleep(200);
+
         // Send completion marker
         packet end_p;
         end_p << CHEAT_SYNC;
@@ -2124,6 +2131,9 @@ void client::send_cheatsync() {
         end_p << std::string("");
         my_dialog->info("Sent cheat sync completion marker");
         send(end_p);
+
+        // Give time for packets to be processed
+        Sleep(500);
     }
 
     send(p);
