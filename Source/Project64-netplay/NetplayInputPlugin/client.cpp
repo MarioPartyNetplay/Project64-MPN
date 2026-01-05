@@ -2367,23 +2367,35 @@ void client::save_cheats(const std::vector<cheat_info>& cheats) {
         WritePrivateProfileString(wgame_id.c_str(), key.c_str(), NULL, wcheat_file.c_str());
     }
 
-    // Write new cheats to Project64.cht (replacing existing ones)
-    for (size_t i = 0; i < cheats.size(); i++) {
-        const auto& cheat = cheats[i];
-        std::wstring key = L"Cheat" + std::to_wstring((int)i);
-        
-        // Format: "Name" code
-        std::string entry = "\"" + cheat.name + "\" " + cheat.code;
-        std::wstring wentry = utf8_to_wstring(entry);
-        WritePrivateProfileString(wgame_id.c_str(), key.c_str(), wentry.c_str(), wcheat_file.c_str());
+    // Combine all active cheats into a single "Netplay" cheat
+    std::string combined_codes;
+    bool has_active_cheats = false;
+
+    for (const auto& cheat : cheats) {
+        if (cheat.active && !cheat.code.empty()) {
+            if (!combined_codes.empty()) {
+                combined_codes += ",";
+            }
+            combined_codes += cheat.code;
+            has_active_cheats = true;
+        }
     }
 
-    // Write enabled status to Project64.cht_enabled file
-    for (size_t i = 0; i < cheats.size(); i++) {
-        const auto& cheat = cheats[i];
-        std::wstring enabled_key = L"Cheat" + std::to_wstring((int)i);
-        std::wstring enabled_value = cheat.active ? L"1" : L"0";
+    if (has_active_cheats && !combined_codes.empty()) {
+        // Write the combined "Netplay" cheat
+        std::wstring key = L"Cheat0";
+        std::string entry = "\"Netplay\" " + combined_codes;
+        std::wstring wentry = utf8_to_wstring(entry);
+        WritePrivateProfileString(wgame_id.c_str(), key.c_str(), wentry.c_str(), wcheat_file.c_str());
+
+        // Write enabled status (always enabled for the combined cheat)
+        std::wstring enabled_key = L"Cheat0";
+        std::wstring enabled_value = L"1";
         WritePrivateProfileString(wgame_id.c_str(), enabled_key.c_str(), enabled_value.c_str(), wenabled_file.c_str());
+
+        my_dialog->info("Created combined Netplay cheat with " + std::to_string(combined_codes.length()) + " bytes of codes");
+    } else {
+        my_dialog->info("No active cheats to combine for Netplay");
     }
 }
 
