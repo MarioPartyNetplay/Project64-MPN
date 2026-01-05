@@ -207,6 +207,10 @@ public:
     size_t available() const {
         return pos > size() ? 0 : size() - pos;
     }
+
+    size_t get_pos() const {
+        return pos;
+    }
     
     packet& reset(size_t size = 0) {
         pos = 0;

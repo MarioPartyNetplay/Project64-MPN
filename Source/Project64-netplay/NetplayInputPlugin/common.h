@@ -31,8 +31,7 @@ enum packet_type : uint8_t {
     INPUT_UPDATE,
     INPUT_RATE,
     REQUEST_AUTHORITY,
-    DELEGATE_AUTHORITY,
-    CHEAT_SYNC
+    DELEGATE_AUTHORITY
 };
 
 enum query_type : uint8_t {

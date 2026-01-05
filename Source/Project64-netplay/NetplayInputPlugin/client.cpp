@@ -1270,7 +1270,7 @@ void client::on_receive(packet& p, bool udp) {
         case CHEAT_SYNC: {
             // Process cheat files (only for non-host clients)
             if (!is_host()) {
-                my_dialog->info("Processing cheat sync - packet size: " + std::to_string(p.size()) + ", pos: " + std::to_string(p.pos) + ", available: " + std::to_string(p.available()));
+                my_dialog->info("Processing cheat sync - packet size: " + std::to_string(p.size()) + ", pos: " + std::to_string(p.get_pos()) + ", available: " + std::to_string(p.available()));
 
                 std::string cheat_file_content = "";
                 std::string enabled_file_content = "";
