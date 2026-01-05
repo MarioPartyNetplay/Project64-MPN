@@ -10,6 +10,7 @@
 ****************************************************************************/
 #include "stdafx.h"
 #include "CheatClass.h"
+#include <string>
 
 #include <Project64-core/Settings/SettingType/SettingsType-Cheats.h>
 #include <Project64-core/Plugins/GFXPlugin.h>
@@ -310,65 +311,155 @@ void CCheats::LoadCheatsFromData(const char * cheat_file_content, const char * e
         }
     }
 
-    // Load active cheats
-    // If enabled_file_content is empty or no active cheats found, load all cheats (fallback)
-    bool load_all_cheats = (!enabled_file_content || (enabled_file_content[0] == '\0') || active_cheats.empty());
-    
-    for (const auto& entry : cheat_entries)
+    // Check if this is netplay mode - combine all active cheats into a single "Netplay" cheat
+    bool is_netplay_mode = false;
+    if (g_Plugins && g_Plugins->Control())
     {
-        int cheat_no = entry.first;
-        
-        // Check if cheat is active
-        bool is_active = false;
-        if (!load_all_cheats)
+        const char* pluginName = g_Plugins->Control()->PluginName();
+        is_netplay_mode = (pluginName != NULL && strstr(pluginName, "NetPlay") != NULL);
+    }
+
+    if (is_netplay_mode)
+    {
+        // Combine all active cheats into a single "Netplay" cheat
+        std::string combined_codes;
+
+        // Load active cheats
+        // If enabled_file_content is empty or no active cheats found, load all cheats (fallback)
+        bool load_all_cheats = (!enabled_file_content || (enabled_file_content[0] == '\0') || active_cheats.empty());
+
+        for (const auto& entry : cheat_entries)
         {
-            auto active_it = active_cheats.find(cheat_no);
-            if (active_it != active_cheats.end())
+            int cheat_no = entry.first;
+
+            // Check if cheat is active
+            bool is_active = false;
+            if (!load_all_cheats)
             {
-                is_active = active_it->second;
+                auto active_it = active_cheats.find(cheat_no);
+                if (active_it != active_cheats.end())
+                {
+                    is_active = active_it->second;
+                }
+            }
+            else
+            {
+                // Fallback: load all cheats if enabled file is empty or parsing failed
+                is_active = true;
+            }
+
+            if (!is_active)
+            {
+                continue;
+            }
+
+            // Parse the cheat entry: format is "Name" code1,code2,code3,...
+            std::string cheat_entry = entry.second;
+
+            // Find the start and end of the name which is surrounded in ""
+            size_t start_of_name = cheat_entry.find("\"");
+            if (start_of_name == std::string::npos || start_of_name >= cheat_entry.length() - 2) { continue; }
+            size_t end_of_name = cheat_entry.find("\"", start_of_name + 1);
+            if (end_of_name == std::string::npos || end_of_name <= start_of_name || end_of_name >= cheat_entry.length()) { continue; }
+
+            // Get the code part (after the closing quote and space)
+            size_t code_start = end_of_name + 1;
+            if (code_start >= cheat_entry.length()) { continue; }
+
+            while (code_start < cheat_entry.length() && (cheat_entry[code_start] == ' ' || cheat_entry[code_start] == '\t'))
+            {
+                code_start++;
+            }
+
+            if (code_start >= cheat_entry.length()) { continue; }
+            std::string cheat_code = cheat_entry.substr(code_start);
+
+            // Add this cheat's codes to the combined codes (separated by commas)
+            if (!combined_codes.empty())
+            {
+                combined_codes += ",";
+            }
+            combined_codes += cheat_code;
+        }
+
+        // Load the combined cheat as a single "Netplay" cheat
+        if (!combined_codes.empty())
+        {
+            if (LoadCode(-1, combined_codes.c_str()))
+            {
+                // Combined cheat loaded successfully
+                OutputDebugStringA("LoadCheatsFromData: loaded combined Netplay cheat");
+            }
+            else
+            {
+                // Combined cheat failed to load
+                OutputDebugStringA("LoadCheatsFromData: failed to load combined Netplay cheat");
             }
         }
-        else
-        {
-            // Fallback: load all cheats if enabled file is empty or parsing failed
-            is_active = true;
-        }
-        
-        if (!is_active)
-        {
-            continue;
-        }
-        
-        // Parse the cheat entry: format is "Name" code1,code2,code3,...
-        std::string cheat_entry = entry.second;
-        
-        // Find the start and end of the name which is surrounded in ""
-        size_t start_of_name = cheat_entry.find("\"");
-        if (start_of_name == std::string::npos || start_of_name >= cheat_entry.length() - 2) { continue; }
-        size_t end_of_name = cheat_entry.find("\"", start_of_name + 1);
-        if (end_of_name == std::string::npos || end_of_name <= start_of_name || end_of_name >= cheat_entry.length()) { continue; }
-        
-        // Get the code part (after the closing quote and space)
-        size_t code_start = end_of_name + 1;
-        if (code_start >= cheat_entry.length()) { continue; }
+    }
+    else
+    {
+        // Original behavior for non-netplay: load each cheat individually
+        // Load active cheats
+        // If enabled_file_content is empty or no active cheats found, load all cheats (fallback)
+        bool load_all_cheats = (!enabled_file_content || (enabled_file_content[0] == '\0') || active_cheats.empty());
 
-        while (code_start < cheat_entry.length() && (cheat_entry[code_start] == ' ' || cheat_entry[code_start] == '\t'))
+        for (const auto& entry : cheat_entries)
         {
-            code_start++;
-        }
+            int cheat_no = entry.first;
 
-        if (code_start >= cheat_entry.length()) { continue; }
-        std::string cheat_code = cheat_entry.substr(code_start);
-        
-        // Load the cheat code directly (use -1 for CheatNo since we're not using extensions)
-        if (LoadCode(-1, cheat_code.c_str()))
-        {
-            // Cheat loaded successfully
-        }
-        else
-        {
-            // Cheat failed to load (invalid code format or requires extension)
-            // This is OK - some cheats require extensions which we don't support for p2-4
+            // Check if cheat is active
+            bool is_active = false;
+            if (!load_all_cheats)
+            {
+                auto active_it = active_cheats.find(cheat_no);
+                if (active_it != active_cheats.end())
+                {
+                    is_active = active_it->second;
+                }
+            }
+            else
+            {
+                // Fallback: load all cheats if enabled file is empty or parsing failed
+                is_active = true;
+            }
+
+            if (!is_active)
+            {
+                continue;
+            }
+
+            // Parse the cheat entry: format is "Name" code1,code2,code3,...
+            std::string cheat_entry = entry.second;
+
+            // Find the start and end of the name which is surrounded in ""
+            size_t start_of_name = cheat_entry.find("\"");
+            if (start_of_name == std::string::npos || start_of_name >= cheat_entry.length() - 2) { continue; }
+            size_t end_of_name = cheat_entry.find("\"", start_of_name + 1);
+            if (end_of_name == std::string::npos || end_of_name <= start_of_name || end_of_name >= cheat_entry.length()) { continue; }
+
+            // Get the code part (after the closing quote and space)
+            size_t code_start = end_of_name + 1;
+            if (code_start >= cheat_entry.length()) { continue; }
+
+            while (code_start < cheat_entry.length() && (cheat_entry[code_start] == ' ' || cheat_entry[code_start] == '\t'))
+            {
+                code_start++;
+            }
+
+            if (code_start >= cheat_entry.length()) { continue; }
+            std::string cheat_code = cheat_entry.substr(code_start);
+
+            // Load the cheat code directly (use -1 for CheatNo since we're not using extensions)
+            if (LoadCode(-1, cheat_code.c_str()))
+            {
+                // Cheat loaded successfully
+            }
+            else
+            {
+                // Cheat failed to load (invalid code format or requires extension)
+                // This is OK - some cheats require extensions which we don't support for p2-4
+            }
         }
     }
 

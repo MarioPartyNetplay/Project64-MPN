@@ -2807,12 +2807,31 @@ void CN64System::RefreshScreen()
     {
         if (HasCheatsSlectionChanged())
         {
-            if (this == g_BaseSystem && g_SyncSystem != NULL)
+            // Check if netplay is active - if so, don't reload cheats from settings
+            // During netplay, cheats are synchronized and should only be loaded from synchronized data
+            bool isNetplayActive = false;
+            if (g_Plugins && g_Plugins->Control())
             {
-                g_SyncSystem->SetCheatsSlectionChanged(true);
+                const char* pluginName = g_Plugins->Control()->PluginName();
+                isNetplayActive = (pluginName != NULL && strstr(pluginName, "NetPlay") != NULL);
             }
-            SetCheatsSlectionChanged(false);
-            m_Cheats.LoadCheats(false, g_BaseSystem->m_Plugins);
+
+            if (!isNetplayActive)
+            {
+                // Only reload cheats from settings for non-netplay sessions
+                if (this == g_BaseSystem && g_SyncSystem != NULL)
+                {
+                    g_SyncSystem->SetCheatsSlectionChanged(true);
+                }
+                SetCheatsSlectionChanged(false);
+                m_Cheats.LoadCheats(false, g_BaseSystem->m_Plugins);
+            }
+            else
+            {
+                // During netplay, just clear the flag without reloading
+                // Cheats are managed by the netplay synchronization system
+                SetCheatsSlectionChanged(false);
+            }
         }
         m_Cheats.ApplyCheats(g_MMU);
     }

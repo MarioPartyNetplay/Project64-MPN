@@ -90,8 +90,20 @@ extern "C" void TriggerDeferredCheatLoadForNetplay(void)
 {
     if (g_BaseSystem)
     {
-        // Load cheats now that they have been synchronized
-        g_BaseSystem->m_Cheats.LoadCheats(false, g_BaseSystem->GetPlugins());
+        // Check if netplay is active - during netplay, cheats are already loaded from synchronized data
+        bool isNetplayActive = false;
+        if (g_Plugins && g_Plugins->Control())
+        {
+            const char* pluginName = g_Plugins->Control()->PluginName();
+            isNetplayActive = (pluginName != NULL && strstr(pluginName, "NetPlay") != NULL);
+        }
+
+        if (!isNetplayActive)
+        {
+            // Only load cheats from settings for non-netplay sessions
+            g_BaseSystem->m_Cheats.LoadCheats(false, g_BaseSystem->GetPlugins());
+        }
+        // During netplay, cheats are already loaded via synchronization, so do nothing
     }
 }
 
