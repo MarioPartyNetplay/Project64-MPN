@@ -1282,18 +1282,21 @@ void client::on_receive(packet& p, bool udp) {
 
             // Trigger soft reset to reload save files into memory (only for non-host clients)
             // Host doesn't need reset since its saves were already correct
-            if (!is_host() && hModule) {
-                typedef void(__cdecl* TriggerSoftResetFunc)(void);
-                TriggerSoftResetFunc triggerSoftReset = (TriggerSoftResetFunc)GetProcAddress(hModule, "TriggerSoftResetForNetplay");
-                if (triggerSoftReset) {
-                    // Use SEH helper to safely call function pointer
-                    if (SafeTriggerCheatReload(triggerSoftReset)) {
-                        my_dialog->info("Triggered soft reset to reload synced saves");
+            if (!is_host()) {
+                HMODULE hModule = GetModuleHandle(NULL);
+                if (hModule) {
+                    typedef void(__cdecl* TriggerSoftResetFunc)(void);
+                    TriggerSoftResetFunc triggerSoftReset = (TriggerSoftResetFunc)GetProcAddress(hModule, "TriggerSoftResetForNetplay");
+                    if (triggerSoftReset) {
+                        // Use SEH helper to safely call function pointer
+                        if (SafeTriggerCheatReload(triggerSoftReset)) {
+                            my_dialog->info("Triggered soft reset to reload synced saves");
+                        } else {
+                            my_dialog->error("Exception occurred while triggering soft reset for save reload");
+                        }
                     } else {
-                        my_dialog->error("Exception occurred while triggering soft reset for save reload");
+                        my_dialog->error("Could not find soft reset function - saves may not reload properly");
                     }
-                } else {
-                    my_dialog->error("Could not find soft reset function - saves may not reload properly");
                 }
             }
             break;
