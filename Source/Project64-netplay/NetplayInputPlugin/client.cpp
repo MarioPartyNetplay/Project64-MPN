@@ -1271,7 +1271,6 @@ void client::on_receive(packet& p, bool udp) {
             // Process cheat files (only for non-host clients)
             if (!is_host()) {
                 std::string type_or_marker = "";
-                std::string content = "";
 
                 try {
                     type_or_marker = p.read<std::string>();
@@ -1280,28 +1279,25 @@ void client::on_receive(packet& p, bool udp) {
                     break;
                 }
 
-                try {
-                    content = p.read<std::string>();
-                } catch (const std::exception& e) {
-                    my_dialog->error("Error reading cheat sync content: " + std::string(e.what()));
-                    break;
-                }
-
                 if (type_or_marker == "END") {
                     // End of chunks - process collected data
-                    my_dialog->info("Received end of cheat chunks - collected cheat chunks: " + std::to_string(cheat_chunks.size()) +
-                                   ", enabled chunks: " + std::to_string(enabled_chunks.size()));
+                    my_dialog->info("Received end of cheat chunks - collected " + std::to_string(cheat_chunks.size()) + " chunks");
                     process_collected_cheat_chunks();
                 } else if (type_or_marker.find("_chunk_") != std::string::npos) {
                     // This is a chunk - store it
+                    std::string content = "";
+                    try {
+                        content = p.read<std::string>();
+                    } catch (const std::exception& e) {
+                        my_dialog->error("Error reading cheat chunk content: " + std::string(e.what()));
+                        break;
+                    }
                     my_dialog->info("Received cheat chunk: " + type_or_marker + " (" + std::to_string(content.length()) + " bytes)");
                     store_cheat_chunk(type_or_marker, content);
                 } else {
-                    // Single packet with complete files (for small files)
-                    std::string enabled_content = content; // Second string is enabled file content
-                    my_dialog->info("Received complete cheat files (cheat: " + std::to_string(type_or_marker.length()) +
-                                   " bytes, enabled: " + std::to_string(enabled_content.length()) + " bytes)");
-                    apply_cheats(type_or_marker, enabled_content);
+                    // Single packet with complete cheat file
+                    my_dialog->info("Received complete cheat file (" + std::to_string(type_or_marker.length()) + " bytes)");
+                    apply_cheats(type_or_marker, ""); // Enabled status is within the .cht file
                 }
             }
             break;
@@ -1974,10 +1970,6 @@ void client::store_cheat_chunk(const std::string& chunk_info, const std::string&
             cheat_chunks[std::to_string(chunk_index)] = content;
             chunk_counts["cheat"] = total_chunks;
             my_dialog->info("Stored cheat chunk " + std::to_string(chunk_index + 1) + "/" + std::to_string(total_chunks));
-        } else if (file_type == "enabled") {
-            enabled_chunks[std::to_string(chunk_index)] = content;
-            chunk_counts["enabled"] = total_chunks;
-            my_dialog->info("Stored enabled chunk " + std::to_string(chunk_index + 1) + "/" + std::to_string(total_chunks));
         } else {
             my_dialog->error("Unknown chunk type: " + file_type);
         }
@@ -1987,17 +1979,14 @@ void client::store_cheat_chunk(const std::string& chunk_info, const std::string&
 }
 
 void client::process_collected_cheat_chunks() {
-    // Get the total number of chunks for each file type
+    // Get the total number of chunks for cheat file
     int cheat_total = chunk_counts["cheat"];
-    int enabled_total = chunk_counts["enabled"];
 
     // Check if we have all chunks
     bool cheat_complete = (cheat_total == 0) || (cheat_chunks.size() == size_t(cheat_total));
-    bool enabled_complete = (enabled_total == 0) || (enabled_chunks.size() == size_t(enabled_total));
 
-    if (!cheat_complete || !enabled_complete) {
-        my_dialog->error("Incomplete chunks - cheat: " + std::to_string(cheat_chunks.size()) + "/" + std::to_string(cheat_total) +
-                        ", enabled: " + std::to_string(enabled_chunks.size()) + "/" + std::to_string(enabled_total));
+    if (!cheat_complete) {
+        my_dialog->error("Incomplete cheat chunks: " + std::to_string(cheat_chunks.size()) + "/" + std::to_string(cheat_total));
         return;
     }
 
@@ -2013,29 +2002,15 @@ void client::process_collected_cheat_chunks() {
         }
     }
 
-    // Assemble enabled file
-    std::string complete_enabled;
-    for (int i = 0; i < enabled_total; i++) {
-        auto it = enabled_chunks.find(std::to_string(i));
-        if (it != enabled_chunks.end()) {
-            complete_enabled += it->second;
-        } else {
-            my_dialog->error("Missing enabled chunk " + std::to_string(i));
-            return;
-        }
-    }
-
-    my_dialog->info("Reassembled complete cheat files (cheat: " + std::to_string(complete_cheat.length()) +
-                   " bytes, enabled: " + std::to_string(complete_enabled.length()) + " bytes)");
+    my_dialog->info("Reassembled complete cheat file (" + std::to_string(complete_cheat.length()) + " bytes)");
 
     // Clear collected chunks
     cheat_chunks.clear();
-    enabled_chunks.clear();
     chunk_counts.clear();
 
-    // Apply the complete files
+    // Apply the complete cheat file (enabled status is within the .cht file)
     my_dialog->info("Applying reassembled cheats...");
-    apply_cheats(complete_cheat, complete_enabled);
+    apply_cheats(complete_cheat, "");
     my_dialog->info("Cheat sync completed successfully");
 }
 
@@ -2055,70 +2030,49 @@ void client::send_cheatsync() {
     std::string enabled_file_content = "";
 
     try {
-        // Read cheat file content
-        std::string cheat_file_path = get_cheat_file_path();
-        if (std::filesystem::exists(cheat_file_path)) {
-            std::ifstream cheat_file(cheat_file_path, std::ios::binary);
-            if (cheat_file.is_open()) {
-                std::stringstream buffer;
-                buffer << cheat_file.rdbuf();
-                cheat_file_content = buffer.str();
-                cheat_file.close();
-                my_dialog->info("Loaded cheat file (" + std::to_string(cheat_file_content.length()) + " bytes)");
-            } else {
-                my_dialog->error("Failed to open cheat file for reading: " + cheat_file_path);
-            }
+    // Read cheat file content (includes enabled status within the .cht file)
+    std::string cheat_file_path = get_cheat_file_path();
+    if (std::filesystem::exists(cheat_file_path)) {
+        std::ifstream cheat_file(cheat_file_path, std::ios::binary);
+        if (cheat_file.is_open()) {
+            std::stringstream buffer;
+            buffer << cheat_file.rdbuf();
+            cheat_file_content = buffer.str();
+            cheat_file.close();
+            my_dialog->info("Loaded cheat file (" + std::to_string(cheat_file_content.length()) + " bytes)");
         } else {
-            my_dialog->info("Cheat file does not exist: " + cheat_file_path);
+            my_dialog->error("Failed to open cheat file for reading: " + cheat_file_path);
         }
+    } else {
+        my_dialog->info("Cheat file does not exist: " + cheat_file_path);
+    }
 
-        // Read enabled file content
-        std::string enabled_file_path = get_cheat_enabled_file_path();
-        if (std::filesystem::exists(enabled_file_path)) {
-            std::ifstream enabled_file(enabled_file_path, std::ios::binary);
-            if (enabled_file.is_open()) {
-                std::stringstream buffer;
-                buffer << enabled_file.rdbuf();
-                enabled_file_content = buffer.str();
-                enabled_file.close();
-                my_dialog->info("Loaded cheat enabled file (" + std::to_string(enabled_file_content.length()) + " bytes)");
-            } else {
-                my_dialog->error("Failed to open cheat enabled file for reading: " + enabled_file_path);
-            }
-        } else {
-            my_dialog->info("Cheat enabled file does not exist: " + enabled_file_path);
-        }
+    // Enabled status is stored within the .cht file itself, no separate enabled file needed
+    enabled_file_content = "";
     } catch (const std::exception& e) {
         my_dialog->error("Error reading cheat files: " + std::string(e.what()));
     }
 
-    // Check if the combined packet would be too large for network transport
+    // Check if the packet would be too large for network transport
     const size_t MAX_CHUNK_SIZE = 16384; // 16KB per chunk for safety
     const size_t MAX_NETWORK_SIZE = 24576; // 24KB total packet limit
 
     size_t cheat_size = packet::var_size(cheat_file_content.length()) + cheat_file_content.length();
-    size_t enabled_size = packet::var_size(enabled_file_content.length()) + enabled_file_content.length();
-    size_t total_size = p.size() + cheat_size + enabled_size;
+    size_t total_size = p.size() + cheat_size;
 
     if (total_size <= MAX_NETWORK_SIZE) {
-        // Send both strings in one packet if they fit
+        // Send cheat file content in one packet
         p << cheat_file_content;
-        p << enabled_file_content;
-        my_dialog->info("Sending cheat files to clients (cheat: " + std::to_string(cheat_file_content.length()) +
-                       " bytes, enabled: " + std::to_string(enabled_file_content.length()) + " bytes, packet size: " + std::to_string(total_size) + ")");
+        my_dialog->info("Sending cheat file to clients (" + std::to_string(cheat_file_content.length()) +
+                       " bytes, packet size: " + std::to_string(total_size) + ")");
         send(p);
     } else {
-        // Split large files into chunks
-        my_dialog->info("Cheat files too large for single packet, splitting into chunks");
+        // Split large file into chunks
+        my_dialog->info("Cheat file too large for single packet, splitting into chunks");
 
         // Send cheat file in chunks
         if (!cheat_file_content.empty()) {
             send_file_in_chunks(cheat_file_content, "cheat", MAX_CHUNK_SIZE);
-        }
-
-        // Send enabled file in chunks
-        if (!enabled_file_content.empty()) {
-            send_file_in_chunks(enabled_file_content, "enabled", MAX_CHUNK_SIZE);
         }
 
         // Small delay before completion marker
@@ -2576,8 +2530,7 @@ void client::save_cheats(const std::vector<cheat_info>& cheats) {
 
 void client::apply_cheats(const std::string& cheat_file_content, const std::string& enabled_file_content) {
     // Queue cheat application to happen asynchronously to avoid blocking network operations
-    my_dialog->info("Queueing cheat application (cheat: " + std::to_string(cheat_file_content.length()) + 
-                   " bytes, enabled: " + std::to_string(enabled_file_content.length()) + " bytes)");
+    my_dialog->info("Queueing cheat application (" + std::to_string(cheat_file_content.length()) + " bytes)");
     
     service.post([this, cheat_file_content, enabled_file_content]() {
         try {
@@ -2664,10 +2617,9 @@ void client::apply_cheats_async(const std::string& cheat_file_content, const std
     }
 
     bool cheat_file_written = false;
-    bool enabled_file_written = false;
 
     try {
-        // Write the entire .cht file content
+        // Write the entire .cht file content (includes enabled status within the file)
         std::string cheat_file = get_cheat_file_path();
 
         // Ensure parent directory exists
@@ -2686,37 +2638,13 @@ void client::apply_cheats_async(const std::string& cheat_file_content, const std
             my_dialog->error("Failed to open cheat file for writing: " + cheat_file + " (Error: " + std::to_string(error) + ")");
         }
 
-        // Write the entire .cht_enabled file content only if we have content
-        if (!enabled_file_content.empty()) {
-            std::string enabled_file = get_cheat_enabled_file_path();
-
-            // Ensure parent directory exists
-            std::filesystem::path enabled_path(enabled_file);
-            std::filesystem::create_directories(enabled_path.parent_path());
-
-            // Write the entire file content (creates file if it doesn't exist)
-            std::ofstream enabled_of(enabled_file.c_str(), std::ofstream::binary | std::ofstream::trunc);
-            if (enabled_of.is_open()) {
-                enabled_of << enabled_file_content;
-                enabled_of.flush();
-                enabled_of.close();
-                enabled_file_written = true;
-            } else {
-                DWORD error = GetLastError();
-                my_dialog->error("Failed to open cheat enabled file for writing: " + enabled_file + " (Error: " + std::to_string(error) + ")");
-            }
-        }
-
         if (cheat_file_written) {
             my_dialog->info("Cheat file synced from host (" + std::to_string(cheat_file_content.length()) + " bytes)");
-        }
-        if (enabled_file_written) {
-            my_dialog->info("Cheat enabled file synced from host (" + std::to_string(enabled_file_content.length()) + " bytes)");
         }
 
         // Trigger Project64 core to reload cheats from the files
         // Use force reload for complete cache clearing and full file re-scan
-        if (hModule && (cheat_file_written || enabled_file_written)) {
+        if (hModule && cheat_file_written) {
             typedef void(__cdecl* TriggerForceCheatReloadFunc)(void);
             TriggerForceCheatReloadFunc triggerForceCheatReload = (TriggerForceCheatReloadFunc)GetProcAddress(hModule, "TriggerForceCheatReloadForNetplay");
             if (triggerForceCheatReload) {
