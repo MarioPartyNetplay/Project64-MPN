@@ -555,6 +555,11 @@ void CMainGui::Resize(DWORD /*fwSizeType*/, WORD nWidth, WORD nHeight)
 
     SendMessage((HWND)m_hStatusWnd, SB_SETPARTS, 2, (LPARAM)&Parts[0]);
     MoveWindow((HWND)m_hStatusWnd, 0, clrect.bottom - swrect.bottom, nWidth, nHeight, TRUE);
+
+    if (g_Plugins && g_Plugins->Gfx() && g_Plugins->Gfx()->ChangeWindow)
+    {
+        g_Plugins->Gfx()->ChangeWindow();
+    }
 }
 
 void CMainGui::Show(bool Visible)
