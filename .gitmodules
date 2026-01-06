@@ -1,6 +1,3 @@
-[submodule "Source/GLideN64"]
-	path = Source/GLideN64
-	url = https://github.com/furtabs/GLideN64.git
 [submodule "Source/3rdParty/asio"]
 	path = Source/3rdParty/asio
 	url = https://github.com/chriskohlhoff/asio.git
