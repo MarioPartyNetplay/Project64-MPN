@@ -99,7 +99,7 @@ uint32_t CRomList::LoadPlaytime(const std::string & RomIniKey)
     return m_PlaytimeFile->GetNumber(RomIniKey.c_str(), "Playtime", 0);
 }
 
-void CRomList::SavePlaytime(const std::string & RomIniKey, uint32_t Playtime)
+void CRomList::SavePlaytime(uint32_t ElapsedPlaytime)
 {
     auto RomIniKey = g_Settings->LoadStringVal(Game_IniKey);
     auto CurrentPlaytime = LoadPlaytime(RomIniKey);
