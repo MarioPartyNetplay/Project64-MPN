@@ -2099,7 +2099,6 @@ void client::send_cheatsync() {
 
     // Give time for all chunks to be processed
     Sleep(200);
-    }
 
     send(p);
 }
