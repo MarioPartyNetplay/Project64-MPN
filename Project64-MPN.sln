@@ -32,6 +32,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "osal", "Source\GLideN64\pro
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libGLideNHQ", "Source\GLideN64\projects\msvc\libGLideNHQ.vcxproj", "{DA965BCF-2219-47AF-ACE7-EAF76D5D4756}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GLideN64", "Source\GLideN64\projects\msvc\GLideN64.vcxproj", "{9B2E7D1A-6E38-4E47-9B59-8B2B8E8E6E6E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug (Server)|Win32 = Debug (Server)|Win32
@@ -268,6 +270,14 @@ Global
 		{DA965BCF-2219-47AF-ACE7-EAF76D5D4756}.Release|Win32.Build.0 = Release|Win32
 		{DA965BCF-2219-47AF-ACE7-EAF76D5D4756}.Release|x64.ActiveCfg = Release|x64
 		{DA965BCF-2219-47AF-ACE7-EAF76D5D4756}.Release|x64.Build.0 = Release|x64
+		{9B2E7D1A-6E38-4E47-9B59-8B2B8E8E6E6E}.Debug|Win32.ActiveCfg = Debug_qt|Win32
+		{9B2E7D1A-6E38-4E47-9B59-8B2B8E8E6E6E}.Debug|Win32.Build.0 = Debug_qt|Win32
+		{9B2E7D1A-6E38-4E47-9B59-8B2B8E8E6E6E}.Debug|x64.ActiveCfg = Debug_qt|x64
+		{9B2E7D1A-6E38-4E47-9B59-8B2B8E8E6E6E}.Debug|x64.Build.0 = Debug_qt|x64
+		{9B2E7D1A-6E38-4E47-9B59-8B2B8E8E6E6E}.Release|Win32.ActiveCfg = Release_qt|Win32
+		{9B2E7D1A-6E38-4E47-9B59-8B2B8E8E6E6E}.Release|Win32.Build.0 = Release_qt|Win32
+		{9B2E7D1A-6E38-4E47-9B59-8B2B8E8E6E6E}.Release|x64.ActiveCfg = Release_qt|x64
+		{9B2E7D1A-6E38-4E47-9B59-8B2B8E8E6E6E}.Release|x64.Build.0 = Release_qt|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -281,6 +291,7 @@ Global
 		{DCC841B2-298A-40F0-84D1-ACBABD3B86E8} = {AA8F7F8E-5377-4911-859D-8A8817B0DB26}
 		{7BF6F100-31DB-44AE-A2A5-5DDEED9A909C} = {AA8F7F8E-5377-4911-859D-8A8817B0DB26}
 		{DA965BCF-2219-47AF-ACE7-EAF76D5D4756} = {AA8F7F8E-5377-4911-859D-8A8817B0DB26}
+		{9B2E7D1A-6E38-4E47-9B59-8B2B8E8E6E6E} = {AA8F7F8E-5377-4911-859D-8A8817B0DB26}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {FB7814D5-E1A1-4CFE-96B6-D4F08208A52B}

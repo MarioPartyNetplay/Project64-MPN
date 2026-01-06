@@ -66,6 +66,7 @@ public:
     void(CALL *UpdateScreen)    (void);
     void(CALL *ViStatusChanged) (void);
     void(CALL *ViWidthChanged)  (void);
+    void(CALL *ResizeVideoOutput)(int32_t Width, int32_t Height);
     void(CALL *SoftReset)       (void);
 #ifdef ANDROID
     void(CALL *SurfaceCreated)  (void);
@@ -101,5 +102,6 @@ private:
     static void CALL DummyMoveScreen(int32_t /*xpos*/, int32_t /*ypos*/) {}
     static void CALL DummyViStatusChanged(void) {}
     static void CALL DummyViWidthChanged(void) {}
+    static void CALL DummyResizeVideoOutput(int32_t /*Width*/, int32_t /*Height*/) {}
     static void CALL DummySoftReset(void) {}
 };
