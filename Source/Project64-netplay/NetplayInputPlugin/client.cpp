@@ -2027,19 +2027,15 @@ void client::process_collected_cheat_chunks() {
         chunk_counts.clear();
 
         // Apply the cheats
+        my_dialog->info("Applying reassembled cheats...");
         apply_cheats(complete_cheat, "");
+        my_dialog->info("Cheat sync completed successfully");
     } catch (const std::exception& e) {
         my_dialog->error("Error processing collected cheat chunks: " + std::string(e.what()));
         // Clear chunks on error to prevent accumulation
         cheat_chunks.clear();
         chunk_counts.clear();
     }
-}
-
-    // Apply the complete cheat file (enabled status is within the .cht file)
-    my_dialog->info("Applying reassembled cheats...");
-    apply_cheats(complete_cheat, "");
-    my_dialog->info("Cheat sync completed successfully");
 }
 
 void client::send_cheatsync() {
