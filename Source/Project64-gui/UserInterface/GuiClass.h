@@ -13,6 +13,7 @@
 #include "../Settings/GuiSettings.h"
 #include <Project64-gui/N64System/Debugger/debugger.h>
 #include <Project64-core/Plugins/PluginClass.h>
+#include <chrono>
 
 class CGfxPlugin;      //Plugin that controls the rendering
 class CAudioPlugin;    //Plugin for audio, need the hwnd
@@ -108,6 +109,7 @@ private:
     void AddRecentRom(const char * ImagePath);
     void SetWindowCaption(const wchar_t * Caption);
     void ShowRomBrowser(void);
+    void SavePlaytime(void);
 
     friend DWORD CALLBACK AboutBoxProc(HWND, DWORD, DWORD, DWORD);
     friend DWORD CALLBACK AboutIniBoxProc(HWND, DWORD, DWORD, DWORD);
@@ -142,4 +144,6 @@ private:
     bool        m_SaveRomBrowserPos;
     LONG        m_SaveRomBrowserTop;
     LONG        m_SaveRomBrowserLeft;
+
+    std::pair<std::chrono::steady_clock::time_point, bool> m_CurrentPlaytime;
 };

@@ -27,6 +27,8 @@ enum SettingID
     Cmd_ShowHelp,
 
     //Support Files
+    SupportFile_Playtime,
+    SupportFile_PlaytimeDefault,
     SupportFile_Settings,
     SupportFile_SettingsDefault,
     SupportFile_RomDatabase,

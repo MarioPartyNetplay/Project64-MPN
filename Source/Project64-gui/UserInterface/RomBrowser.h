@@ -114,7 +114,7 @@ private:
         RB_Manufacturer = 9, RB_Country = 10, RB_Developer = 11,
         RB_Crc1 = 12, RB_Crc2 = 13, RB_CICChip = 14,
         RB_ReleaseDate = 15, RB_Genre = 16, RB_Players = 17,
-        RB_ForceFeedback = 18, RB_FileFormat = 19
+        RB_ForceFeedback = 18, RB_FileFormat = 19, RB_Playtime = 21
     };
 
     enum

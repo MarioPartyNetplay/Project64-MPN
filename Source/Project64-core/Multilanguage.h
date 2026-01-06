@@ -204,6 +204,7 @@ enum LanguageStringID
     RB_PLAYERS = 317,
     RB_FORCE_FEEDBACK = 318,
     RB_FILE_FORMAT = 319,
+    RB_PLAYTIME = 3114,
 
     //Select Rom
     SELECT_ROM_DIR = 320,

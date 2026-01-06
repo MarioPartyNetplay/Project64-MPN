@@ -92,6 +92,8 @@ void CSettings::AddHowToHandleSetting(const char * BaseDirectory)
     AddHandler(Cmd_RomFile, new CSettingTypeTempString(""));
 
     //Support Files
+    AddHandler(SupportFile_Playtime, new CSettingTypeApplicationPath("Settings", "Playtime", SupportFile_PlaytimeDefault));
+    AddHandler(SupportFile_PlaytimeDefault, new CSettingTypeRelativePath("User", "Playtime.rdn"));
     AddHandler(SupportFile_Settings, new CSettingTypeApplicationPath("", "ConfigFile", SupportFile_SettingsDefault));
     AddHandler(SupportFile_SettingsDefault, new CSettingTypeRelativePath("User", "Project64.cfg"));
     AddHandler(SupportFile_RomDatabase, new CSettingTypeApplicationPath("", "RomDatabase", SupportFile_RomDatabaseDefault));
