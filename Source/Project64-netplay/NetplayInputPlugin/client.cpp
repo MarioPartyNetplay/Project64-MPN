@@ -1311,9 +1311,10 @@ void client::on_receive(packet& p, bool udp) {
                 send_save_info();
             }
 
-            // Trigger soft reset to reload save files into memory (only for non-host clients)
+            // TEMPORARILY DISABLED: Trigger soft reset to reload save files into memory (only for non-host clients)
             // Host doesn't need reset since its saves were already correct
-            if (!is_host()) {
+            // Disabled to prevent connection issues during save sync
+            if (false && !is_host()) {
                 HMODULE hModule = GetModuleHandle(NULL);
                 if (hModule) {
                     typedef void(__cdecl* TriggerSoftResetFunc)(void);
@@ -2683,9 +2684,9 @@ void client::apply_cheats_async(const std::string& cheat_file_content, const std
             my_dialog->info("Cheat file synced from host (" + std::to_string(cheat_file_content.length()) + " bytes)");
         }
 
-        // Trigger Project64 core to reload cheats from the files
-        // Use force reload for complete cache clearing and full file re-scan
-        if (hModule && cheat_file_written) {
+        // TEMPORARILY DISABLED: Trigger Project64 core to reload cheats from the files
+        // This was causing connection resets - need to investigate cheat reload functions
+        if (false && hModule && cheat_file_written) {
             typedef void(__cdecl* TriggerForceCheatReloadFunc)(void);
             TriggerForceCheatReloadFunc triggerForceCheatReload = (TriggerForceCheatReloadFunc)GetProcAddress(hModule, "TriggerForceCheatReloadForNetplay");
             if (triggerForceCheatReload) {
@@ -2722,9 +2723,13 @@ void client::apply_cheats_async(const std::string& cheat_file_content, const std
                 }
             }
 
-            // Give Project64 core minimal time to process the file changes
-            // Reduced from 1000ms to 200ms to prevent network timeouts
-            Sleep(200);
+            // Give Project64 core more time to process the file changes
+            // Increased from 200ms to 500ms to prevent network timeouts during cheat reload
+            Sleep(500);
+        }
+
+        if (cheat_file_written) {
+            my_dialog->info("Cheat file written but reload disabled to prevent connection issues");
         }
 
         my_dialog->info("Cheats synced from host");
