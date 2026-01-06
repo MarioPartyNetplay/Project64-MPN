@@ -1159,8 +1159,7 @@ void CRomBrowser::HideRomList(void)
 
     if (UISettingsLoadBool(RomBrowser_Maximized)) { ShowWindow(m_MainWindow, SW_RESTORE); }
 
-    //Change the window style
-    long Style = GetWindowLong(m_MainWindow, GWL_STYLE) &	~(WS_SIZEBOX | WS_MAXIMIZEBOX);
+    long Style = GetWindowLong(m_MainWindow, GWL_STYLE) | WS_SIZEBOX | WS_MAXIMIZEBOX;
     SetWindowLong(m_MainWindow, GWL_STYLE, Style);
 
     //Move window to correct location
