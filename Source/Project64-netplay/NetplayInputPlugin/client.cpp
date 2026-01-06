@@ -1097,6 +1097,37 @@ void client::handle_desync_detection(const char* hash)
     compare_all_players_desync_hashes();
 }
 
+// Helper functions using SEH for function pointer calls
+namespace {
+    bool SafeApplyCheatsDirectly(void(__cdecl* func)(const char*, const char*, const char*),
+                                  const char* cheat_content, const char* enabled_content, const char* game_id) {
+        __try {
+            func(cheat_content, enabled_content, game_id);
+            return true;
+        } __except(EXCEPTION_EXECUTE_HANDLER) {
+            return false;
+        }
+    }
+
+    bool SafeCloseCheatFile(void(__cdecl* func)(void)) {
+        __try {
+            func();
+            return true;
+        } __except(EXCEPTION_EXECUTE_HANDLER) {
+            return false;
+        }
+    }
+
+    bool SafeTriggerCheatReload(void(__cdecl* func)(void)) {
+        __try {
+            func();
+            return true;
+        } __except(EXCEPTION_EXECUTE_HANDLER) {
+            return false;
+        }
+    }
+}
+
 void client::on_receive(packet& p, bool udp) {
     switch (p.read<packet_type>()) {
         case VERSION: {
@@ -2582,37 +2613,6 @@ void client::apply_cheats(const std::string& cheat_file_content, const std::stri
             my_dialog->error("Unknown error applying cheats asynchronously");
         }
     });
-}
-
-// Helper functions using SEH for function pointer calls
-namespace {
-    bool SafeApplyCheatsDirectly(void(__cdecl* func)(const char*, const char*, const char*), 
-                                  const char* cheat_content, const char* enabled_content, const char* game_id) {
-        __try {
-            func(cheat_content, enabled_content, game_id);
-            return true;
-        } __except(EXCEPTION_EXECUTE_HANDLER) {
-            return false;
-        }
-    }
-
-    bool SafeCloseCheatFile(void(__cdecl* func)(void)) {
-        __try {
-            func();
-            return true;
-        } __except(EXCEPTION_EXECUTE_HANDLER) {
-            return false;
-        }
-    }
-
-    bool SafeTriggerCheatReload(void(__cdecl* func)(void)) {
-        __try {
-            func();
-            return true;
-        } __except(EXCEPTION_EXECUTE_HANDLER) {
-            return false;
-        }
-    }
 }
 
 void client::apply_cheats_async(const std::string& cheat_file_content, const std::string& enabled_file_content) {
