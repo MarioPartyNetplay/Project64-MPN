@@ -1166,14 +1166,14 @@ void client::on_receive(packet& p, bool udp) {
 
                     auto save_data = p.read<save_info>();
                     auto my_save = me->saves[i];
-                    
+
                     // Validate save data
                     if (save_data.rom_name != me->rom.name) {
                         my_dialog->error("Save sync error: ROM name mismatch for save slot " + std::to_string(i));
                         error_count++;
                         continue;
                     }
-                    
+
                     // Check for oversized save files that could cause crashes
                     const size_t MAX_SAVE_SIZE = 2 * 1024 * 1024; // 2MB limit
                     if (save_data.save_data.size() > MAX_SAVE_SIZE) {
@@ -1183,25 +1183,40 @@ void client::on_receive(packet& p, bool udp) {
                         continue;
                     }
 
+                    // For host: skip sync since host's saves are already correct
+                    if (is_host()) {
+                        // Host just updates its user_map entry for consistency
+                        if (me) {
+                            for (auto& user : user_map) {
+                                if (user && me && user.get() == me.get()) {
+                                    user->saves[i] = save_data;
+                                    break;
+                                }
+                            }
+                        }
+                        skipped_count++;
+                        continue;
+                    }
+
                     // Always sync if hashes differ, or if one is empty and the other isn't
                     bool needs_sync = (my_save.sha1_data != save_data.sha1_data);
                     bool my_save_empty = my_save.save_name.empty() || my_save.save_data.empty();
                     bool incoming_save_empty = save_data.save_name.empty() || save_data.save_data.empty();
-                    
+
                     // Also sync if one is empty and the other isn't (even if hashes match, which shouldn't happen)
                     if (!needs_sync && my_save_empty != incoming_save_empty) {
                         needs_sync = true;
                     }
-                    
+
                     if (needs_sync) {
                         synced_count++;
-                        
+
                         // Backup existing save before replacing (for non-hosts)
-                        if (!is_host() && !my_save.save_name.empty()) {
+                        if (!my_save.save_name.empty()) {
                             std::string original_dir = save_path + "Original\\";
                             std::string original_path = save_path + my_save.save_name;
                             std::string backup_path = original_dir + my_save.save_name;
-                            
+
                             // Backup if file exists and backup doesn't exist yet
                             if (std::filesystem::exists(original_path) && !std::filesystem::exists(backup_path)) {
                                 try {
@@ -1215,7 +1230,7 @@ void client::on_receive(packet& p, bool udp) {
                                 }
                             }
                         }
-                        
+
                         // Handle empty save - delete existing file before updating
                         bool incoming_empty = save_data.save_name.empty() || save_data.save_data.empty();
                         if (incoming_empty && !my_save.save_name.empty()) {
@@ -1228,7 +1243,7 @@ void client::on_receive(packet& p, bool udp) {
                                 }
                             }
                         }
-                        
+
                         // Update local save and replace file
                         // This will write the new save or skip if empty (already deleted above)
                         me->saves[i] = save_data;
@@ -1263,6 +1278,23 @@ void client::on_receive(packet& p, bool udp) {
             if (me) {
                 update_save_info();
                 send_save_info();
+            }
+
+            // Trigger soft reset to reload save files into memory (only for non-host clients)
+            // Host doesn't need reset since its saves were already correct
+            if (!is_host() && hModule) {
+                typedef void(__cdecl* TriggerSoftResetFunc)(void);
+                TriggerSoftResetFunc triggerSoftReset = (TriggerSoftResetFunc)GetProcAddress(hModule, "TriggerSoftResetForNetplay");
+                if (triggerSoftReset) {
+                    // Use SEH helper to safely call function pointer
+                    if (SafeTriggerCheatReload(triggerSoftReset)) {
+                        my_dialog->info("Triggered soft reset to reload synced saves");
+                    } else {
+                        my_dialog->error("Exception occurred while triggering soft reset for save reload");
+                    }
+                } else {
+                    my_dialog->error("Could not find soft reset function - saves may not reload properly");
+                }
             }
             break;
         }
