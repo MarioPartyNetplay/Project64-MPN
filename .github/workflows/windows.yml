@@ -34,9 +34,15 @@ jobs:
       uses: microsoft/setup-msbuild@v1.0.2
       with:
         vs-version: '16.6.2'
-    # Run MSBuild
-    - name: Build Solution
-      run: msbuild "Project64-MPN.sln" /verbosity:minimal /property:Configuration=Release  /property:Platform=Win32
+    # Build GLideN64 (with Qt support)
+    - name: Build GLideN64
+      run: |
+        cd Source/GLideN64/projects/msvc
+        GLideN64_Builder.cmd --all --dlqt --nopjqt
+      shell: cmd
+    # Build Main Project
+    - name: Build Project64-MPN
+      run: msbuild "Project64-MPN.sln" /verbosity:minimal /property:Configuration=Release /property:Platform=Win32
     # Upload Artifact
     - name: Upload Build Artifact
       uses: actions/upload-artifact@v4
