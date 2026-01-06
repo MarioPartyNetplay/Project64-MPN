@@ -64,6 +64,9 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup />
   <ItemDefinitionGroup>
+    <PreBuildEvent>
+      <Command>call "$(ProjectDir)Source\Script\update_git_hash.cmd"</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
   </ItemGroup>
