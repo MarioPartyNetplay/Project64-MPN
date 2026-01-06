@@ -1288,12 +1288,12 @@ void client::on_receive(packet& p, bool udp) {
                     std::string content = "";
                     try {
                         content = p.read<std::string>();
+                        my_dialog->info("Received cheat chunk: " + type_or_marker + " (" + std::to_string(content.length()) + " bytes)");
+                        store_cheat_chunk(type_or_marker, content);
                     } catch (const std::exception& e) {
                         my_dialog->error("Error reading cheat chunk content: " + std::string(e.what()));
                         break;
                     }
-                    my_dialog->info("Received cheat chunk: " + type_or_marker + " (" + std::to_string(content.length()) + " bytes)");
-                    store_cheat_chunk(type_or_marker, content);
                 } else {
                     // Single packet with complete cheat file
                     my_dialog->info("Received complete cheat file (" + std::to_string(type_or_marker.length()) + " bytes)");
@@ -1923,90 +1923,118 @@ void client::send_file_in_chunks(const std::string& content, const std::string& 
     my_dialog->info("Sending " + file_type + " file in " + std::to_string(total_chunks) + " chunks");
 
     for (size_t i = 0; i < total_chunks; i++) {
-        size_t start = i * chunk_size;
-        size_t end = std::min(start + chunk_size, content.length());
-        std::string chunk = content.substr(start, end - start);
+        try {
+            size_t start = i * chunk_size;
+            size_t end = std::min(start + chunk_size, content.length());
+            std::string chunk = content.substr(start, end - start);
 
-        packet chunk_p;
-        chunk_p << CHEAT_SYNC;
-        chunk_p << std::string(file_type + "_chunk_" + std::to_string(i) + "_" + std::to_string(total_chunks));
-        chunk_p << chunk;
+            packet chunk_p;
+            chunk_p << CHEAT_SYNC;
+            chunk_p << std::string(file_type + "_chunk_" + std::to_string(i) + "_" + std::to_string(total_chunks));
+            chunk_p << chunk;
 
-        my_dialog->info("Sending " + file_type + " chunk " + std::to_string(i + 1) + "/" + std::to_string(total_chunks) +
-                       " (" + std::to_string(chunk.length()) + " bytes)");
-        send(chunk_p);
+            my_dialog->info("Sending " + file_type + " chunk " + std::to_string(i + 1) + "/" + std::to_string(total_chunks) +
+                           " (" + std::to_string(chunk.length()) + " bytes)");
 
-        // Small delay between chunks to prevent overwhelming the network
-        Sleep(100);
+            // Send the chunk
+            send(chunk_p);
+
+            // Small delay between chunks to prevent overwhelming the network
+            Sleep(50);
+        } catch (const std::exception& e) {
+            my_dialog->error("Error sending " + file_type + " chunk " + std::to_string(i + 1) + ": " + std::string(e.what()));
+            throw; // Re-throw to let caller handle
+        }
     }
 }
 
 void client::store_cheat_chunk(const std::string& chunk_info, const std::string& content) {
-    // Parse chunk info: "type_chunk_index_total"
-    // Example: "cheat_chunk_0_5" means cheat file, chunk 0 of 5 total
-    size_t chunk_pos = chunk_info.find("_chunk_");
-    if (chunk_pos == std::string::npos) {
-        my_dialog->error("Invalid chunk info format: " + chunk_info);
-        return;
-    }
-
-    std::string file_type = chunk_info.substr(0, chunk_pos);
-    std::string remainder = chunk_info.substr(chunk_pos + 7); // Skip "_chunk_"
-
-    size_t underscore_pos = remainder.find('_');
-    if (underscore_pos == std::string::npos) {
-        my_dialog->error("Invalid chunk numbering: " + chunk_info);
-        return;
-    }
-
-    std::string index_str = remainder.substr(0, underscore_pos);
-    std::string total_str = remainder.substr(underscore_pos + 1);
-
     try {
+        // Parse chunk info: "type_chunk_index_total"
+        // Example: "cheat_chunk_0_5" means cheat file, chunk 0 of 5 total
+        size_t chunk_pos = chunk_info.find("_chunk_");
+        if (chunk_pos == std::string::npos) {
+            throw std::runtime_error("Invalid chunk info format: " + chunk_info);
+        }
+
+        std::string file_type = chunk_info.substr(0, chunk_pos);
+        std::string remainder = chunk_info.substr(chunk_pos + 7); // Skip "_chunk_"
+
+        size_t underscore_pos = remainder.find('_');
+        if (underscore_pos == std::string::npos) {
+            throw std::runtime_error("Invalid chunk numbering: " + chunk_info);
+        }
+
+        std::string index_str = remainder.substr(0, underscore_pos);
+        std::string total_str = remainder.substr(underscore_pos + 1);
+
         int chunk_index = std::stoi(index_str);
         int total_chunks = std::stoi(total_str);
+
+        if (chunk_index < 0 || chunk_index >= total_chunks || total_chunks <= 0) {
+            throw std::runtime_error("Invalid chunk index/total: " + std::to_string(chunk_index) + "/" + std::to_string(total_chunks));
+        }
 
         if (file_type == "cheat") {
             cheat_chunks[std::to_string(chunk_index)] = content;
             chunk_counts["cheat"] = total_chunks;
             my_dialog->info("Stored cheat chunk " + std::to_string(chunk_index + 1) + "/" + std::to_string(total_chunks));
+
+            // Check if we have all chunks and can process them
+            if (cheat_chunks.size() == size_t(total_chunks)) {
+                my_dialog->info("All cheat chunks received, processing...");
+                process_collected_cheat_chunks();
+            }
         } else {
-            my_dialog->error("Unknown chunk type: " + file_type);
+            throw std::runtime_error("Unknown chunk type: " + file_type);
         }
     } catch (const std::exception& e) {
-        my_dialog->error("Error parsing chunk numbers: " + std::string(e.what()));
+        my_dialog->error("Error storing cheat chunk: " + std::string(e.what()));
     }
 }
 
 void client::process_collected_cheat_chunks() {
-    // Get the total number of chunks for cheat file
-    int cheat_total = chunk_counts["cheat"];
+    try {
+        // Get the total number of chunks for cheat file
+        int cheat_total = chunk_counts["cheat"];
 
-    // Check if we have all chunks
-    bool cheat_complete = (cheat_total == 0) || (cheat_chunks.size() == size_t(cheat_total));
+        // Check if we have all chunks
+        bool cheat_complete = (cheat_total == 0) || (cheat_chunks.size() == size_t(cheat_total));
 
-    if (!cheat_complete) {
-        my_dialog->error("Incomplete cheat chunks: " + std::to_string(cheat_chunks.size()) + "/" + std::to_string(cheat_total));
-        return;
-    }
-
-    // Assemble cheat file
-    std::string complete_cheat;
-    for (int i = 0; i < cheat_total; i++) {
-        auto it = cheat_chunks.find(std::to_string(i));
-        if (it != cheat_chunks.end()) {
-            complete_cheat += it->second;
-        } else {
-            my_dialog->error("Missing cheat chunk " + std::to_string(i));
+        if (!cheat_complete) {
+            my_dialog->error("Incomplete cheat chunks: " + std::to_string(cheat_chunks.size()) + "/" + std::to_string(cheat_total));
             return;
         }
+
+        // Assemble cheat file
+        std::string complete_cheat;
+        complete_cheat.reserve(cheat_total * 8192); // Pre-allocate memory
+
+        for (int i = 0; i < cheat_total; i++) {
+            auto it = cheat_chunks.find(std::to_string(i));
+            if (it != cheat_chunks.end()) {
+                complete_cheat += it->second;
+            } else {
+                my_dialog->error("Missing cheat chunk " + std::to_string(i));
+                return;
+            }
+        }
+
+        my_dialog->info("Reassembled complete cheat file (" + std::to_string(complete_cheat.length()) + " bytes)");
+
+        // Clear collected chunks first to free memory
+        cheat_chunks.clear();
+        chunk_counts.clear();
+
+        // Apply the cheats
+        apply_cheats(complete_cheat, "");
+    } catch (const std::exception& e) {
+        my_dialog->error("Error processing collected cheat chunks: " + std::string(e.what()));
+        // Clear chunks on error to prevent accumulation
+        cheat_chunks.clear();
+        chunk_counts.clear();
     }
-
-    my_dialog->info("Reassembled complete cheat file (" + std::to_string(complete_cheat.length()) + " bytes)");
-
-    // Clear collected chunks
-    cheat_chunks.clear();
-    chunk_counts.clear();
+}
 
     // Apply the complete cheat file (enabled status is within the .cht file)
     my_dialog->info("Applying reassembled cheats...");
@@ -2053,41 +2081,24 @@ void client::send_cheatsync() {
         my_dialog->error("Error reading cheat files: " + std::string(e.what()));
     }
 
-    // Check if the packet would be too large for network transport
-    const size_t MAX_CHUNK_SIZE = 16384; // 16KB per chunk for safety
-    const size_t MAX_NETWORK_SIZE = 24576; // 24KB total packet limit
+    // Always use chunking for cheat files to ensure reliability
+    // Large single packets can cause network issues and crashes
+    const size_t MAX_CHUNK_SIZE = 8192; // 8KB per chunk for better reliability
 
-    size_t cheat_size = packet::var_size(cheat_file_content.length()) + cheat_file_content.length();
-    size_t total_size = p.size() + cheat_size;
+    my_dialog->info("Sending cheat file to clients in chunks (" + std::to_string(cheat_file_content.length()) + " bytes total)");
 
-    if (total_size <= MAX_NETWORK_SIZE) {
-        // Send cheat file content in one packet
-        p << cheat_file_content;
-        my_dialog->info("Sending cheat file to clients (" + std::to_string(cheat_file_content.length()) +
-                       " bytes, packet size: " + std::to_string(total_size) + ")");
-        send(p);
-    } else {
-        // Split large file into chunks
-        my_dialog->info("Cheat file too large for single packet, splitting into chunks");
-
-        // Send cheat file in chunks
-        if (!cheat_file_content.empty()) {
+    // Send cheat file in chunks
+    if (!cheat_file_content.empty()) {
+        try {
             send_file_in_chunks(cheat_file_content, "cheat", MAX_CHUNK_SIZE);
+        } catch (const std::exception& e) {
+            my_dialog->error("Error sending cheat file chunks: " + std::string(e.what()));
+            return;
         }
+    }
 
-        // Small delay before completion marker
-        Sleep(200);
-
-        // Send completion marker
-        packet end_p;
-        end_p << CHEAT_SYNC;
-        end_p << std::string("END"); // Special marker for end of chunks
-        end_p << std::string("");
-        my_dialog->info("Sent cheat sync completion marker");
-        send(end_p);
-
-        // Give time for packets to be processed
-        Sleep(500);
+    // Give time for all chunks to be processed
+    Sleep(200);
     }
 
     send(p);
