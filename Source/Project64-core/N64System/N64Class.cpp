@@ -82,22 +82,8 @@ m_SyncCpu(SyncSystem)
     }
     m_Limiter.SetHertz(gameHertz);
     g_Settings->SaveDword(GameRunning_ScreenHertz, gameHertz);
-
-    // Check if netplay is active - if so, defer cheat loading until after synchronization
-    bool isNetplayActive = false;
-    if (Plugins && Plugins->Control())
-    {
-        const char* pluginName = Plugins->Control()->PluginName();
-        isNetplayActive = (pluginName != NULL && strstr(pluginName, "NetPlay") != NULL);
-    }
-
-    if (!isNetplayActive)
-    {
-        // Load cheats normally for non-netplay sessions
-        m_Cheats.LoadCheats(!g_Settings->LoadDword(Setting_RememberCheats), Plugins);
-    }
-    // For netplay, cheats will be loaded later via TriggerDeferredCheatLoadForNetplay
-
+    m_Cheats.LoadCheats(!g_Settings->LoadDword(Setting_RememberCheats), Plugins);
+    
     WriteTrace(TraceN64System, TraceDebug, "Setting up system");
     CInterpreterCPU::BuildCPU();
 
