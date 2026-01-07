@@ -4,6 +4,7 @@
 
 #include <windows.h>
 #include <commdlg.h>
+#include <shellapi.h>
 
 #include "Discord.h"
 
@@ -251,7 +252,15 @@ void CMainMenu::OnSettings(HWND hWnd)
 void CMainMenu::OnOpenUserFolder(HWND hWnd)
 {
     CPath UserFolderPath(g_Settings->LoadStringVal(Cmd_BaseDirectory).c_str(), "User\\");
-    ShellExecuteW(hWnd, L"explore", stdstr(UserFolderPath.ToString().c_str()).ToUTF16().c_str(), NULL, NULL, SW_SHOWNORMAL);
+    stdstr folderPath = UserFolderPath.ToString();
+
+    // Use ShellExecuteEx for better control and error handling
+    SHELLEXECUTEINFOW sei = { sizeof(sei) };
+    sei.fMask = SEE_MASK_INVOKEIDLIST | SEE_MASK_FLAG_NO_UI;
+    sei.hwnd = hWnd;
+    sei.lpVerb = L"explore";
+    sei.lpFile = stdstr(folderPath.c_str()).ToUTF16().c_str();
+    sei.nShow = SW_SHOWNORMAL;
 }
 
 bool CMainMenu::ProcessMessage(HWND hWnd, DWORD /*FromAccelerator*/, DWORD MenuID)
