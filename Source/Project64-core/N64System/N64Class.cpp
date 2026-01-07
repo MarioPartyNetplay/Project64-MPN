@@ -40,6 +40,7 @@
 #include <fstream>
 #include <vector>
 #include <Project64-core/N64System/Mips/TLBClass.h>
+#include <Project64-core/Settings/SettingType/SettingsType-CheatsEnabled.h>
 
 #pragma warning(disable:4355) // Disable 'this' : used in base member initializer list
 
@@ -2814,9 +2815,63 @@ void CN64System::RefreshScreen()
             }
             else
             {
-                // During netplay, just clear the flag without reloading
-                // Cheats are managed by the netplay synchronization system
+                // During netplay, load cheats from settings and also load them into the netplay array
+                // This ensures cheats are available locally for the host player
+                if (this == g_BaseSystem && g_SyncSystem != NULL)
+                {
+                    g_SyncSystem->SetCheatsSlectionChanged(true);
+                }
                 SetCheatsSlectionChanged(false);
+                m_Cheats.LoadCheats(false, g_BaseSystem->m_Plugins);
+
+                // Also load the same cheat data into the netplay array for local application
+                // This ensures ApplyCheatsForNetplay() has cheats to apply locally
+                std::string cheatFilePath = CSettingTypeCheats::GetGameSpecificCheatFilePath(".cht");
+                std::string enabledFilePath = CSettingTypeCheatsEnabled::GetGameSpecificCheatEnabledFilePath();
+                std::string gameId = g_Settings->LoadStringVal(Game_IniKey);
+
+                // Load cheat file content
+                std::string cheatFileContent;
+                if (!cheatFilePath.empty())
+                {
+                    FILE* cheatFile = fopen(cheatFilePath.c_str(), "rb");
+                    if (cheatFile)
+                    {
+                        fseek(cheatFile, 0, SEEK_END);
+                        size_t fileSize = ftell(cheatFile);
+                        fseek(cheatFile, 0, SEEK_SET);
+                        cheatFileContent.resize(fileSize);
+                        fread(&cheatFileContent[0], 1, fileSize, cheatFile);
+                        fclose(cheatFile);
+                    }
+                }
+
+                // Load enabled file content
+                std::string enabledFileContent;
+                if (!enabledFilePath.empty())
+                {
+                    FILE* enabledFile = fopen(enabledFilePath.c_str(), "rb");
+                    if (enabledFile)
+                    {
+                        fseek(enabledFile, 0, SEEK_END);
+                        size_t fileSize = ftell(enabledFile);
+                        fseek(enabledFile, 0, SEEK_SET);
+                        enabledFileContent.resize(fileSize);
+                        fread(&enabledFileContent[0], 1, fileSize, enabledFile);
+                        fclose(enabledFile);
+                    }
+                }
+
+                // Load cheats into netplay array if we have data
+                if (!cheatFileContent.empty() && !gameId.empty())
+                {
+                    m_Cheats.LoadCheatsFromDataForNetplay(
+                        cheatFileContent.c_str(),
+                        enabledFileContent.empty() ? NULL : enabledFileContent.c_str(),
+                        gameId.c_str(),
+                        g_BaseSystem->m_Plugins
+                    );
+                }
             }
         }
 
