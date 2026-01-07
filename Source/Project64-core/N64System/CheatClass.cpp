@@ -158,6 +158,7 @@ void CCheats::LoadPermCheats(CPlugins * Plugins)
 
 void CCheats::LoadCheats(bool DisableSelected, CPlugins * Plugins)
 {
+    CGuard Guard(m_CriticalSection);
     m_Codes.clear();
     LoadPermCheats(Plugins);
 
@@ -187,6 +188,7 @@ void CCheats::LoadCheats(bool DisableSelected, CPlugins * Plugins)
 
 void CCheats::LoadCheatsFromData(const char * cheat_file_content, const char * enabled_file_content, const char * game_identifier, CPlugins * Plugins)
 {
+    CGuard Guard(m_CriticalSection);
     m_Codes.clear();
     LoadPermCheats(Plugins);
 
@@ -430,6 +432,9 @@ static void InvalidateRecompilerCache(uint32_t VAddr)
         // This ensures any recompiled code that reads from this address will be recompiled
         // Use Remove_ProtectedMem reason to indicate this is a cheat/modification
         try {
+            // Thread-safe access to recompiler
+            static CriticalSection s_RecompilerCS;
+            CGuard Guard(s_RecompilerCS);
             g_Recompiler->ClearRecompCode_Virt(VAddr & ~0xFFF, 0x1000, CRecompiler::Remove_ProtectedMem);
         } catch (...) {
             // Ignore errors - recompiler might not be active or address might be invalid
@@ -439,6 +444,7 @@ static void InvalidateRecompilerCache(uint32_t VAddr)
 
 void CCheats::ApplyCheats(CMipsMemoryVM * MMU)
 {
+    CGuard Guard(m_CriticalSection);
     for (size_t CurrentCheat = 0; CurrentCheat < m_Codes.size(); CurrentCheat++)
     {
         const CODES & CodeEntry = m_Codes[CurrentCheat];
@@ -451,6 +457,7 @@ void CCheats::ApplyCheats(CMipsMemoryVM * MMU)
 
 void CCheats::ApplyGSButton(CMipsMemoryVM * MMU)
 {
+    CGuard Guard(m_CriticalSection);
     uint32_t Address;
     for (size_t CurrentCheat = 0; CurrentCheat < m_Codes.size(); CurrentCheat++)
     {
@@ -766,6 +773,7 @@ Author: Thread-safe netplay cheat application
 ********************************************************************************************/
 void CCheats::ApplyCheatsForNetplay(CMipsMemoryVM * MMU)
 {
+    CGuard Guard(m_CriticalSection);
     if (!MMU) return;
 
     // Apply netplay cheats from separate array to avoid race conditions
@@ -793,6 +801,7 @@ Author: Thread-safe netplay cheat loading
 ********************************************************************************************/
 void CCheats::LoadCheatsFromDataForNetplay(const char * cheat_file_content, const char * enabled_file_content, const char * game_identifier, CPlugins * Plugins)
 {
+    CGuard Guard(m_CriticalSection);
     // Clear netplay cheat codes
     m_NetplayCodes.clear();
 
@@ -1022,6 +1031,9 @@ bool CCheats::LoadCodeIntoArray(CODES_ARRAY& codes_array, int CheatNo, const cha
         if (remaining_length >= 4 && strncmp(ReadPos, "????", 4) == 0)
         {
             if (CheatNo < 0 || CheatNo > MaxCheats) { return false; }
+            // Thread-safe settings access
+            static CriticalSection s_SettingsCS;
+            CGuard SettingsGuard(s_SettingsCS);
             stdstr CheatExt = g_Settings->LoadStringIndex(Cheat_Extension, CheatNo);
             if (CheatExt.empty() || CheatExt.length() < 2) { return false; }
             CodeEntry.Value = CheatExt[0] == '$' ? (uint16_t)strtoul(&CheatExt.c_str()[1], 0, 16) : (uint16_t)atol(CheatExt.c_str());
@@ -1029,6 +1041,9 @@ bool CCheats::LoadCodeIntoArray(CODES_ARRAY& codes_array, int CheatNo, const cha
         else if (remaining_length >= 2 && strncmp(ReadPos, "??", 2) == 0)
         {
             if (CheatNo < 0 || CheatNo > MaxCheats) { return false; }
+            // Thread-safe settings access
+            static CriticalSection s_SettingsCS;
+            CGuard SettingsGuard(s_SettingsCS);
             stdstr CheatExt = g_Settings->LoadStringIndex(Cheat_Extension, CheatNo);
             if (CheatExt.empty()) { return false; }
             CodeEntry.Value = (uint8_t)(strtoul(ReadPos, 0, 16));
@@ -1037,6 +1052,9 @@ bool CCheats::LoadCodeIntoArray(CODES_ARRAY& codes_array, int CheatNo, const cha
         else if (remaining_length >= 4 && strncmp(&ReadPos[2], "??", 2) == 0)
         {
             if (CheatNo < 0 || CheatNo > MaxCheats) { return false; }
+            // Thread-safe settings access
+            static CriticalSection s_SettingsCS;
+            CGuard SettingsGuard(s_SettingsCS);
             stdstr CheatExt = g_Settings->LoadStringIndex(Cheat_Extension, CheatNo);
             if (CheatExt.empty()) { return false; }
             CodeEntry.Value = (uint16_t)(strtoul(ReadPos, 0, 16) << 16);

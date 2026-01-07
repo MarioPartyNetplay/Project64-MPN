@@ -13,6 +13,7 @@
 #include "N64Class.h"
 #include "Mips/SystemEvents.h"
 #include "Settings/SettingType/SettingsType-Cheats.h"
+#include <Common/CriticalSection.h>
 #include <string>
 #ifdef _WIN32
 #include <wincrypt.h>
@@ -151,6 +152,10 @@ extern "C" void TriggerSoftResetForNetplay(void)
 
 extern "C" void ApplyCheatsDirectlyForNetplay(const char * cheat_file_content, const char * enabled_file_content, const char * game_identifier)
 {
+    // Thread-safe access to global system state
+    static CriticalSection s_GlobalCS;
+    CGuard GlobalGuard(s_GlobalCS);
+
     if (g_BaseSystem && cheat_file_content && game_identifier)
     {
         try
