@@ -252,7 +252,7 @@ void CMainMenu::OnSettings(HWND hWnd)
 void CMainMenu::OnOpenUserFolder(HWND hWnd)
 {
     CPath UserFolderPath(g_Settings->LoadStringVal(Cmd_BaseDirectory).c_str(), "User\\");
-    stdstr folderPath = UserFolderPath.ToString();
+    stdstr folderPath = (std::string)UserFolderPath;
 
     // Use ShellExecuteEx for better control and error handling
     SHELLEXECUTEINFOW sei = { sizeof(sei) };
