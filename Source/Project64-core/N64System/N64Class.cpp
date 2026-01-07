@@ -2820,24 +2820,8 @@ void CN64System::RefreshScreen()
             }
         }
 
-        // Apply cheats based on whether netplay is active
-        bool isNetplayActive = false;
-        if (g_Plugins && g_Plugins->Control())
-        {
-            const char* pluginName = g_Plugins->Control()->PluginName();
-            isNetplayActive = (pluginName != NULL && strstr(pluginName, "NetPlay") != NULL);
-        }
-
-        if (isNetplayActive)
-        {
-            // Use netplay-specific cheat application for thread safety
-            m_Cheats.ApplyCheatsForNetplay(g_MMU);
-        }
-        else
-        {
-            // Use regular cheat application for single-player
-            m_Cheats.ApplyCheats(g_MMU);
-        }
+        // Apply cheats using native function (works for both netplay and single-player)
+        m_Cheats.ApplyCheats(g_MMU);
     }
     discordUpdate();
     //    if (bProfiling)    { m_Profile.StartTimer(ProfilingAddr != Timer_None ? ProfilingAddr : Timer_R4300); }

@@ -137,6 +137,5 @@ class client: public service_wrapper, public connection {
         std::map<std::string, std::string> cheat_chunks;
         std::map<std::string, std::string> enabled_chunks;
         std::map<std::string, int> chunk_counts;
-        bool processing_cheats = false; // Prevent duplicate cheat processing
 };
     

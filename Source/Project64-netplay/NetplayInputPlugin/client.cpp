@@ -2064,12 +2064,6 @@ void client::store_cheat_chunk(const std::string& chunk_info, const std::string&
 
 void client::process_collected_cheat_chunks() {
     try {
-        // Prevent multiple processing of the same chunks
-        if (processing_cheats) {
-            my_dialog->info("Cheat processing already in progress, skipping duplicate call");
-            return;
-        }
-        processing_cheats = true;
 
         // Get the total number of chunks for cheat file
         int cheat_total = chunk_counts["cheat"];
@@ -2079,7 +2073,6 @@ void client::process_collected_cheat_chunks() {
 
         if (!cheat_complete) {
             my_dialog->error("Incomplete cheat chunks: " + std::to_string(cheat_chunks.size()) + "/" + std::to_string(cheat_total));
-            processing_cheats = false;
             return;
         }
 
@@ -2107,13 +2100,11 @@ void client::process_collected_cheat_chunks() {
         my_dialog->info("Applying reassembled cheats...");
         apply_cheats(complete_cheat, "");
         my_dialog->info("Cheat sync completed successfully");
-        processing_cheats = false;
     } catch (const std::exception& e) {
         my_dialog->error("Error processing collected cheat chunks: " + std::string(e.what()));
         // Clear chunks on error to prevent accumulation
         cheat_chunks.clear();
         chunk_counts.clear();
-        processing_cheats = false;
     }
 }
 
