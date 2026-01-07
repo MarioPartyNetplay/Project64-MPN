@@ -974,7 +974,12 @@ void CCheats::LoadCheatsFromDataForNetplay(const char * cheat_file_content, cons
         std::string cheat_code = cheat_entry.substr(code_start);
 
         // Load the cheat code into netplay array (use -1 for CheatNo since we're not using extensions)
-        LoadCodeIntoArray(m_NetplayCodes, -1, cheat_code.c_str());
+        if (!LoadCodeIntoArray(m_NetplayCodes, -1, cheat_code.c_str()))
+        {
+            // Cheat failed to load (invalid code format or requires extension)
+            // This is OK - some cheats require extensions which we don't support for p2-4
+            continue;
+        }
     }
 
     // Debug logging
