@@ -2154,6 +2154,13 @@ void client::send_cheatsync() {
     if (!cheat_file_content.empty()) {
         try {
             send_file_in_chunks(cheat_file_content, "cheat", MAX_CHUNK_SIZE);
+
+            // Send END marker to signal completion of chunks
+            packet end_packet;
+            end_packet << CHEAT_SYNC;
+            end_packet << std::string("END");
+            send(end_packet);
+            my_dialog->info("Sent END marker for cheat file chunks");
         } catch (const std::exception& e) {
             my_dialog->error("Error sending cheat file chunks: " + std::string(e.what()));
             return;
