@@ -817,11 +817,9 @@ void client::start_game() {
 void client::connect(const string& host, uint16_t port, const string& room) {
     my_dialog->info("Connecting to " + host + (port == 6400 ? "" : ":" + to_string(port)) + "...");
 
-    if (room.length() == 4) {
-        set_host_status(false);
-    } else {
-        set_host_status(true);
-    }
+    // When connecting to a server, we're always a client (not a host)
+    // The room parameter is just for lobby/room identification
+    set_host_status(false);
 
     ip::tcp::resolver tcp_resolver(service);
     error_code error;
