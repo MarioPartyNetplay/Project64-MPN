@@ -631,8 +631,8 @@ void client::on_message(string message) {
                     Sleep(1000);
                     send_savesync();
                     Sleep(250);
-                    send_cheatsync();
-                    Sleep(1250);
+                    //send_cheatsync();
+                    //Sleep(1250);
 
                     if (is_open()) {
                         send_start_game();
