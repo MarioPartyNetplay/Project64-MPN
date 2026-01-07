@@ -251,7 +251,7 @@ void CMainMenu::OnSettings(HWND hWnd)
 void CMainMenu::OnOpenUserFolder(HWND hWnd)
 {
     CPath UserFolderPath(g_Settings->LoadStringVal(Cmd_BaseDirectory).c_str(), "User\\");
-    ShellExecuteW(hWnd, L"explore", stdstr(UserFolderPath.c_str()).ToUTF16().c_str(), NULL, NULL, SW_SHOWNORMAL);
+    ShellExecuteW(hWnd, L"explore", stdstr(UserFolderPath.ToString().c_str()).ToUTF16().c_str(), NULL, NULL, SW_SHOWNORMAL);
 }
 
 bool CMainMenu::ProcessMessage(HWND hWnd, DWORD /*FromAccelerator*/, DWORD MenuID)
