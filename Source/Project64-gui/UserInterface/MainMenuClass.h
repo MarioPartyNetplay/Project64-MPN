@@ -5,7 +5,7 @@ enum MainMenuID
 {
     //File Menu
     ID_FILE_OPEN_ROM = 4000, ID_FILE_ROM_INFO, ID_FILE_STARTEMULATION, ID_FILE_ENDEMULATION,
-    ID_FILE_ROMDIRECTORY, ID_FILE_REFRESHROMLIST, ID_FILE_EXIT,
+    ID_FILE_ROMDIRECTORY, ID_FILE_REFRESHROMLIST, ID_FILE_EXIT, ID_FILE_OPEN_USER_FOLDER,
 
     //language
     ID_LANG_START, ID_LANG_END = ID_LANG_START + 100,
@@ -84,6 +84,7 @@ private:
     void OnLodState(HWND hWnd);
     void OnCheats(HWND hWnd);
     void OnSettings(HWND hWnd);
+    void OnOpenUserFolder(HWND hWnd);
 
     void FillOutMenu(HMENU hMenu);
     std::wstring GetSaveSlotString(int Slot);

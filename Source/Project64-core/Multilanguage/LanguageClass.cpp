@@ -64,6 +64,7 @@ void CLanguage::LoadDefaultStrings(void)
     DEF_STR(MENU_FILE, "&File");
     DEF_STR(MENU_OPEN, "&Open ROM");
     DEF_STR(MENU_ROM_INFO, "ROM &Info....");
+    DEF_STR(MENU_OPEN_USER_FOLDER, "Open &User Folder");
     DEF_STR(MENU_START, "Start Emulation");
     DEF_STR(MENU_END, "&End Emulation");
     DEF_STR(MENU_CHOOSE_ROM, "Choose ROM Directory...");

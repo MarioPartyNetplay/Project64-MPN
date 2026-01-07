@@ -248,6 +248,12 @@ void CMainMenu::OnSettings(HWND hWnd)
     SettingConfig.Display(hWnd);
 }
 
+void CMainMenu::OnOpenUserFolder(HWND hWnd)
+{
+    CPath UserFolderPath(g_Settings->LoadStringVal(Cmd_BaseDirectory).c_str(), "User\\");
+    ShellExecuteW(hWnd, L"explore", UserFolderPath, NULL, NULL, SW_SHOWNORMAL);
+}
+
 bool CMainMenu::ProcessMessage(HWND hWnd, DWORD /*FromAccelerator*/, DWORD MenuID)
 {
     switch (MenuID)
@@ -276,6 +282,7 @@ bool CMainMenu::ProcessMessage(HWND hWnd, DWORD /*FromAccelerator*/, DWORD MenuI
         break;
     case ID_FILE_REFRESHROMLIST: m_Gui->RefreshRomList(); break;
     case ID_FILE_EXIT:           DestroyWindow((HWND)hWnd); break;
+    case ID_FILE_OPEN_USER_FOLDER: OnOpenUserFolder(hWnd); break;
     case ID_SYSTEM_RESET_SOFT:
         WriteTrace(TraceUserInterface, TraceDebug, "ID_SYSTEM_RESET_SOFT");
         g_BaseSystem->ExternalEvent(SysEvent_ResetCPU_Soft);
@@ -800,6 +807,8 @@ void CMainMenu::FillOutMenu(HMENU hMenu)
     }
     FileMenu.push_back(MENU_ITEM(SPLITER));
     FileMenu.push_back(MENU_ITEM(ID_FILE_EXIT, MENU_EXIT, m_ShortCuts.ShortCutString(ID_FILE_EXIT, AccessLevel)));
+    FileMenu.push_back(MENU_ITEM(SPLITER));
+    FileMenu.push_back(MENU_ITEM(ID_FILE_OPEN_USER_FOLDER, MENU_OPEN_USER_FOLDER, m_ShortCuts.ShortCutString(ID_FILE_OPEN_USER_FOLDER, AccessLevel)));
 
     /* Current Save
     ****************/
