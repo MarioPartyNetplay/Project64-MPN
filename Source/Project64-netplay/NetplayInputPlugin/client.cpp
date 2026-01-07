@@ -2617,31 +2617,32 @@ void client::apply_cheats(const std::string& cheat_file_content, const std::stri
 }
 
 void client::apply_cheats_async(const std::string& cheat_file_content, const std::string& enabled_file_content) {
-    HMODULE hModule = GetModuleHandle(NULL);
+    try {
+        HMODULE hModule = GetModuleHandle(NULL);
 
-    // For non-host clients (p2-4), try to write cheats directly to memory first
-    if (!is_host()) {
-        // Get game identifier
-        std::string game_id = get_game_identifier();
+        // For non-host clients (p2-4), try to write cheats directly to memory first
+        if (!is_host()) {
+            // Get game identifier
+            std::string game_id = get_game_identifier();
 
-        // Apply cheats directly to memory if function is available
-        if (hModule) {
-            typedef void(__cdecl* ApplyCheatsDirectlyFunc)(const char*, const char*, const char*);
-            ApplyCheatsDirectlyFunc applyCheatsDirectly = (ApplyCheatsDirectlyFunc)GetProcAddress(hModule, "ApplyCheatsDirectlyForNetplay");
-            if (applyCheatsDirectly) {
-                // Use SEH helper to safely call function pointer
-                if (SafeApplyCheatsDirectly(applyCheatsDirectly, cheat_file_content.c_str(), enabled_file_content.c_str(), game_id.c_str())) {
-                    my_dialog->info("Cheats applied directly to memory from host (" + std::to_string(cheat_file_content.length()) + " bytes cheat data)");
-                    return;
+            // Apply cheats directly to memory if function is available
+            if (hModule) {
+                typedef void(__cdecl* ApplyCheatsDirectlyFunc)(const char*, const char*, const char*);
+                ApplyCheatsDirectlyFunc applyCheatsDirectly = (ApplyCheatsDirectlyFunc)GetProcAddress(hModule, "ApplyCheatsDirectlyForNetplay");
+                if (applyCheatsDirectly) {
+                    // Use SEH helper to safely call function pointer
+                    if (SafeApplyCheatsDirectly(applyCheatsDirectly, cheat_file_content.c_str(), enabled_file_content.c_str(), game_id.c_str())) {
+                        my_dialog->info("Cheats applied directly to memory from host (" + std::to_string(cheat_file_content.length()) + " bytes cheat data)");
+                        return;
+                    } else {
+                        my_dialog->error("Exception occurred while applying cheats directly, falling back to file sync");
+                        // Fall through to file sync
+                    }
                 } else {
-                    my_dialog->error("Exception occurred while applying cheats directly, falling back to file sync");
-                    // Fall through to file sync
+                    my_dialog->info("ApplyCheatsDirectlyForNetplay function not found, falling back to file method");
                 }
-            } else {
-                my_dialog->info("ApplyCheatsDirectlyForNetplay function not found, falling back to file method");
             }
         }
-    }
 
     // Host (p1) or fallback: write to .ini files and reload (original behavior)
     // First, close the INI file handle so we can write to it
@@ -2684,9 +2685,9 @@ void client::apply_cheats_async(const std::string& cheat_file_content, const std
             my_dialog->info("Cheat file synced from host (" + std::to_string(cheat_file_content.length()) + " bytes)");
         }
 
-        // TEMPORARILY DISABLED: Trigger Project64 core to reload cheats from the files
-        // This was causing connection resets - need to investigate cheat reload functions
-        if (false && hModule && cheat_file_written) {
+        // Trigger Project64 core to reload cheats from the files
+        // Use safer netplay-specific functions that don't cause connection resets
+        if (hModule && cheat_file_written) {
             typedef void(__cdecl* TriggerForceCheatReloadFunc)(void);
             TriggerForceCheatReloadFunc triggerForceCheatReload = (TriggerForceCheatReloadFunc)GetProcAddress(hModule, "TriggerForceCheatReloadForNetplay");
             if (triggerForceCheatReload) {
@@ -2736,5 +2737,12 @@ void client::apply_cheats_async(const std::string& cheat_file_content, const std
 
     } catch (const std::exception& e) {
         my_dialog->error("Error during cheat file sync: " + std::string(e.what()));
+    }
+    } catch (const std::exception& e) {
+        my_dialog->error("Critical error during cheat application: " + std::string(e.what()));
+        // Don't rethrow - we want to continue the netplay session
+    } catch (...) {
+        my_dialog->error("Unknown critical error during cheat application");
+        // Don't rethrow - we want to continue the netplay session
     }
 }

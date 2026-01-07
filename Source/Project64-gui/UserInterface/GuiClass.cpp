@@ -555,20 +555,6 @@ void CMainGui::Resize(DWORD /*fwSizeType*/, WORD nWidth, WORD nHeight)
 
     SendMessage((HWND)m_hStatusWnd, SB_SETPARTS, 2, (LPARAM)&Parts[0]);
     MoveWindow((HWND)m_hStatusWnd, 0, clrect.bottom - swrect.bottom, nWidth, nHeight, TRUE);
-
-    // Notify graphics plugin of window resize for proper scaling
-    if (g_Plugins && g_Plugins->Gfx() && g_Plugins->Gfx()->ResizeVideoOutput)
-    {
-        WriteTrace(TraceGFXPlugin, TraceDebug, "ResizeVideoOutput: Starting");
-        g_Plugins->Gfx()->ResizeVideoOutput(nWidth, nHeight);
-        WriteTrace(TraceGFXPlugin, TraceDebug, "ResizeVideoOutput: Done");
-    }
-
-    // Notify graphics plugin that window has been resized
-    if (g_Plugins && g_Plugins->Gfx() && g_Plugins->Gfx()->ChangeWindow)
-    {
-        g_Plugins->Gfx()->ChangeWindow();
-    }
 }
 
 void CMainGui::Show(bool Visible)

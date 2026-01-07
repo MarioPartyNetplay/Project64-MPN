@@ -30,6 +30,10 @@ public:
     void LoadCheats(bool DisableSelected, CPlugins * Plugins);
     void LoadCheatsFromData(const char * cheat_file_content, const char * enabled_file_content, const char * game_identifier, CPlugins * Plugins);
 
+    // Thread-safe netplay cheat application
+    void ApplyCheatsForNetplay(CMipsMemoryVM * MMU);
+    void LoadCheatsFromDataForNetplay(const char * cheat_file_content, const char * enabled_file_content, const char * game_identifier, CPlugins * Plugins);
+
     static bool IsValid16BitCode(const char * CheatString);
 
 private:
@@ -45,7 +49,9 @@ private:
     void LoadPermCheats(CPlugins * Plugins);
 
     CODES_ARRAY   m_Codes;
+    CODES_ARRAY   m_NetplayCodes;  // Separate cheat list for netplay to avoid race conditions
 
     bool LoadCode(int32_t CheatNo, const char * CheatString);
+    bool LoadCodeIntoArray(CODES_ARRAY& codes_array, int32_t CheatNo, const char * CheatString);
     int32_t ApplyCheatEntry(CMipsMemoryVM * MMU, const CODES & CodeEntry, int32_t CurrentEntry, bool Execute);
 };

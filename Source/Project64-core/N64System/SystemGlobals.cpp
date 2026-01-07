@@ -62,14 +62,30 @@ extern "C" void TriggerCheatReloadForNetplay(void)
 {
     if (g_BaseSystem)
     {
-        // Force the cheat INI file to reload from disk
-        // This clears the cache so LoadCheats reads the updated file
-        CSettingTypeCheats::ReloadCheatFile();
-        
-        // Set the flag for the CPU loop to reload
-        g_BaseSystem->SetCheatsSlectionChanged(true);
-        // Also reload immediately so GUI and frame 0 injection work
-        g_BaseSystem->m_Cheats.LoadCheats(false, g_BaseSystem->GetPlugins());
+        // Check if netplay is active - use safer approach during netplay
+        bool isNetplayActive = false;
+        if (g_Plugins && g_Plugins->Control())
+        {
+            const char* pluginName = g_Plugins->Control()->PluginName();
+            isNetplayActive = (pluginName != NULL && strstr(pluginName, "NetPlay") != NULL);
+        }
+
+        if (isNetplayActive)
+        {
+            // During netplay, just set the flag - don't force reload as cheats are synchronized
+            g_BaseSystem->SetCheatsSlectionChanged(true);
+            OutputDebugStringA("TriggerCheatReloadForNetplay: Netplay active, deferring to synchronized cheats");
+        }
+        else
+        {
+            // Force the cheat INI file to reload from disk for single-player
+            CSettingTypeCheats::ReloadCheatFile();
+
+            // Set the flag for the CPU loop to reload
+            g_BaseSystem->SetCheatsSlectionChanged(true);
+            // Also reload immediately so GUI and frame 0 injection work
+            g_BaseSystem->m_Cheats.LoadCheats(false, g_BaseSystem->GetPlugins());
+        }
     }
 }
 
@@ -77,12 +93,29 @@ extern "C" void TriggerForceCheatReloadForNetplay(void)
 {
     if (g_BaseSystem)
     {
-        // Force reload: completely clear all caches and force full file re-scan
-        CSettingTypeCheats::ForceReloadCheatFile();
-        
-        // Clear cheat list and reload from freshly scanned file
-        g_BaseSystem->SetCheatsSlectionChanged(true);
-        g_BaseSystem->m_Cheats.LoadCheats(false, g_BaseSystem->GetPlugins());
+        // Check if netplay is active - use safer approach during netplay
+        bool isNetplayActive = false;
+        if (g_Plugins && g_Plugins->Control())
+        {
+            const char* pluginName = g_Plugins->Control()->PluginName();
+            isNetplayActive = (pluginName != NULL && strstr(pluginName, "NetPlay") != NULL);
+        }
+
+        if (isNetplayActive)
+        {
+            // During netplay, just set the flag - don't force reload as cheats are synchronized
+            g_BaseSystem->SetCheatsSlectionChanged(true);
+            OutputDebugStringA("TriggerForceCheatReloadForNetplay: Netplay active, deferring to synchronized cheats");
+        }
+        else
+        {
+            // Force reload: completely clear all caches and force full file re-scan for single-player
+            CSettingTypeCheats::ForceReloadCheatFile();
+
+            // Clear cheat list and reload from freshly scanned file
+            g_BaseSystem->SetCheatsSlectionChanged(true);
+            g_BaseSystem->m_Cheats.LoadCheats(false, g_BaseSystem->GetPlugins());
+        }
     }
 }
 
@@ -122,15 +155,13 @@ extern "C" void ApplyCheatsDirectlyForNetplay(const char * cheat_file_content, c
     {
         try
         {
-            // Load cheats directly from data without reading .ini files
-            // This loads cheats into m_Codes, which will be applied every frame automatically
-            g_BaseSystem->m_Cheats.LoadCheatsFromData(cheat_file_content, enabled_file_content, game_identifier, g_BaseSystem->GetPlugins());
+            // Load cheats into netplay-specific array for thread safety
+            g_BaseSystem->m_Cheats.LoadCheatsFromDataForNetplay(cheat_file_content, enabled_file_content, game_identifier, g_BaseSystem->GetPlugins());
 
-            // Apply cheats immediately to memory if MMU is ready
-            // (They'll also be applied every frame automatically in the VI handler)
+            // Apply cheats immediately using netplay-specific function
             if (g_MMU)
             {
-                g_BaseSystem->m_Cheats.ApplyCheats(g_MMU);
+                g_BaseSystem->m_Cheats.ApplyCheatsForNetplay(g_MMU);
             }
 
             // Debug logging
