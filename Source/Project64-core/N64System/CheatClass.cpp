@@ -26,8 +26,9 @@
 
 CCheats::CCheats()
 {
-    // Initialize cheat array as empty
+    // Initialize both cheat arrays as empty
     m_Codes.clear();
+    m_NetplayCodes.clear();
 }
 
 CCheats::~CCheats()
@@ -753,4 +754,313 @@ int CCheats::ApplyCheatEntry(CMipsMemoryVM * MMU, const CODES & CodeEntry, int C
     case 0: return MaxGSEntries; break;
     }
     return 1;
+}
+
+/********************************************************************************************
+ApplyCheatsForNetplay
+
+Purpose: Thread-safe cheat application for netplay using separate array
+Parameters: MMU - Memory management unit for accessing emulator memory
+Author: Thread-safe netplay cheat application
+
+********************************************************************************************/
+void CCheats::ApplyCheatsForNetplay(CMipsMemoryVM * MMU)
+{
+    if (!MMU) return;
+
+    // Apply netplay cheats from separate array to avoid race conditions
+    for (size_t CurrentCheat = 0; CurrentCheat < m_NetplayCodes.size(); CurrentCheat++)
+    {
+        const CODES & CodeEntry = m_NetplayCodes[CurrentCheat];
+        for (size_t CurrentEntry = 0; CurrentEntry < CodeEntry.size();)
+        {
+            CurrentEntry += ApplyCheatEntry(MMU, CodeEntry, CurrentEntry, true);
+        }
+    }
+}
+
+/********************************************************************************************
+LoadCheatsFromDataForNetplay
+
+Purpose: Load cheats into separate netplay array for thread safety
+Parameters:
+- cheat_file_content: Raw cheat file content
+- enabled_file_content: Raw enabled status content
+- game_identifier: Game identifier string
+- Plugins: Plugin interface
+Author: Thread-safe netplay cheat loading
+
+********************************************************************************************/
+void CCheats::LoadCheatsFromDataForNetplay(const char * cheat_file_content, const char * enabled_file_content, const char * game_identifier, CPlugins * Plugins)
+{
+    // Clear netplay cheat codes
+    m_NetplayCodes.clear();
+
+    // Load permanent cheats first
+    LoadPermCheats(Plugins);
+
+    if (!cheat_file_content || !game_identifier)
+    {
+        return;
+    }
+
+    // Debug logging
+    OutputDebugStringA("LoadCheatsFromDataForNetplay: loading cheats for game ");
+    OutputDebugStringA(game_identifier);
+
+    // Parse enabled file to get active cheat status
+    std::map<int, bool> active_cheats;
+    if (enabled_file_content)
+    {
+        std::istringstream enabled_stream(enabled_file_content);
+        std::string line;
+        std::string current_section;
+
+        while (std::getline(enabled_stream, line))
+        {
+            // Remove carriage return if present
+            if (!line.empty() && line.back() == '\r')
+            {
+                line.pop_back();
+            }
+
+            // Trim whitespace
+            size_t start = line.find_first_not_of(" \t");
+            if (start == std::string::npos)
+            {
+                continue;
+            }
+            size_t end = line.find_last_not_of(" \t");
+            if (end == std::string::npos || end < start)
+            {
+                continue; // Malformed line
+            }
+            line = line.substr(start, end - start + 1);
+
+            // Check for section header
+            if (!line.empty() && line[0] == '[' && line.back() == ']')
+            {
+                current_section = line.substr(1, line.length() - 2);
+                continue;
+            }
+
+            // Only process entries for the game identifier section
+            if (current_section != game_identifier)
+            {
+                continue;
+            }
+
+            // Parse key=value
+            size_t eq_pos = line.find('=');
+            if (eq_pos == std::string::npos || eq_pos == 0 || eq_pos >= line.length() - 1)
+            {
+                continue;
+            }
+
+            std::string key = line.substr(0, eq_pos);
+            std::string value = line.substr(eq_pos + 1);
+
+            // Check if it's a CheatN key
+            if (key.length() > 5 && key.substr(0, 5) == "Cheat")
+            {
+                int cheat_no = atoi(key.substr(5).c_str());
+                active_cheats[cheat_no] = (value == "1" || value == "true" || value == "True");
+            }
+        }
+    }
+
+    // Parse cheat file content
+    std::istringstream cheat_stream(cheat_file_content);
+    std::string line;
+    std::string current_section;
+    std::map<int, std::string> cheat_entries;
+
+    while (std::getline(cheat_stream, line))
+    {
+        // Remove carriage return if present
+        if (!line.empty() && line.back() == '\r')
+        {
+            line.pop_back();
+        }
+
+        // Trim whitespace
+        size_t start = line.find_first_not_of(" \t");
+        if (start == std::string::npos)
+        {
+            continue;
+        }
+        size_t end = line.find_last_not_of(" \t");
+        line = line.substr(start, end - start + 1);
+
+        // Check for section header
+        if (!line.empty() && line[0] == '[' && line.back() == ']')
+        {
+            current_section = line.substr(1, line.length() - 2);
+            continue;
+        }
+
+        // Only process entries for the game identifier section
+        if (current_section != game_identifier)
+        {
+            continue;
+        }
+
+        // Parse key=value
+        size_t eq_pos = line.find('=');
+        if (eq_pos == std::string::npos)
+        {
+            continue;
+        }
+
+        std::string key = line.substr(0, eq_pos);
+        std::string value = line.substr(eq_pos + 1);
+
+        // Check if it's a CheatN key
+        if (key.length() > 5 && key.substr(0, 5) == "Cheat")
+        {
+            int cheat_no = atoi(key.substr(5).c_str());
+            cheat_entries[cheat_no] = value;
+        }
+    }
+
+    // Load active cheats into netplay array
+    // If enabled_file_content is empty or no active cheats found, load all cheats (fallback)
+    bool load_all_cheats = (!enabled_file_content || (enabled_file_content[0] == '\0') || active_cheats.empty());
+
+    for (const auto& entry : cheat_entries)
+    {
+        int cheat_no = entry.first;
+
+        // Check if cheat is active
+        bool is_active = false;
+        if (!load_all_cheats)
+        {
+            auto active_it = active_cheats.find(cheat_no);
+            if (active_it != active_cheats.end())
+            {
+                is_active = active_it->second;
+            }
+        }
+        else
+        {
+            // Fallback: load all cheats if enabled file is empty or parsing failed
+            is_active = true;
+        }
+
+        if (!is_active)
+        {
+            continue;
+        }
+
+        // Parse the cheat entry: format is "Name" code1,code2,code3,...
+        std::string cheat_entry = entry.second;
+
+        // Find the start and end of the name which is surrounded in ""
+        size_t start_of_name = cheat_entry.find("\"");
+        if (start_of_name == std::string::npos || start_of_name >= cheat_entry.length() - 2) { continue; }
+        size_t end_of_name = cheat_entry.find("\"", start_of_name + 1);
+        if (end_of_name == std::string::npos || end_of_name <= start_of_name || end_of_name >= cheat_entry.length()) { continue; }
+
+        // Get the code part (after the closing quote and space)
+        size_t code_start = end_of_name + 1;
+        if (code_start >= cheat_entry.length()) { continue; }
+
+        while (code_start < cheat_entry.length() && (cheat_entry[code_start] == ' ' || cheat_entry[code_start] == '\t'))
+        {
+            code_start++;
+        }
+
+        if (code_start >= cheat_entry.length()) { continue; }
+        std::string cheat_code = cheat_entry.substr(code_start);
+
+        // Load the cheat code into netplay array (use -1 for CheatNo since we're not using extensions)
+        if (!LoadCodeIntoArray(m_NetplayCodes, -1, cheat_code.c_str()))
+        {
+            // Cheat failed to load (invalid code format or requires extension)
+            // This is OK - some cheats require extensions which we don't support for p2-4
+            continue;
+        }
+    }
+
+    // Debug logging
+    OutputDebugStringA("LoadCheatsFromDataForNetplay: finished loading cheats");
+}
+
+/********************************************************************************************
+LoadCodeIntoArray
+
+Purpose: Load a cheat code into a specific cheat array (helper for netplay)
+Parameters:
+- codes_array: Target cheat array
+- CheatNo: Cheat number (-1 for netplay)
+- CheatString: Cheat code string
+Returns: true if loaded successfully
+Author: Helper function for thread-safe netplay cheat loading
+
+********************************************************************************************/
+bool CCheats::LoadCodeIntoArray(CODES_ARRAY& codes_array, int CheatNo, const char * CheatString)
+{
+    if (!IsValid16BitCode(CheatString))
+    {
+        return false;
+    }
+
+    const char * ReadPos = CheatString;
+    size_t remaining_length = strlen(CheatString);
+
+    CODES Code;
+    while (ReadPos && remaining_length > 0)
+    {
+        GAMESHARK_CODE CodeEntry;
+
+        CodeEntry.Command = strtoul(ReadPos, 0, 16);
+        ReadPos = strchr(ReadPos, ' ');
+        if (ReadPos == NULL) { break; }
+        ReadPos += 1;
+        remaining_length = strlen(ReadPos);
+
+        if (remaining_length >= 4 && strncmp(ReadPos, "????", 4) == 0)
+        {
+            if (CheatNo < 0 || CheatNo > MaxCheats) { return false; }
+            stdstr CheatExt = g_Settings->LoadStringIndex(Cheat_Extension, CheatNo);
+            if (CheatExt.empty() || CheatExt.length() < 2) { return false; }
+            CodeEntry.Value = CheatExt[0] == '$' ? (uint16_t)strtoul(&CheatExt.c_str()[1], 0, 16) : (uint16_t)atol(CheatExt.c_str());
+        }
+        else if (remaining_length >= 2 && strncmp(ReadPos, "??", 2) == 0)
+        {
+            if (CheatNo < 0 || CheatNo > MaxCheats) { return false; }
+            stdstr CheatExt = g_Settings->LoadStringIndex(Cheat_Extension, CheatNo);
+            if (CheatExt.empty()) { return false; }
+            CodeEntry.Value = (uint8_t)(strtoul(ReadPos, 0, 16));
+            CodeEntry.Value |= (CheatExt[0] == '$' ? (uint8_t)strtoul(&CheatExt.c_str()[1], 0, 16) : (uint8_t)atol(CheatExt.c_str())) << 16;
+        }
+        else if (remaining_length >= 4 && strncmp(&ReadPos[2], "??", 2) == 0)
+        {
+            if (CheatNo < 0 || CheatNo > MaxCheats) { return false; }
+            stdstr CheatExt = g_Settings->LoadStringIndex(Cheat_Extension, CheatNo);
+            if (CheatExt.empty()) { return false; }
+            CodeEntry.Value = (uint16_t)(strtoul(ReadPos, 0, 16) << 16);
+            CodeEntry.Value |= CheatExt[0] == '$' ? (uint8_t)strtoul(&CheatExt.c_str()[1], 0, 16) : (uint8_t)atol(CheatExt.c_str());
+        }
+        else
+        {
+            CodeEntry.Value = remaining_length >= 4 ? (uint16_t)strtoul(ReadPos, 0, 16) : 0;
+        }
+        Code.push_back(CodeEntry);
+
+        ReadPos = strchr(ReadPos, ',');
+        if (ReadPos == NULL)
+        {
+            break;
+        }
+        ReadPos++;
+        remaining_length = strlen(ReadPos);
+    }
+    if (Code.size() == 0 || Code.size() > MaxGSEntries)
+    {
+        return false;
+    }
+
+    codes_array.push_back(Code);
+    return true;
 }

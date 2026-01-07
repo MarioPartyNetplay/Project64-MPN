@@ -155,17 +155,17 @@ extern "C" void ApplyCheatsDirectlyForNetplay(const char * cheat_file_content, c
     {
         try
         {
-            // Use native cheat loading function directly (bypass netplay-specific arrays)
-            g_BaseSystem->m_Cheats.LoadCheatsFromData(cheat_file_content, enabled_file_content, game_identifier, g_BaseSystem->GetPlugins());
+            // Load cheats into separate netplay array for thread safety
+            g_BaseSystem->m_Cheats.LoadCheatsFromDataForNetplay(cheat_file_content, enabled_file_content, game_identifier, g_BaseSystem->GetPlugins());
 
-            // Apply cheats immediately using native function
+            // Apply cheats from netplay array to avoid race conditions
             if (g_MMU)
             {
-                g_BaseSystem->m_Cheats.ApplyCheats(g_MMU);
+                g_BaseSystem->m_Cheats.ApplyCheatsForNetplay(g_MMU);
             }
 
             // Debug logging
-            OutputDebugStringA("ApplyCheatsDirectlyForNetplay: loaded cheats successfully using native calls");
+            OutputDebugStringA("ApplyCheatsDirectlyForNetplay: loaded cheats successfully");
         }
         catch (const std::exception& e)
         {
