@@ -12,7 +12,7 @@
 #include <Project64-core/Settings/SettingType/SettingsType-Cheats.h>
 #include <Project64-core/N64System/CheatClass.h>
 
-extern CCheatsUI * g_cheatUI = NULL;
+extern CCheatsUI* g_cheatUI = NULL;
 
 enum
 {
@@ -21,10 +21,10 @@ enum
 };
 
 CCheatsUI::CCheatsUI(void) :
-m_rcList(new RECT),
-m_rcAdd(new RECT),
-m_EditCheat(-1),
-m_DeleteingEntries(false)
+    m_rcList(new RECT),
+    m_rcAdd(new RECT),
+    m_EditCheat(-1),
+    m_DeleteingEntries(false)
 {
     m_Window = NULL;
     m_hSelectCheat = NULL;
@@ -38,7 +38,7 @@ CCheatsUI::~CCheatsUI()
     delete m_rcAdd;
 }
 
-void CCheatsUI::AddCodeLayers(int CheatNumber, const stdstr &CheatName, HWND hParent, bool CheatActive)
+void CCheatsUI::AddCodeLayers(int CheatNumber, const stdstr& CheatName, HWND hParent, bool CheatActive)
 {
     TV_INSERTSTRUCT tv;
 
@@ -117,7 +117,7 @@ stdstr CCheatsUI::GetDlgItemStr(HWND hDlg, int nIDDlgItem)
     stdstr Result;
     Result.resize(length + 1);
 
-    GetWindowText(hDlgItem, (char *)Result.c_str(), Result.length());
+    GetWindowText(hDlgItem, (char*)Result.c_str(), Result.length());
     return Result;
 }
 
@@ -185,7 +185,7 @@ int CALLBACK CCheatsUI::CheatAddProc(HWND hDlg, uint32_t uMsg, uint32_t wParam, 
     {
     case WM_INITDIALOG:
     {
-        CCheatsUI   * _this = (CCheatsUI *)lParam;
+        CCheatsUI* _this = (CCheatsUI*)lParam;
         SetProp(hDlg, "Class", _this);
 
         SetWindowTextW(hDlg, wGS(CHEAT_ADDCHEAT_FRAME).c_str());
@@ -280,7 +280,7 @@ int CALLBACK CCheatsUI::CheatAddProc(HWND hDlg, uint32_t uMsg, uint32_t wParam, 
             break;
         case IDC_ADD:
         {
-            CCheatsUI * _this = (CCheatsUI *)GetProp(hDlg, "Class");
+            CCheatsUI* _this = (CCheatsUI*)GetProp(hDlg, "Class");
 
             stdstr NewCheatName = GetDlgItemStr(hDlg, IDC_CODE_NAME);
             int i = 0;
@@ -328,7 +328,7 @@ int CALLBACK CCheatsUI::CheatAddProc(HWND hDlg, uint32_t uMsg, uint32_t wParam, 
         break;
         case IDC_NEWCHEAT:
         {
-            CCheatsUI * _this = (CCheatsUI *)GetProp(hDlg, "Class");
+            CCheatsUI* _this = (CCheatsUI*)GetProp(hDlg, "Class");
 
             if (_this->CheatChanged(hDlg))
             {
@@ -350,7 +350,7 @@ int CALLBACK CCheatsUI::CheatAddProc(HWND hDlg, uint32_t uMsg, uint32_t wParam, 
     break;
     case WM_EDITCHEAT:
     {
-        CCheatsUI * _this = (CCheatsUI *)GetProp(hDlg, "Class");
+        CCheatsUI* _this = (CCheatsUI*)GetProp(hDlg, "Class");
         _this->m_EditCheat = wParam;
         if (_this->m_EditCheat < 0)
         {
@@ -363,7 +363,7 @@ int CALLBACK CCheatsUI::CheatAddProc(HWND hDlg, uint32_t uMsg, uint32_t wParam, 
         }
 
         stdstr CheatEntryStr = g_Settings->LoadStringIndex(Cheat_Entry, _this->m_EditCheat);
-        const char * String = CheatEntryStr.c_str();
+        const char* String = CheatEntryStr.c_str();
 
         //Set Cheat Name
         int len = strrchr(String, '"') - strchr(String, '"') - 1;
@@ -372,11 +372,11 @@ int CALLBACK CCheatsUI::CheatAddProc(HWND hDlg, uint32_t uMsg, uint32_t wParam, 
         SetDlgItemText(hDlg, IDC_CODE_NAME, CheatName.c_str());
 
         //Add Gameshark codes to screen
-        const char * ReadPos = strrchr(String, '"') + 2;
+        const char* ReadPos = strrchr(String, '"') + 2;
         stdstr Buffer;
         do
         {
-            char * End = strchr((char *)ReadPos, ',');
+            char* End = strchr((char*)ReadPos, ',');
             if (End)
             {
                 Buffer.append(ReadPos, End - ReadPos);
@@ -404,7 +404,7 @@ int CALLBACK CCheatsUI::CheatAddProc(HWND hDlg, uint32_t uMsg, uint32_t wParam, 
             ReadPos += 1;
             do
             {
-                char * End = strchr((char *)ReadPos, ',');
+                char* End = strchr((char*)ReadPos, ',');
                 if (End)
                 {
                     Buffer.append(ReadPos, End - ReadPos);
@@ -445,7 +445,7 @@ int CALLBACK CCheatsUI::CheatListProc(HWND hDlg, uint32_t uMsg, uint32_t wParam,
     {
     case WM_INITDIALOG:
     {
-        CCheatsUI   * _this = (CCheatsUI *)lParam;
+        CCheatsUI* _this = (CCheatsUI*)lParam;
         SetProp(hDlg, "Class", _this);
 
         uint32_t Style;
@@ -483,7 +483,7 @@ int CALLBACK CCheatsUI::CheatListProc(HWND hDlg, uint32_t uMsg, uint32_t wParam,
     break;
     case WM_COMMAND:
     {
-        CCheatsUI   * _this = (CCheatsUI *)GetProp(hDlg, "Class");
+        CCheatsUI* _this = (CCheatsUI*)GetProp(hDlg, "Class");
 
         switch (LOWORD(wParam))
         {
@@ -516,7 +516,7 @@ int CALLBACK CCheatsUI::CheatListProc(HWND hDlg, uint32_t uMsg, uint32_t wParam,
     break;
     case WM_NOTIFY:
     {
-        CCheatsUI   * _this = (CCheatsUI *)GetProp(hDlg, "Class");
+        CCheatsUI* _this = (CCheatsUI*)GetProp(hDlg, "Class");
 
         if (_this->m_DeleteingEntries)
         {
@@ -661,7 +661,7 @@ int CALLBACK CCheatsUI::CheatListProc(HWND hDlg, uint32_t uMsg, uint32_t wParam,
     break;
     case UM_CHANGECODEEXTENSION:
     {
-        CCheatsUI   * _this = (CCheatsUI *)GetProp(hDlg, "Class");
+        CCheatsUI* _this = (CCheatsUI*)GetProp(hDlg, "Class");
         ;
         //Get the selected item
         _this->m_hSelectedItem = (HWND)lParam;
@@ -693,10 +693,10 @@ int CALLBACK CCheatsUI::CheatListProc(HWND hDlg, uint32_t uMsg, uint32_t wParam,
 
         //Update cheat listing with new extention
         stdstr CheatName(_this->GetCheatName(item.lParam, true));
-        char * Cheat = strrchr((char *)CheatName.c_str(), '\\');
+        char* Cheat = strrchr((char*)CheatName.c_str(), '\\');
         if (Cheat == NULL)
         {
-            Cheat = const_cast<char *>(CheatName.c_str());
+            Cheat = const_cast<char*>(CheatName.c_str());
         }
         else
         {
@@ -720,7 +720,7 @@ int CALLBACK CCheatsUI::CheatsCodeExProc(HWND hDlg, uint32_t uMsg, uint32_t wPar
     {
     case WM_INITDIALOG:
     {
-        CCheatsUI   * _this = (CCheatsUI *)lParam;
+        CCheatsUI* _this = (CCheatsUI*)lParam;
         SetProp(hDlg, "Class", _this);
 
         //Find the cheat Number of the option being selected
@@ -740,10 +740,10 @@ int CALLBACK CCheatsUI::CheatsCodeExProc(HWND hDlg, uint32_t uMsg, uint32_t wPar
         //Read through and add all options to the list box
         stdstr Options(g_Settings->LoadStringIndex(Cheat_Options, item.lParam));
         stdstr CurrentExt(g_Settings->LoadStringIndex(Cheat_Extension, item.lParam));
-        const char * ReadPos = Options.c_str();
+        const char* ReadPos = Options.c_str();
         while (*ReadPos != 0)
         {
-            const char * NextComma = strchr(ReadPos, ',');
+            const char* NextComma = strchr(ReadPos, ',');
             int len = NextComma == NULL ? strlen(ReadPos) : NextComma - ReadPos;
             stdstr CheatExt(ReadPos);
             CheatExt.resize(len);
@@ -765,7 +765,7 @@ int CALLBACK CCheatsUI::CheatsCodeExProc(HWND hDlg, uint32_t uMsg, uint32_t wPar
             break;
         case IDOK:
         {
-            CCheatsUI * _this = (CCheatsUI *)GetProp(hDlg, "Class");
+            CCheatsUI* _this = (CCheatsUI*)GetProp(hDlg, "Class");
 
             //Find the cheat Number of the option being selected
             TVITEM item;
@@ -780,6 +780,7 @@ int CALLBACK CCheatsUI::CheatsCodeExProc(HWND hDlg, uint32_t uMsg, uint32_t wPar
             SendMessage(GetDlgItem(hDlg, IDC_CHEAT_LIST), LB_GETTEXT, index, (LPARAM)CheatExten);
 
             g_Settings->SaveStringIndex(Cheat_Extension, item.lParam, CheatExten);
+            CSettingTypeCheats::FlushChanges();
             if (g_BaseSystem)
             {
                 g_BaseSystem->SetCheatsSlectionChanged(true);
@@ -807,7 +808,7 @@ int CALLBACK CCheatsUI::CheatsCodeQuantProc(HWND hDlg, uint32_t uMsg, uint32_t w
     {
     case WM_INITDIALOG:
     {
-        CCheatsUI   * _this = (CCheatsUI *)lParam;
+        CCheatsUI* _this = (CCheatsUI*)lParam;
         SetProp(hDlg, "Class", _this);
 
         //Find the cheat Number of the option being selected
@@ -830,7 +831,7 @@ int CALLBACK CCheatsUI::CheatsCodeQuantProc(HWND hDlg, uint32_t uMsg, uint32_t w
         SetDlgItemText(hDlg, IDC_VALUE, Value.c_str());
 
         Start = (uint16_t)(Range.c_str()[0] == '$' ? strtoul(&Range.c_str()[1], 0, 16) : atol(Range.c_str()));
-        const char * ReadPos = strrchr(Range.c_str(), '-');
+        const char* ReadPos = strrchr(Range.c_str(), '-');
         if (ReadPos != NULL)
         {
             Stop = (uint16_t)(ReadPos[1] == '$' ? strtoul(&ReadPos[2], 0, 16) : atol(&ReadPos[1]));
@@ -855,7 +856,7 @@ int CALLBACK CCheatsUI::CheatsCodeQuantProc(HWND hDlg, uint32_t uMsg, uint32_t w
                 uint32_t Value;
                 GetDlgItemText(hDlg, IDC_VALUE, szTmp, sizeof(szTmp));
                 Value = szTmp[0] == '$' ? strtoul(&szTmp[1], 0, 16) : strtoul(&szTmp[0], 0, 16);
-                if (Value > Stop)  { Value = Stop; }
+                if (Value > Stop) { Value = Stop; }
                 if (Value < Start) { Value = Start; }
                 sprintf(szTmp2, "$%X", Value);
                 if (strcmp(szTmp, szTmp2) != 0)
@@ -874,7 +875,7 @@ int CALLBACK CCheatsUI::CheatsCodeQuantProc(HWND hDlg, uint32_t uMsg, uint32_t w
             break;
         case IDOK:
         {
-            CCheatsUI * _this = (CCheatsUI *)GetProp(hDlg, "Class");
+            CCheatsUI* _this = (CCheatsUI*)GetProp(hDlg, "Class");
 
             //Find the cheat Number of the option being selected
             TVITEM item;
@@ -893,6 +894,7 @@ int CALLBACK CCheatsUI::CheatsCodeQuantProc(HWND hDlg, uint32_t uMsg, uint32_t w
             sprintf(CheatExten, "$%X", Value);
 
             g_Settings->SaveStringIndex(Cheat_Extension, item.lParam, CheatExten);
+            CSettingTypeCheats::FlushChanges();
             if (g_BaseSystem)
             {
                 g_BaseSystem->SetCheatsSlectionChanged(true);
@@ -912,7 +914,7 @@ int CALLBACK CCheatsUI::CheatsCodeQuantProc(HWND hDlg, uint32_t uMsg, uint32_t w
     return true;
 }
 
-bool CCheatsUI::IsCheatMessage(MSG * msg)
+bool CCheatsUI::IsCheatMessage(MSG* msg)
 {
     if (m_Window)
     {
@@ -927,7 +929,7 @@ int CALLBACK CCheatsUI::ManageCheatsProc(HWND hDlg, uint32_t uMsg, uint32_t wPar
     {
     case WM_INITDIALOG:
     {
-        CCheatsUI * _this = (CCheatsUI *)lParam;
+        CCheatsUI* _this = (CCheatsUI*)lParam;
         SetProp(hDlg, "Class", _this);
         _this->m_Window = hDlg;
 
@@ -940,10 +942,10 @@ int CALLBACK CCheatsUI::ManageCheatsProc(HWND hDlg, uint32_t uMsg, uint32_t wPar
         SetWindowPos(_this->m_hSelectCheat, HWND_TOP, 5, 8, 0, 0, SWP_NOSIZE);
         ShowWindow(_this->m_hSelectCheat, SW_SHOW);
 
-        RECT * rc = &WndPlac.rcNormalPosition;
+        RECT* rc = &WndPlac.rcNormalPosition;
         if (g_Settings->LoadDword(UserInterface_BasicMode))
         {
-            RECT * rcList = (RECT *)_this->m_rcList;
+            RECT* rcList = (RECT*)_this->m_rcList;
             GetWindowRect(GetDlgItem(_this->m_hSelectCheat, IDC_CHEATSFRAME), rcList);
             _this->m_MinSizeDlg = rcList->right - rcList->left + 16;
             _this->m_MaxSizeDlg = _this->m_MinSizeDlg;
@@ -960,7 +962,7 @@ int CALLBACK CCheatsUI::ManageCheatsProc(HWND hDlg, uint32_t uMsg, uint32_t wPar
             SetWindowPos(_this->m_AddCheat, HWND_TOP, (rc->right - rc->left) / 2, 8, 0, 0, SWP_NOSIZE);
             ShowWindow(_this->m_AddCheat, SW_HIDE);
 
-            RECT * rcAdd = (RECT *)_this->m_rcAdd, *rcList = (RECT *)_this->m_rcList;
+            RECT* rcAdd = (RECT*)_this->m_rcAdd, * rcList = (RECT*)_this->m_rcList;
             GetWindowRect(GetDlgItem(_this->m_hSelectCheat, IDC_CHEATSFRAME), rcList);
             GetWindowRect(GetDlgItem(_this->m_AddCheat, IDC_ADDCHEATSFRAME), rcAdd);
             _this->m_MinSizeDlg = rcList->right - rcList->left + 32;
@@ -988,6 +990,7 @@ int CALLBACK CCheatsUI::ManageCheatsProc(HWND hDlg, uint32_t uMsg, uint32_t wPar
         int X = (((rcParent.right - rcParent.left) - DlgWidth) / 2) + rcParent.left;
         int Y = (((rcParent.bottom - rcParent.top) - DlgHeight) / 2) + rcParent.top;
 
+        SetWindowPos(hDlg, NULL, X, Y, 0, 0, SWP_NOZORDER | SWP_NOSIZE);
 
         _this->RefreshCheatManager();
     }
@@ -997,7 +1000,7 @@ int CALLBACK CCheatsUI::ManageCheatsProc(HWND hDlg, uint32_t uMsg, uint32_t wPar
         {
         case IDCANCEL:
         {
-            CCheatsUI * _this = (CCheatsUI *)GetProp(hDlg, "Class");
+            CCheatsUI* _this = (CCheatsUI*)GetProp(hDlg, "Class");
             if (_this->m_AddCheat)
             {
                 DestroyWindow(_this->m_AddCheat);
@@ -1019,7 +1022,7 @@ int CALLBACK CCheatsUI::ManageCheatsProc(HWND hDlg, uint32_t uMsg, uint32_t wPar
         break;
         case IDC_STATE:
         {
-            CCheatsUI * _this = (CCheatsUI *)GetProp(hDlg, "Class");
+            CCheatsUI* _this = (CCheatsUI*)GetProp(hDlg, "Class");
             WINDOWPLACEMENT WndPlac;
             WndPlac.length = sizeof(WndPlac);
             GetWindowPlacement(hDlg, &WndPlac);
@@ -1108,7 +1111,7 @@ int CCheatsUI::TV_GetCheckState(HWND hwndTreeView, HWND hItem)
     return ((int)(tvItem.state >> 12) - 1);
 }
 
-void CCheatsUI::MenuSetText(HMENU hMenu, int MenuPos, const wchar_t * Title, const wchar_t * ShortCut)
+void CCheatsUI::MenuSetText(HMENU hMenu, int MenuPos, const wchar_t* Title, const wchar_t* ShortCut)
 {
     MENUITEMINFOW MenuInfo;
     wchar_t String[256];
@@ -1143,7 +1146,7 @@ stdstr CCheatsUI::GetCheatName(int CheatNo, bool AddExtension) const
     if (EndOfName == -1) { return stdstr(""); }
 
     stdstr Name = LineEntry.substr(StartOfName + 1, EndOfName - StartOfName - 1);
-    const char * CodeString = &(LineEntry.c_str())[EndOfName + 2];
+    const char* CodeString = &(LineEntry.c_str())[EndOfName + 2];
     if (!CCheats::IsValid16BitCode(CodeString))
     {
         Name.Format("*** %s", Name.c_str());
@@ -1152,23 +1155,27 @@ stdstr CCheatsUI::GetCheatName(int CheatNo, bool AddExtension) const
     if (AddExtension && CheatUsesCodeExtensions(LineEntry))
     {
         stdstr CheatValue(g_Settings->LoadStringIndex(Cheat_Extension, CheatNo));
+        if (CheatValue.empty())
+        {
+            CheatValue = "??? - Not Set";
+        }
         Name.Format("%s (=>%s)", Name.c_str(), CheatValue.c_str());
     }
 
     return Name;
 }
 
-bool CCheatsUI::CheatUsesCodeExtensions(const stdstr &LineEntry)
+bool CCheatsUI::CheatUsesCodeExtensions(const stdstr& LineEntry)
 {
     //Find the start and end of the name which is surronded in ""
-    if (LineEntry.length() == 0){ return false; }
+    if (LineEntry.length() == 0) { return false; }
     int StartOfName = LineEntry.find("\"");
-    if (StartOfName == -1)      { return false; }
+    if (StartOfName == -1) { return false; }
     int EndOfName = LineEntry.find("\"", StartOfName + 1);
-    if (EndOfName == -1)        { return false; }
+    if (EndOfName == -1) { return false; }
 
     //Read through the gameshark entries till you find a ??
-    const char *ReadPos = &(LineEntry.c_str())[EndOfName + 2];
+    const char* ReadPos = &(LineEntry.c_str())[EndOfName + 2];
     bool CodeExtension = false;
 
     for (int i = 0; i < CCheats::MaxGSEntries && CodeExtension == false; i++)
@@ -1336,7 +1343,7 @@ void CCheatsUI::CheckParentStatus(HWND hParent)
     }
 }
 
-stdstr CCheatsUI::ReadCodeString(HWND hDlg, bool &validcodes, bool &validoptions, bool &nooptions, int &codeformat)
+stdstr CCheatsUI::ReadCodeString(HWND hDlg, bool& validcodes, bool& validoptions, bool& nooptions, int& codeformat)
 {
     int numlines, linecount, len;
     char str[128];
@@ -1363,7 +1370,7 @@ stdstr CCheatsUI::ReadCodeString(HWND hDlg, bool &validcodes, bool &validoptions
 
         //str[0] = sizeof(str) > 255?255:sizeof(str);
         *(LPWORD)str = sizeof(str);
-        len = SendDlgItemMessage(hDlg, IDC_CHEAT_CODES, EM_GETLINE, (WPARAM)linecount, (LPARAM)(const char *)str);
+        len = SendDlgItemMessage(hDlg, IDC_CHEAT_CODES, EM_GETLINE, (WPARAM)linecount, (LPARAM)(const char*)str);
         str[len] = 0;
 
         if (len <= 0) { continue; }
@@ -1431,7 +1438,7 @@ stdstr CCheatsUI::ReadCodeString(HWND hDlg, bool &validcodes, bool &validoptions
     return codestring;
 }
 
-stdstr CCheatsUI::ReadOptionsString(HWND hDlg, bool &/*validcodes*/, bool &validoptions, bool &/*nooptions*/, int &codeformat)
+stdstr CCheatsUI::ReadOptionsString(HWND hDlg, bool&/*validcodes*/, bool& validoptions, bool&/*nooptions*/, int& codeformat)
 {
     int numlines, linecount, len;
     char str[128];
@@ -1450,7 +1457,7 @@ stdstr CCheatsUI::ReadOptionsString(HWND hDlg, bool &/*validcodes*/, bool &valid
         memset(str, 0, sizeof(str));
         //str[0] = sizeof(str) > 255?255:sizeof(str);
         *(LPWORD)str = sizeof(str);
-        len = SendDlgItemMessage(hDlg, IDC_CHEAT_OPTIONS, EM_GETLINE, (WPARAM)linecount, (LPARAM)(const char *)str);
+        len = SendDlgItemMessage(hDlg, IDC_CHEAT_OPTIONS, EM_GETLINE, (WPARAM)linecount, (LPARAM)(const char*)str);
         str[len] = 0;
 
         if (len > 0)

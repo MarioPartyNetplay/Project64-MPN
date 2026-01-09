@@ -64,6 +64,7 @@ void CLanguage::LoadDefaultStrings(void)
     DEF_STR(MENU_FILE, "&File");
     DEF_STR(MENU_OPEN, "&Open ROM");
     DEF_STR(MENU_ROM_INFO, "ROM &Info....");
+    DEF_STR(MENU_OPEN_USER_FOLDER, "Open &User Folder");
     DEF_STR(MENU_START, "Start Emulation");
     DEF_STR(MENU_END, "&End Emulation");
     DEF_STR(MENU_CHOOSE_ROM, "Choose ROM Directory...");
@@ -171,7 +172,8 @@ void CLanguage::LoadDefaultStrings(void)
     DEF_STR(RB_PLAYERS, "Players");
     DEF_STR(RB_FORCE_FEEDBACK, "Force Feedback");
     DEF_STR(RB_FILE_FORMAT, "File Format");
-
+    DEF_STR(RB_PLAYTIME, "Playtime");
+    
     //Select ROM
     DEF_STR(SELECT_ROM_DIR, "Select current ROM directory");
 
@@ -224,7 +226,7 @@ void CLanguage::LoadDefaultStrings(void)
 
     //Options (general) Tab
     DEF_STR(OPTION_AUTO_SLEEP, "Pause emulation when window is not active");
-    DEF_STR(OPTION_DARK, "Enable dark-theme");
+    DEF_STR(OPTION_DARKTHEME, "Dark theme (Requires emu restart)");
     DEF_STR(OPTION_AUTO_FULLSCREEN, "Enter full-screen mode when loading a ROM");
     DEF_STR(OPTION_BASIC_MODE, "Hide advanced settings");
     DEF_STR(OPTION_REMEMBER_CHEAT, "Remember selected cheats");

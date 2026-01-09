@@ -80,6 +80,7 @@ public:
     void   Pause();
     void   RunRSP();
     bool   SaveState();
+    bool   SaveStateToFile(const char * FilePath);
     bool   LoadState(const char * FileName);
     bool   LoadState();
 
@@ -89,6 +90,7 @@ public:
     bool   HasCheatsSlectionChanged(void) const { return m_CheatsSlectionChanged; }
     uint32_t  GetButtons(int32_t Control) const { return m_Buttons[Control]; }
     CPlugins * GetPlugins() { return m_Plugins; }
+    void   getNumberControllers();
 
     //Variable used to track that the SP is being handled and stays the same as the real SP in sync core
 #ifdef TEST_SP_TRACKING
@@ -121,6 +123,8 @@ private:
     void   RefreshScreen();
     void   DumpSyncErrors(CN64System * SecondCPU);
     void   StartEmulation2(bool NewThread);
+    void   HandleDesyncDetection();
+    std::string GenerateDesyncSaveStateHash();
     bool   SetActiveSystem(bool bActive = true);
     void   InitRegisters(bool bPostPif, CMipsMemoryVM & MMU);
     void   DisplayRSPListCount();
@@ -185,18 +189,6 @@ private:
        
     bool m_HasAutosaved;
 
-    char* m_DiscordApplicationId;
-    uint8_t m_DiscordCurrentPlayers;
-    int64_t m_DiscordNextPost;
-    bool    m_DiscordSendPresence;
-    int64_t m_DiscordStartTime;
-
-    void    discordInit();
-    void    discordUpdate();
-    void    getMk64Rps(uint8_t* Rdram, DiscordRichPresence& discordPresence);
-    void    getMp1Rps(uint8_t* Rdram, DiscordRichPresence& discordPresence);
-    void    getMp2Rps(uint8_t* Rdram, DiscordRichPresence& discordPresence);
-    void    getMp3Rps(uint8_t* Rdram, DiscordRichPresence& discordPresence);
-    void    getSsbRps(uint8_t* Rdram, DiscordRichPresence& discordPresence);
-    void    getNumberControllers();
+    // Netplay desync detection
+    uint32_t m_DesyncFrameCounter;
 };

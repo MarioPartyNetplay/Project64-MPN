@@ -6,16 +6,18 @@
 #include "util.h"
 #include "uri.h"
 
-#include "dirent.h"
-#include <cryptopp/sha.h>
-#include <cryptopp/files.h>
-#include <cryptopp/filters.h>
-#include <cryptopp/base64.h>
-#include <cryptopp/hex.h>
+#include <dirent.h>
+#include <sha.h>
+#include <files.h>
+#include <filters.h>
+#include <base64.h>
+#include <hex.h>
 
 #include <Windows.h>
-#include <filesystem> 
+#include <filesystem>
 #include <regex>
+#include <algorithm>
+#include <sstream>
 
 using namespace std;
 using namespace asio;
@@ -75,15 +77,15 @@ client::client(shared_ptr<client_dialog> dialog) :
     });
 
     my_dialog->info("Available Commands:\r\n\r\n"
-                    "/name <name>		Set your name\r\n"
-                    "/host [port]		Host a private server\r\n"
-                    "/join <address>		Join a game\r\n"
-                    "/start			Start the game\r\n"
-                    "/map <src>:<dst> [...]	Map your controller ports\r\n"
-                    "/autolag			Toggle automatic lag on and off\r\n"
-                    "/lag <lag>		Set the netplay input lag\r\n"
-                    "/golf			Toggle golf mode on and off\r\n"
-                    "/auth <id>		Delegate input authority to another user\r\n");
+                    "/name <name>		    	Set your name\r\n"
+                    "/host [port]		    	Host a private server\r\n"
+                    "/join <address>		                Join a game\r\n"
+                    "/start			                Start the game\r\n"
+                    "/map <src>:<dst> [...]                            Map your controller ports\r\n"
+                    "/autolag			    	Toggle automatic lag on and off\r\n"
+                    "/buffer <buffer>			Set the netplay input lag\r\n"
+                    "/golf			                Toggle golf mode on and off\r\n"
+                    "/auth <id>		                Delegate input authority to another user\r\n");
 
 #ifdef DEBUG
     input_log.open("input.log");
@@ -111,12 +113,173 @@ bool client::input_detected(const input_data& input, uint32_t mask) {
 }
 
 void client::load_public_server_list() {
-    public_servers["50.20.251.212:26980|Buffalo (New York)"] = SERVER_STATUS_PENDING;
-    public_servers["216.225.150.202:27140|Dallas (Texas)"] = SERVER_STATUS_PENDING;
-    public_servers["74.217.200.24:27015|Seattle (Washington)"] = SERVER_STATUS_PENDING;
-    public_servers["192.135.116.52:26945|Amsterdam (Netherlands)"] = SERVER_STATUS_PENDING;
+    // Fetch server list from GitHub repository
+    fetch_server_list_from_web();
+
     my_dialog->update_server_list(public_servers);
     ping_public_server_list();
+}
+
+void client::fetch_server_list_from_web() {
+    try {
+        // Clear existing servers
+        public_servers.clear();
+
+        // Add hardcoded servers directly
+        public_servers["us-east.marioparty.online:9065|Buffalo (New York)"] = SERVER_STATUS_PENDING;
+        public_servers["germany.marioparty.online:9051|Frankfurt (Germany)"] = SERVER_STATUS_PENDING;
+        public_servers["brazil.marioparty.online:9000|São Paulo (Brazil)"] = SERVER_STATUS_PENDING;
+
+        if (!public_servers.empty()) {
+            my_dialog->info("Loaded " + std::to_string(public_servers.size()) + " servers");
+        }
+
+    } catch (const std::exception& e) {
+        my_dialog->error("Failed to load server list: " + std::string(e.what()));
+    }
+}
+
+void client::fetch_servers_from_github() {
+    try {
+        // GitHub raw content URL for servers.txt
+        std::string host = "raw.githubusercontent.com";
+        std::string path = "/MarioPartyNetplay/Project64-MPN/refs/heads/master/servers.txt";
+
+        // Resolve hostname
+        ip::tcp::resolver resolver(service);
+        std::error_code resolve_error;
+        auto endpoints = resolver.resolve(host, "80", resolve_error);
+        if (resolve_error) {
+            throw std::runtime_error("Failed to resolve hostname: " + resolve_error.message());
+        }
+
+        // Create socket and connect
+        auto socket = std::make_shared<ip::tcp::socket>(service);
+        auto connect_timer = std::make_shared<asio::steady_timer>(service);
+        connect_timer->expires_after(std::chrono::seconds(10)); // 10 second timeout
+
+        // Set up timeout handler
+        connect_timer->async_wait([socket](const std::error_code& error) {
+            if (!error) {
+                // Timer expired, close socket to cancel connection
+                std::error_code ec;
+                socket->close(ec);
+            }
+        });
+
+        // Connect with timeout
+        std::error_code connect_error;
+        asio::connect(*socket, endpoints, connect_error);
+        if (connect_error) {
+            throw std::runtime_error("Failed to connect: " + connect_error.message());
+        }
+
+        // Send HTTP GET request
+        std::string request =
+            "GET " + path + " HTTP/1.1\r\n"
+            "Host: " + host + "\r\n"
+            "Connection: close\r\n"
+            "User-Agent: Project64-Netplay\r\n"
+            "\r\n";
+
+        asio::write(*socket, asio::buffer(request));
+
+        // Read response
+        std::string response;
+        std::array<char, 1024> buffer;
+        std::error_code error;
+
+        while (true) {
+            size_t bytes_read = socket->read_some(asio::buffer(buffer), error);
+            if (error == std::errc::connection_reset || error == std::errc::connection_aborted) {
+                break; // Connection closed
+            } else if (error) {
+                throw std::runtime_error("Network error: " + error.message());
+            }
+            response.append(buffer.data(), bytes_read);
+        }
+
+        socket->close();
+
+        // Parse HTTP response
+        size_t header_end = response.find("\r\n\r\n");
+        if (header_end == std::string::npos) {
+            throw std::runtime_error("Invalid HTTP response");
+        }
+
+        std::string body = response.substr(header_end + 4);
+
+        // Check for HTTP 200 OK
+        if (response.find("HTTP/1.1 200 OK") == std::string::npos &&
+            response.find("HTTP/1.0 200 OK") == std::string::npos) {
+            throw std::runtime_error("HTTP request failed");
+        }
+
+        // Parse server list from body
+        std::istringstream stream(body);
+        std::string line;
+        bool found_servers = false;
+
+        while (std::getline(stream, line)) {
+            // Remove carriage return if present
+            if (!line.empty() && line.back() == '\r') {
+                line.pop_back();
+            }
+
+            // Skip empty lines and comments
+            if (line.empty() || line[0] == '#') {
+                continue;
+            }
+
+            // Parse server entry: host:port|description
+            size_t pipe_pos = line.find('|');
+            if (pipe_pos != std::string::npos) {
+                std::string server_info = line;
+                public_servers[server_info] = SERVER_STATUS_PENDING;
+                found_servers = true;
+            }
+        }
+
+        if (!found_servers) {
+            throw std::runtime_error("No valid servers found in response");
+        }
+
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Error fetching servers from GitHub: " + std::string(e.what()));
+    }
+}
+
+void client::load_servers_from_file() {
+    try {
+        std::ifstream file("servers.txt");
+        if (!file.is_open()) {
+            throw std::runtime_error("Could not open servers.txt file");
+        }
+
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            if (line.empty() || line[0] == '#') {
+                continue;
+            }
+
+            // Parse server entry: host:port|description
+            size_t pipe_pos = line.find('|');
+            if (pipe_pos != std::string::npos) {
+                std::string server_info = line;
+                public_servers[server_info] = SERVER_STATUS_PENDING;
+            }
+        }
+
+        file.close();
+
+        if (public_servers.empty()) {
+            throw std::runtime_error("No valid servers found in servers.txt");
+        }
+
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Error loading servers from file: " + std::string(e.what()));
+    }
 }
 
 void client::ping_public_server_list() {
@@ -412,6 +575,10 @@ bool client::wait_until_start() {
     return true;
 }
 
+bool client::has_started() const {
+    return started;
+}
+
 void client::on_message(string message) {
     try {
         if (message.substr(0, 1) == "/") {
@@ -458,23 +625,24 @@ void client::on_message(string message) {
                 connect(host, port, path);
             } else if (params[0] == "/start") {
                 if (started) throw runtime_error("Game has already started");
-
-                my_dialog->info("Syncing host's save with everyone else");
                 if (!is_host()) {
-                    move_original_saves_to_temp();
-                }
-                Sleep(1000);
-                send_savesync();
-                Sleep(5000);
-
-                if (is_open()) {
-                    send_start_game();
+                    my_dialog->info("Only the host can start the game...");
                 } else {
-                    map_src_to_dst();
-                    set_lag(0);
-                    start_game();
+                    Sleep(1000);
+                    send_savesync();
+                    Sleep(250);
+                    //send_cheatsync();
+                    //Sleep(1250);
+
+                    if (is_open()) {
+                        send_start_game();
+                    } else {
+                        map_src_to_dst();
+                        set_lag(0);
+                        start_game();
+                    }
                 }
-            } else if (params[0] == "/lag") {
+            } else if (params[0] == "/buffer" || params[0] == "/lag") {
                 if (params.size() < 2) throw runtime_error("Missing parameter");
                 uint8_t lag = stoi(params[1]);
                 if (!is_open()) throw runtime_error("Not connected");
@@ -528,11 +696,9 @@ void client::on_message(string message) {
                     change_input_authority(user_id, authority_id);
 
                     if (user_id == authority_id) {
-                        my_dialog->info("Input authority has been restored");
-                        my_dialog->info("Please enable your frame rate limit.");
+                        my_dialog->info("Input authority restored - enable frame rate limit");
                     } else {
-                        my_dialog->info("Input authority has been delegated to " + user_map[authority_id]->name);
-                        my_dialog->info("Please disable your frame rate limit");
+                        my_dialog->info("Input authority delegated to " + user_map[authority_id]->name);
                     }
                 }
             } else {
@@ -641,28 +807,19 @@ void client::close(const std::error_code& error) {
 }
 
 void client::start_game() {
-    static bool save_data_reverted = false;
     unique_lock<mutex> lock(start_mutex);
     if (started) return;
     started = true;
     start_condition.notify_all();
-    my_dialog->info("Starting game...");
-
-    if (!save_data_reverted) {
-        Sleep(2500);
-        revert_save_data();
-        save_data_reverted = true;
-    }
+    // Note: Save reversion happens in RomClosed() after the game writes its final save
 }
 
 void client::connect(const string& host, uint16_t port, const string& room) {
     my_dialog->info("Connecting to " + host + (port == 6400 ? "" : ":" + to_string(port)) + "...");
 
-    if (room.length() == 4) {
-        set_host_status(false);
-    } else {
-        set_host_status(true);
-    }
+    // When connecting to a server, we're always a client (not a host)
+    // The room parameter is just for lobby/room identification
+    set_host_status(false);
 
     ip::tcp::resolver tcp_resolver(service);
     error_code error;
@@ -710,13 +867,67 @@ void client::connect(const string& host, uint16_t port, const string& room) {
     receive_tcp_packet();
 }
 
-void client::replace_save_file(const save_info& save_data) {
-    if (!save_data.save_name.empty()) {
-        DeleteFileA((save_path + save_data.save_name).c_str());
-
-        std::ofstream of((save_path + save_data.save_name).c_str(), std::ofstream::binary);
-        of << save_data.save_data;
+bool client::replace_save_file(const save_info& save_data) {
+    // This function should only be called with non-empty saves
+    // Empty saves are handled in the SAVE_SYNC handler
+    if (save_data.save_name.empty() || save_data.save_data.empty()) {
+        return false;
+    }
+    
+    std::string save_path_full = save_path + save_data.save_name;
+    
+    try {
+        // Ensure directory exists
+        std::filesystem::path file_path(save_path_full);
+        if (file_path.has_parent_path()) {
+            std::filesystem::create_directories(file_path.parent_path());
+        }
+        
+        // Delete existing file if it exists (to replace it)
+        if (std::filesystem::exists(save_path_full)) {
+            if (!DeleteFileA(save_path_full.c_str())) {
+                DWORD error = GetLastError();
+                my_dialog->error("Failed to delete existing save file " + save_data.save_name + " (Error: " + std::to_string(error) + ")");
+                return false;
+            }
+        }
+        
+        // Write new save data
+        std::ofstream of(save_path_full.c_str(), std::ofstream::binary | std::ofstream::trunc);
+        if (!of.is_open()) {
+            DWORD error = GetLastError();
+            my_dialog->error("Failed to open save file for writing: " + save_data.save_name + " (Error: " + std::to_string(error) + ")");
+            return false;
+        }
+        
+        of.write(save_data.save_data.data(), save_data.save_data.size());
+        of.flush();
         of.close();
+        
+        // Verify file was written correctly
+        if (!of.good()) {
+            my_dialog->error("Error writing save file: " + save_data.save_name);
+            return false;
+        }
+        
+        // Verify file size matches
+        if (std::filesystem::exists(save_path_full)) {
+            auto file_size = std::filesystem::file_size(save_path_full);
+            if (file_size != save_data.save_data.size()) {
+                my_dialog->error("Save file size mismatch for " + save_data.save_name + 
+                               " (expected " + std::to_string(save_data.save_data.size()) + 
+                               ", got " + std::to_string(file_size) + ")");
+                return false;
+            }
+        }
+        
+        return true;
+    } catch (const std::filesystem::filesystem_error& e) {
+        my_dialog->error("Filesystem error writing save " + save_data.save_name + ": " + std::string(e.what()));
+        return false;
+    } catch (const std::exception& e) {
+        my_dialog->error("Error writing save " + save_data.save_name + ": " + std::string(e.what()));
+        return false;
     }
 }
 
@@ -730,15 +941,14 @@ std::vector<string> client::find_rom_save_files(const string& rom_name) {
         return ret;
 
 
-    std::regex accept = std::regex("\\b((\\w+\\s?)+\\.((sra)|(eep)|(fla)|(mpk)))");
+    // Sync ALL files containing the ROM name (remove save type restrictions)
     while ((entry = readdir(dp)) != NULL) {
         if (entry->d_type && entry->d_type == DT_DIR) {
             continue;
         }
 
         std::string filename = std::string(entry->d_name);
-        if (filename.find(rom_name) != std::string::npos
-            && std::regex_search(entry->d_name, accept)) {
+        if (filename.find(rom_name) != std::string::npos) {
             ret.push_back(filename);
         }
     }
@@ -769,8 +979,6 @@ string client::slurp2(const string& path) {
 void client::update_save_info()
 {
     std::vector<string> save_files = find_rom_save_files(me->rom.name);
-    if (save_files.size() == 0)
-        my_dialog->error("Save data is empty");
 
     std::sort(save_files.begin(), save_files.end());
 
@@ -785,6 +993,14 @@ void client::update_save_info()
         save_info.save_data = save_info.save_name.empty() ? "" : slurp2(save_path + save_info.save_name);
         save_info.sha1_data = save_info.save_name.empty() ? "" : sha1_save_info(save_info);
     }
+    
+    // Calculate cheat file hash
+    me->cheat_file_hash = calculate_cheat_file_hash();
+    
+    // Calculate state hash if game has started
+    if (started) {
+        update_state_hash();
+    }
 }
 
 
@@ -798,6 +1014,115 @@ string client::sha1_save_info(const save_info& saveInfo)
             new CryptoPP::StringSink(digest)))
     );
     return digest;
+}
+
+string client::calculate_cheat_file_hash()
+{
+    std::string cheat_file = get_cheat_file_path();
+    std::wstring wcheat_file = utf8_to_wstring(cheat_file);
+    
+    // Check if cheat file exists
+    if (GetFileAttributes(wcheat_file.c_str()) == INVALID_FILE_ATTRIBUTES) {
+        return ""; // No cheat file, return empty hash
+    }
+    
+    try {
+        CryptoPP::SHA256 hash;
+        string digest;
+        CryptoPP::FileSource file(cheat_file.c_str(), true, new CryptoPP::HashFilter(hash,
+            new CryptoPP::HexEncoder(
+                new CryptoPP::StringSink(digest)))
+        );
+        return digest;
+    } catch (...) {
+        return ""; // Error reading file, return empty hash
+    }
+}
+
+string client::calculate_state_hash()
+{
+    HMODULE hModule = GetModuleHandle(NULL);
+    if (!hModule) {
+        return "";
+    }
+    
+    typedef bool(__cdecl* GetStateHashFunc)(char*, size_t);
+    GetStateHashFunc getStateHash = (GetStateHashFunc)GetProcAddress(hModule, "GetEmulatorStateHashForNetplay");
+    if (!getStateHash) {
+        return ""; // Function not available
+    }
+    
+    char hash_buffer[65];
+    if (getStateHash(hash_buffer, sizeof(hash_buffer))) {
+        return std::string(hash_buffer);
+    }
+    
+    return "";
+}
+
+void client::update_state_hash()
+{
+    if (!started) {
+        return; // Game not started yet
+    }
+
+    me->state_hash = calculate_state_hash();
+
+    // Send state hash update to other players
+    if (!me->state_hash.empty() && is_open()) {
+        // State hash is automatically included in user_info when sent
+        // For now, we'll rely on periodic user_info updates or add a dedicated packet type if needed
+    }
+}
+
+void client::handle_desync_detection(const char* hash)
+{
+    if (!started || !hash || !hash[0]) {
+        return; // Game not started or invalid hash
+    }
+
+    // Store the save state hash for desync detection
+    me->desync_hash = hash;
+
+    // Send desync hash update to other players
+    if (is_open()) {
+        // For now, we'll rely on periodic user_info updates or add a dedicated packet type if needed
+        // The desync hash is automatically included in user_info when sent
+    }
+
+    // Compare desync hashes with other players immediately
+    compare_all_players_desync_hashes();
+}
+
+// Helper functions using SEH for function pointer calls
+namespace {
+    bool SafeApplyCheatsDirectly(void(__cdecl* func)(const char*, const char*, const char*),
+                                  const char* cheat_content, const char* enabled_content, const char* game_id) {
+        __try {
+            func(cheat_content, enabled_content, game_id);
+            return true;
+        } __except(EXCEPTION_EXECUTE_HANDLER) {
+            return false;
+        }
+    }
+
+    bool SafeCloseCheatFile(void(__cdecl* func)(void)) {
+        __try {
+            func();
+            return true;
+        } __except(EXCEPTION_EXECUTE_HANDLER) {
+            return false;
+        }
+    }
+
+    bool SafeTriggerCheatReload(void(__cdecl* func)(void)) {
+        __try {
+            func();
+            return true;
+        } __except(EXCEPTION_EXECUTE_HANDLER) {
+            return false;
+        }
+    }
 }
 
 void client::on_receive(packet& p, bool udp) {
@@ -818,6 +1143,11 @@ void client::on_receive(packet& p, bool udp) {
             user_map.push_back(u);
             user_list.push_back(u);
             update_user_list();
+            // Log cheat information for the joining player
+            log_player_cheat_info(u);
+            // Compare all players' save hashes when a new player joins
+            compare_all_players_save_hashes();
+            compare_all_players_cheat_file_hashes();
             break;
         }
 
@@ -827,36 +1157,221 @@ void client::on_receive(packet& p, bool udp) {
 
             for (int i = 0; i < me->saves.size(); i++) {
                 auto save_data = p.read<save_info>();
-                if (user->saves[i].sha1_data != me->saves[i].sha1_data) {
-                    my_dialog->info(user->name + " updated " + me->saves[i].save_name + " to \r\nhash: " + save_data.sha1_data);
-                }
-
                 user->saves[i] = save_data;
             }
 
+            // Compare all players' save hashes when save info is updated
+            compare_all_players_save_hashes();
+            compare_all_players_cheat_file_hashes();
             break;
         }
 
         case SAVE_SYNC: {
+            // Validate me pointer before proceeding
+            if (!me) {
+                my_dialog->error("Save sync error: invalid user info");
+                break;
+            }
+
+            // Non-hosts backup their original saves BEFORE replacing them with host's saves
+            // Host doesn't need backup since their save is the one being synced
+            if (!is_host()) {
+                move_original_saves_to_temp();
+            }
+
+            int synced_count = 0;
+            int skipped_count = 0;
+            int error_count = 0;
+
+            // Read saves from packet - each save is preceded by a boolean flag indicating if it's valid
             for (int i = 0; i < me->saves.size(); i++) {
-                auto save_data = p.read<save_info>();
-                auto my_save = me->saves[i];
-                if (my_save.sha1_data != save_data.sha1_data) {
-                    my_dialog->info("Updating Save Data to \r\nhash: " + save_data.sha1_data);
+                try {
+                    // Check if we have data available for the save
+                    if (p.available() == 0) {
+                        // No more saves in packet, but we still have slots - skip remaining slots
+                        break;
+                    }
 
-                    my_save = save_data;
-                    replace_save_file(my_save);
-                }
+                    auto save_data = p.read<save_info>();
+                    auto my_save = me->saves[i];
 
-                for (auto& user : user_map) {
-                    if (user->saves[i].sha1_data == save_data.sha1_data)
+                    // Validate save data
+                    if (save_data.rom_name != me->rom.name) {
+                        my_dialog->error("Save sync error: ROM name mismatch for save slot " + std::to_string(i));
+                        error_count++;
                         continue;
-                    user->saves[i] = save_data;
+                    }
+
+                    // Check for oversized save files that could cause crashes
+                    const size_t MAX_SAVE_SIZE = 2 * 1024 * 1024; // 2MB limit
+                    if (save_data.save_data.size() > MAX_SAVE_SIZE) {
+                        my_dialog->error("Save file too large for sync: " + save_data.save_name +
+                                       " (" + std::to_string(save_data.save_data.size()) + " bytes), skipping");
+                        error_count++;
+                        continue;
+                    }
+
+                    // For host: skip sync since host's saves are already correct
+                    if (is_host()) {
+                        // Host just updates its user_map entry for consistency
+                        if (me) {
+                            for (auto& user : user_map) {
+                                if (user && me && user.get() == me.get()) {
+                                    user->saves[i] = save_data;
+                                    break;
+                                }
+                            }
+                        }
+                        skipped_count++;
+                        continue;
+                    }
+
+                    // Always sync if hashes differ, or if one is empty and the other isn't
+                    bool needs_sync = (my_save.sha1_data != save_data.sha1_data);
+                    bool my_save_empty = my_save.save_name.empty() || my_save.save_data.empty();
+                    bool incoming_save_empty = save_data.save_name.empty() || save_data.save_data.empty();
+
+                    // Also sync if one is empty and the other isn't (even if hashes match, which shouldn't happen)
+                    if (!needs_sync && my_save_empty != incoming_save_empty) {
+                        needs_sync = true;
+                    }
+
+                    if (needs_sync) {
+                        synced_count++;
+
+                        // Backup existing save before replacing (for non-hosts)
+                        if (!my_save.save_name.empty()) {
+                            std::string original_dir = save_path + "Original\\";
+                            std::string original_path = save_path + my_save.save_name;
+                            std::string backup_path = original_dir + my_save.save_name;
+
+                            // Backup if file exists and backup doesn't exist yet
+                            if (std::filesystem::exists(original_path) && !std::filesystem::exists(backup_path)) {
+                                try {
+                                    std::filesystem::create_directories(original_dir);
+                                    // Add a small delay to avoid potential race conditions with directory creation
+                                    Sleep(10);
+                                    std::filesystem::copy(original_path, backup_path, std::filesystem::copy_options::overwrite_existing);
+                                } catch (const std::filesystem::filesystem_error& e) {
+                                    my_dialog->error("Failed to backup save " + my_save.save_name + ": " + std::string(e.what()));
+                                    error_count++;
+                                }
+                            }
+                        }
+
+                        // Handle empty save - delete existing file before updating
+                        bool incoming_empty = save_data.save_name.empty() || save_data.save_data.empty();
+                        if (incoming_empty && !my_save.save_name.empty()) {
+                            std::string existing_path = save_path + my_save.save_name;
+                            if (std::filesystem::exists(existing_path)) {
+                                if (!DeleteFileA(existing_path.c_str())) {
+                                    DWORD error = GetLastError();
+                                    my_dialog->error("Failed to delete save file " + my_save.save_name + " (Error: " + std::to_string(error) + ")");
+                                    error_count++;
+                                }
+                            }
+                        }
+
+                        // Update local save and replace file
+                        // This will write the new save or skip if empty (already deleted above)
+                        me->saves[i] = save_data;
+                        if (!incoming_empty && !replace_save_file(save_data)) {
+                            error_count++;
+                        }
+                    } else {
+                        skipped_count++;
+                    }
+
+                    // Update local client's save data in user_map for hash tracking
+                    // Only update the local player (me) in the user_map
+                    if (me) {
+                        for (auto& user : user_map) {
+                            if (user && me && user.get() == me.get()) {
+                                user->saves[i] = save_data;
+                                break;
+                            }
+                        }
+                    }
+                } catch (const std::exception& e) {
+                    my_dialog->error("Error processing save slot " + std::to_string(i) + ": " + std::string(e.what()));
+                    error_count++;
                 }
             }
 
-            update_save_info();
-            send_save_info();
+            if (error_count > 0) {
+                my_dialog->error("Save sync completed with " + std::to_string(error_count) + " error(s)");
+            }
+
+            // Only update save info if me is still valid
+            if (me) {
+                update_save_info();
+                send_save_info();
+            }
+
+            // TEMPORARILY DISABLED: Trigger soft reset to reload save files into memory (only for non-host clients)
+            // Host doesn't need reset since its saves were already correct
+            // Disabled to prevent connection issues during save sync
+            if (false && !is_host()) {
+                HMODULE hModule = GetModuleHandle(NULL);
+                if (hModule) {
+                    typedef void(__cdecl* TriggerSoftResetFunc)(void);
+                    TriggerSoftResetFunc triggerSoftReset = (TriggerSoftResetFunc)GetProcAddress(hModule, "TriggerSoftResetForNetplay");
+                    if (triggerSoftReset) {
+                        // Use SEH helper to safely call function pointer
+                        if (SafeTriggerCheatReload(triggerSoftReset)) {
+                            my_dialog->info("Triggered soft reset to reload synced saves");
+                        } else {
+                            my_dialog->error("Exception occurred while triggering soft reset for save reload");
+                        }
+                    } else {
+                        my_dialog->error("Could not find soft reset function - saves may not reload properly");
+                    }
+                }
+            }
+            break;
+        }
+
+        case CHEAT_SYNC: {
+            // Process cheat files (only for non-host clients)
+            if (!is_host()) {
+                std::string type_or_marker = "";
+
+                try {
+                    type_or_marker = p.read<std::string>();
+                } catch (const std::exception& e) {
+                    my_dialog->error("Error reading cheat sync type/marker: " + std::string(e.what()));
+                    break;
+                }
+
+                if (type_or_marker == "END") {
+                    // End of chunks - process collected data (only if not already processed)
+                    my_dialog->info("Received end of cheat chunks - collected " + std::to_string(cheat_chunks.size()) + " chunks");
+
+                    // Check if we haven't already processed the chunks
+                    int cheat_total = chunk_counts["cheat"];
+                    if (cheat_chunks.size() == size_t(cheat_total)) {
+                        process_collected_cheat_chunks();
+                    } else {
+                        my_dialog->error("Received END marker but missing chunks: " +
+                                       std::to_string(cheat_chunks.size()) + "/" + std::to_string(cheat_total));
+                    }
+                } else if (type_or_marker.find("_chunk_") != std::string::npos) {
+                    // This is a chunk - store it
+                    std::string content = "";
+                    try {
+                        content = p.read<std::string>();
+                        my_dialog->info("Received cheat chunk: " + type_or_marker + " (" + std::to_string(content.length()) + " bytes)");
+                        store_cheat_chunk(type_or_marker, content);
+                    } catch (const std::exception& e) {
+                        my_dialog->error("Error reading cheat chunk content: " + std::string(e.what()));
+                        break;
+                    }
+                } else {
+                    // Single packet with complete cheat file
+                    my_dialog->info("Received complete cheat file (" + std::to_string(type_or_marker.length()) + " bytes)");
+                    apply_cheats(type_or_marker, ""); // Enabled status is within the .cht file
+                }
+            }
             break;
         }
 
@@ -886,6 +1401,22 @@ void client::on_receive(packet& p, bool udp) {
                 }
             }
             me = user_list.back();
+            
+            // Set host status: host is the first user in the list (user_list[0])
+            if (!user_list.empty() && me == user_list[0]) {
+                set_host_status(true);
+            } else {
+                set_host_status(false);
+            }
+            // Log cheat information for all players in the room
+            for (auto& user : user_list) {
+                if (user) {
+                    log_player_cheat_info(user);
+                }
+            }
+            // Compare all players' save hashes after accepting into room
+            compare_all_players_save_hashes();
+            compare_all_players_cheat_file_hashes();
             break;
         }
 
@@ -1142,6 +1673,9 @@ void client::on_tick() {
     if (!udp_established) {
         send_udp_ping();
     }
+    
+    // Note: Desync detection now uses save state hashing every 1800 frames (1 minute at 30 FPS)
+    // This is handled by the core emulator calling HandleNetplayDesyncDetection()
 
     timer.expires_after(500ms);
     auto self(weak_from_this());
@@ -1172,15 +1706,444 @@ void client::send_save_info() {
     send(p);
 }
 
-void client::send_savesync() {
-    packet p;
-    p << SAVE_SYNC;
-    if (!user_map.empty() && user_map[0]) { // Assuming the first user is the host
-        auto host_user = user_map[0];
-        for (auto& save : host_user->saves) {
-            p << save; // Send the host's saves
+void client::compare_all_players_save_hashes() {
+    if (user_list.size() < 2) {
+        return; // Need at least 2 players to compare
+    }
+    
+    for (int slot = 0; slot < me->saves.size(); slot++) {
+        std::map<std::string, std::vector<std::string>> hash_to_players; // hash -> list of player names
+        int players_with_saves = 0;
+        
+        // Collect all players' hashes for this slot
+        for (size_t i = 0; i < user_list.size(); i++) {
+            if (!user_list[i]) continue;
+            
+            const auto& user = user_list[i];
+            if (slot >= user->saves.size()) continue;
+            
+            const auto& save = user->saves[slot];
+            std::string hash = save.sha1_data;
+            std::string player_name = user->name;
+            
+            // Skip empty saves (no hash)
+            if (hash.empty()) {
+                continue;
+            }
+            
+            players_with_saves++;
+            hash_to_players[hash].push_back(player_name);
+        }
+        
+        // Only compare if we have at least 2 players with saves for this slot
+        if (players_with_saves < 2) {
+            continue; // Not enough players with saves to compare
         }
     }
+}
+
+void client::compare_all_players_cheat_file_hashes() {
+    if (user_list.size() < 2) {
+        return; // Need at least 2 players to compare
+    }
+    
+    std::map<std::string, std::vector<std::string>> hash_to_players; // hash -> list of player names
+    int players_with_cheats = 0;
+    
+    // Collect all players' cheat file hashes
+    for (size_t i = 0; i < user_list.size(); i++) {
+        if (!user_list[i]) continue;
+        
+        const auto& user = user_list[i];
+        std::string hash = user->cheat_file_hash;
+        std::string player_name = user->name;
+        
+        // Skip empty cheat files (no hash)
+        if (hash.empty()) {
+            continue;
+        }
+        
+        players_with_cheats++;
+        hash_to_players[hash].push_back(player_name);
+    }
+    
+    // Only compare if we have at least 2 players with cheat files
+    if (players_with_cheats < 2) {
+        return; // Not enough players with cheat files to compare
+    }
+    
+    // Check if all non-empty cheat files have the same hash
+    if (hash_to_players.size() > 1) {
+        // Multiple different hashes found - mismatch!
+        std::string game_name = me->rom.name.empty() ? "current game" : me->rom.name;
+        std::string cheat_file_name = game_name + ".cht";
+        std::string mismatch_msg = "Cheat file hash mismatch for " + cheat_file_name + ":";
+        for (const auto& hash_group : hash_to_players) {
+            std::string players_str;
+            for (size_t j = 0; j < hash_group.second.size(); j++) {
+                if (j > 0) players_str += ", ";
+                players_str += hash_group.second[j];
+            }
+            mismatch_msg += "\r\n  " + hash_group.first.substr(0, 16) + "... (" + players_str + ")";
+        }
+        my_dialog->error(mismatch_msg);
+    } else if (hash_to_players.size() == 1) {
+        // All players with cheat files have matching hashes
+        std::string players_str;
+        const auto& players = hash_to_players.begin()->second;
+        for (size_t j = 0; j < players.size(); j++) {
+            if (j > 0) players_str += ", ";
+            players_str += players[j];
+        }
+    }
+    // If hash_to_players is empty, all cheat files are empty (no mismatch, nothing to report)
+}
+
+void client::log_player_cheat_info(std::shared_ptr<user_info> user) {
+    if (!user) return;
+    
+    std::string player_name = user->name;
+    std::string cheat_hash = user->cheat_file_hash;
+    
+    // If this is us (me), also load and log our enabled cheats
+    if (user == me || user->id == me->id) {
+        std::vector<cheat_info> cheats = load_cheats();
+    }
+}
+
+void client::compare_all_players_state_hashes() {
+    if (user_list.size() < 2) {
+        return; // Need at least 2 players to compare
+    }
+    
+    std::map<std::string, std::vector<std::string>> hash_to_players; // hash -> list of player names
+    int players_with_state = 0;
+    
+    // Collect all players' state hashes
+    for (size_t i = 0; i < user_list.size(); i++) {
+        if (!user_list[i]) continue;
+        
+        const auto& user = user_list[i];
+        std::string hash = user->state_hash;
+        std::string player_name = user->name;
+        
+        // Skip empty state hashes (game not started or hash not calculated yet)
+        if (hash.empty()) {
+            continue;
+        }
+        
+        players_with_state++;
+        hash_to_players[hash].push_back(player_name);
+    }
+    
+    // Only compare if we have at least 2 players with state hashes
+    if (players_with_state < 2) {
+        return; // Not enough players with state to compare
+    }
+    
+    // Check if all non-empty state hashes have the same hash
+    if (hash_to_players.size() > 1) {
+        // Multiple different hashes found - DESYNC DETECTED!
+        std::string mismatch_msg = "DESYNC DETECTED! Emulator states do not match:\r\n";
+        mismatch_msg += "Players have diverged and are no longer synchronized.\r\n";
+        mismatch_msg += "This usually indicates:\r\n";
+        mismatch_msg += "- Different inputs were processed\r\n";
+        mismatch_msg += "- Timing differences\r\n";
+        mismatch_msg += "- Emulator differences\r\n";
+        mismatch_msg += "- Network issues\r\n\r\n";
+        mismatch_msg += "Player groups with different states:";
+        for (const auto& hash_group : hash_to_players) {
+            std::string players_str;
+            for (size_t j = 0; j < hash_group.second.size(); j++) {
+                if (j > 0) players_str += ", ";
+                players_str += hash_group.second[j];
+            }
+            mismatch_msg += "\r\n  " + hash_group.first.substr(0, 16) + "... (" + players_str + ")";
+        }
+        mismatch_msg += "\r\n\r\nYou may need to restart the netplay session.";
+        my_dialog->error(mismatch_msg);
+    }
+    // If hash_to_players.size() == 1, all players are in sync (good!)
+    // If hash_to_players is empty, no players have state hashes yet (game not started)
+}
+
+void client::compare_all_players_desync_hashes()
+{
+    if (user_list.size() < 2) {
+        return; // Need at least 2 players to compare
+    }
+
+    std::map<std::string, std::vector<std::string>> hash_to_players; // hash -> list of player names
+    int players_with_desync_hash = 0;
+
+    // Collect all players' desync hashes
+    for (size_t i = 0; i < user_list.size(); i++) {
+        if (!user_list[i]) continue;
+
+        std::shared_ptr<user_info> user = user_list[i];
+        std::string hash = user->desync_hash;
+        std::string player_name = user->name;
+
+        // Skip empty desync hashes (not calculated yet)
+        if (hash.empty()) {
+            continue;
+        }
+
+        players_with_desync_hash++;
+        hash_to_players[hash].push_back(player_name);
+    }
+
+    // Only compare if we have at least 2 players with desync hashes
+    if (players_with_desync_hash < 2) {
+        return; // Not enough players with desync hashes to compare
+    }
+
+    // Check if all non-empty desync hashes have the same hash
+    if (hash_to_players.size() > 1) {
+        // Multiple different hashes found - DESYNC DETECTED!
+        std::string mismatch_msg = "DESYNC DETECTED! Save state hashes do not match:\r\n";
+        mismatch_msg += "Players have diverged and are no longer synchronized.\r\n";
+        mismatch_msg += "This usually indicates:\r\n";
+        mismatch_msg += "- Different inputs were processed\r\n";
+        mismatch_msg += "- Different timing or lag\r\n";
+        mismatch_msg += "- Emulator state corruption\r\n";
+
+        for (const auto& hash_group : hash_to_players) {
+            std::string players_str;
+            for (size_t j = 0; j < hash_group.second.size(); j++) {
+                if (j > 0) players_str += ", ";
+                players_str += hash_group.second[j];
+            }
+            mismatch_msg += "\r\n  " + hash_group.first.substr(0, 16) + "... (" + players_str + ")";
+        }
+        mismatch_msg += "\r\n\r\nYou may need to restart the netplay session.";
+        my_dialog->error(mismatch_msg);
+
+    }
+    // If hash_to_players.size() == 1, all players are in sync (good!)
+    // If hash_to_players is empty, no players have desync hashes yet
+}
+
+void client::send_savesync() {
+    if (!is_host()) {
+        my_dialog->error("Only the host can initiate save sync");
+        return;
+    }
+
+    if (user_map.empty() || !user_map[0]) {
+        my_dialog->error("Cannot sync saves: host user not found");
+        return;
+    }
+
+    my_dialog->info("Syncing saves...");
+
+    packet p;
+    p << SAVE_SYNC;
+    auto host_user = user_map[0];
+
+    int save_count = 0;
+    for (auto& save : host_user->saves) {
+        // Skip saves that are too large for the packet
+        if (save.save_data.size() > (packet::MAX_SIZE / 2)) {  // Leave room for other packet data
+            my_dialog->error("Save file too large for network sync: " + save.save_name +
+                           " (" + std::to_string(save.save_data.size()) + " bytes), skipping");
+            // Send empty save to maintain packet structure
+            save_info empty_save;
+            p << empty_save;
+            continue;
+        }
+
+        p << save; // Send the host's saves
+        if (!save.save_name.empty() && !save.save_data.empty()) {
+            save_count++;
+        }
+    }
+
+    // Cheat sync moved to separate CHEAT_SYNC packets
+    send(p);
+}
+
+void client::send_file_in_chunks(const std::string& content, const std::string& file_type, size_t chunk_size) {
+    if (content.empty()) return;
+
+    size_t total_chunks = (content.length() + chunk_size - 1) / chunk_size;
+    my_dialog->info("Sending " + file_type + " file in " + std::to_string(total_chunks) + " chunks");
+
+    for (size_t i = 0; i < total_chunks; i++) {
+        try {
+            size_t start = i * chunk_size;
+            size_t end = std::min(start + chunk_size, content.length());
+            std::string chunk = content.substr(start, end - start);
+
+            packet chunk_p;
+            chunk_p << CHEAT_SYNC;
+            chunk_p << std::string(file_type + "_chunk_" + std::to_string(i) + "_" + std::to_string(total_chunks));
+            chunk_p << chunk;
+
+            my_dialog->info("Sending " + file_type + " chunk " + std::to_string(i + 1) + "/" + std::to_string(total_chunks) +
+                           " (" + std::to_string(chunk.length()) + " bytes)");
+
+            // Send the chunk
+            send(chunk_p);
+
+            // Small delay between chunks to prevent overwhelming the network
+            Sleep(50);
+        } catch (const std::exception& e) {
+            my_dialog->error("Error sending " + file_type + " chunk " + std::to_string(i + 1) + ": " + std::string(e.what()));
+            throw; // Re-throw to let caller handle
+        }
+    }
+}
+
+void client::store_cheat_chunk(const std::string& chunk_info, const std::string& content) {
+    try {
+        // Parse chunk info: "type_chunk_index_total"
+        // Example: "cheat_chunk_0_5" means cheat file, chunk 0 of 5 total
+        size_t chunk_pos = chunk_info.find("_chunk_");
+        if (chunk_pos == std::string::npos) {
+            throw std::runtime_error("Invalid chunk info format: " + chunk_info);
+        }
+
+        std::string file_type = chunk_info.substr(0, chunk_pos);
+        std::string remainder = chunk_info.substr(chunk_pos + 7); // Skip "_chunk_"
+
+        size_t underscore_pos = remainder.find('_');
+        if (underscore_pos == std::string::npos) {
+            throw std::runtime_error("Invalid chunk numbering: " + chunk_info);
+        }
+
+        std::string index_str = remainder.substr(0, underscore_pos);
+        std::string total_str = remainder.substr(underscore_pos + 1);
+
+        int chunk_index = std::stoi(index_str);
+        int total_chunks = std::stoi(total_str);
+
+        if (chunk_index < 0 || chunk_index >= total_chunks || total_chunks <= 0) {
+            throw std::runtime_error("Invalid chunk index/total: " + std::to_string(chunk_index) + "/" + std::to_string(total_chunks));
+        }
+
+        if (file_type == "cheat") {
+            cheat_chunks[std::to_string(chunk_index)] = content;
+            chunk_counts["cheat"] = total_chunks;
+            my_dialog->info("Stored cheat chunk " + std::to_string(chunk_index + 1) + "/" + std::to_string(total_chunks));
+        } else {
+            throw std::runtime_error("Unknown chunk type: " + file_type);
+        }
+    } catch (const std::exception& e) {
+        my_dialog->error("Error storing cheat chunk: " + std::string(e.what()));
+    }
+}
+
+void client::process_collected_cheat_chunks() {
+    try {
+
+        // Get the total number of chunks for cheat file
+        int cheat_total = chunk_counts["cheat"];
+
+        // Check if we have all chunks
+        bool cheat_complete = (cheat_total == 0) || (cheat_chunks.size() == size_t(cheat_total));
+
+        if (!cheat_complete) {
+            my_dialog->error("Incomplete cheat chunks: " + std::to_string(cheat_chunks.size()) + "/" + std::to_string(cheat_total));
+            return;
+        }
+
+        // Assemble cheat file
+        std::string complete_cheat;
+        complete_cheat.reserve(cheat_total * 8192); // Pre-allocate memory
+
+        for (int i = 0; i < cheat_total; i++) {
+            auto it = cheat_chunks.find(std::to_string(i));
+            if (it != cheat_chunks.end()) {
+                complete_cheat += it->second;
+            } else {
+                my_dialog->error("Missing cheat chunk " + std::to_string(i));
+                return;
+            }
+        }
+
+        my_dialog->info("Reassembled complete cheat file (" + std::to_string(complete_cheat.length()) + " bytes)");
+
+        // Clear collected chunks first to free memory
+        cheat_chunks.clear();
+        chunk_counts.clear();
+
+        // Apply the cheats
+        my_dialog->info("Applying reassembled cheats...");
+        apply_cheats(complete_cheat, "");
+        my_dialog->info("Cheat sync completed successfully");
+    } catch (const std::exception& e) {
+        my_dialog->error("Error processing collected cheat chunks: " + std::string(e.what()));
+        // Clear chunks on error to prevent accumulation
+        cheat_chunks.clear();
+        chunk_counts.clear();
+    }
+}
+
+void client::send_cheatsync() {
+    if (!is_host()) {
+        my_dialog->error("Only the host can initiate cheat sync");
+        return;
+    }
+
+    my_dialog->info("Syncing cheats...");
+
+    packet p;
+    p << CHEAT_SYNC;
+
+    // Read cheat file content
+    std::string cheat_file_content = "";
+    std::string enabled_file_content = "";
+
+    try {
+    // Read cheat file content (includes enabled status within the .cht file)
+    std::string cheat_file_path = get_cheat_file_path();
+    if (std::filesystem::exists(cheat_file_path)) {
+        std::ifstream cheat_file(cheat_file_path, std::ios::binary);
+        if (cheat_file.is_open()) {
+            std::stringstream buffer;
+            buffer << cheat_file.rdbuf();
+            cheat_file_content = buffer.str();
+            cheat_file.close();
+            my_dialog->info("Loaded cheat file (" + std::to_string(cheat_file_content.length()) + " bytes)");
+        } else {
+            my_dialog->error("Failed to open cheat file for reading: " + cheat_file_path);
+        }
+    } else {
+        my_dialog->info("Cheat file does not exist: " + cheat_file_path);
+    }
+
+    // Enabled status is stored within the .cht file itself, no separate enabled file needed
+    enabled_file_content = "";
+    } catch (const std::exception& e) {
+        my_dialog->error("Error reading cheat files: " + std::string(e.what()));
+    }
+
+    // Always use chunking for cheat files to ensure reliability
+    // Large single packets can cause network issues and crashes
+    const size_t MAX_CHUNK_SIZE = 8192; // 8KB per chunk for better reliability
+
+    my_dialog->info("Sending cheat file to clients in chunks (" + std::to_string(cheat_file_content.length()) + " bytes total)");
+
+    // Send cheat file in chunks
+    if (!cheat_file_content.empty()) {
+        try {
+            send_file_in_chunks(cheat_file_content, "cheat", MAX_CHUNK_SIZE);
+
+            // Send END marker to signal completion of chunks
+            packet end_packet;
+            end_packet << CHEAT_SYNC;
+            end_packet << std::string("END");
+            send(end_packet);
+            my_dialog->info("Sent END marker for cheat file chunks");
+        } catch (const std::exception& e) {
+            my_dialog->error("Error sending cheat file chunks: " + std::string(e.what()));
+            return;
+        }
+    }
+
+    // Give time for all chunks to be processed
+    Sleep(200);
 
     send(p);
 }
@@ -1263,19 +2226,34 @@ void client::revert_save_data() {
 
     for (auto& save : me->saves) {
         if (!save.save_name.empty()) {
-            // Move netplay save to NetplayTemp
-            std::string netplay_path = save_path + save.save_name;
-            std::string temp_path = netplay_temp_dir + save.save_name;
-            std::filesystem::rename(netplay_path, temp_path);
+            try {
+                std::string netplay_path = save_path + save.save_name;
+                std::string temp_path = netplay_temp_dir + save.save_name;
+                std::string original_path = original_dir + save.save_name;
 
-            // Restore original save
-            std::string original_path = original_dir + save.save_name;
-            std::filesystem::rename(original_path, save_path + save.save_name);
+                // Only revert if we have a backup (non-hosts have backups, hosts don't)
+                if (!std::filesystem::exists(original_path)) {
+                    continue;
+                }
+
+                // Move current (netplay) save to NetplayTemp if it exists
+                if (std::filesystem::exists(netplay_path)) {
+                    // Ensure NetplayTemp directory exists
+                    std::filesystem::create_directories(netplay_temp_dir);
+                    std::filesystem::rename(netplay_path, temp_path);
+                }
+
+                // Restore original save from backup
+                std::filesystem::rename(original_path, netplay_path);
+            } catch (const std::filesystem::filesystem_error& e) {
+                my_dialog->error("Failed to revert save " + save.save_name + ": " + e.what());
+            }
         }
     }
 }
 
 void client::ensure_save_directories() {
+    // Create save backup directories
     std::string original_dir = save_path + "Original\\";
     std::string temp_dir = save_path + "NetplayTemp\\";
 
@@ -1283,13 +2261,91 @@ void client::ensure_save_directories() {
     std::filesystem::create_directories(temp_dir);
 }
 
+void client::restore_leftover_backups() {
+    // Check for leftover backups from a previous session that was force-closed (Alt+F4)
+    // If any exist in the Original folder, restore them now
+    std::string original_dir = save_path + "Original\\";
+    std::string netplay_temp_dir = save_path + "NetplayTemp\\";
+
+    try {
+        if (std::filesystem::exists(original_dir)) {
+            for (const auto& entry : std::filesystem::directory_iterator(original_dir)) {
+                if (!entry.is_regular_file()) continue;
+                
+                std::string filename = entry.path().filename().string();
+                std::string ext = entry.path().extension().string();
+                
+                // Process save files (.sra, .eep, .fla, .mpk)
+                if (ext == ".sra" || ext == ".eep" || ext == ".fla" || ext == ".mpk") {
+                    std::string backup_path = entry.path().string();
+                    std::string main_path = save_path + filename;
+                    std::string temp_path = netplay_temp_dir + filename;
+
+                    my_dialog->info("Restoring leftover backup: " + filename);
+
+                    // Move current (netplay) save to NetplayTemp if it exists
+                    if (std::filesystem::exists(main_path)) {
+                        std::filesystem::create_directories(netplay_temp_dir);
+                        std::filesystem::rename(main_path, temp_path);
+                    }
+
+                    // Restore the backup
+                    std::filesystem::rename(backup_path, main_path);
+                }
+            }
+        }
+    } catch (const std::filesystem::filesystem_error& e) {
+        my_dialog->error("Failed to restore leftover backups: " + std::string(e.what()));
+    }
+
+}
+
+
+std::string client::get_config_path() const {
+    std::string config_path = save_path;
+    if (config_path.length() >= 5) {
+        std::string last_five = config_path.substr(config_path.length() - 5);
+        if (last_five == "Save\\") {
+            config_path = config_path.substr(0, config_path.length() - 5);
+        }
+    }
+    if (config_path.length() >= 5) {
+        std::string last_five = config_path.substr(config_path.length() - 5);
+        if (last_five != "User\\") {
+            config_path += "User\\";
+        }
+    } else {
+        config_path += "User\\";
+    }
+    return config_path;
+}
+
+
 void client::move_original_saves_to_temp() {
     std::string original_dir = save_path + "Original\\";
+    
+    // Ensure the Original directory exists
+    try {
+        std::filesystem::create_directories(original_dir);
+    } catch (const std::filesystem::filesystem_error& e) {
+        my_dialog->error("Failed to create Original directory: " + std::string(e.what()));
+        return;
+    }
+
     for (auto& save : me->saves) {
         if (!save.save_name.empty()) {
-            std::string original_path = save_path + save.save_name;
-            std::string temp_path = original_dir + save.save_name;
-            std::filesystem::copy(original_path, temp_path, std::filesystem::copy_options::overwrite_existing);
+            try {
+                std::string original_path = save_path + save.save_name;
+                std::string backup_path = original_dir + save.save_name;
+
+                // Only backup if the original save exists and we don't already have a backup
+                // (prevents overwriting backup during reconnect scenarios)
+                if (std::filesystem::exists(original_path) && !std::filesystem::exists(backup_path)) {
+                    std::filesystem::copy(original_path, backup_path, std::filesystem::copy_options::overwrite_existing);
+                }
+            } catch (const std::filesystem::filesystem_error& e) {
+                my_dialog->error("Failed to backup save " + save.save_name + ": " + e.what());
+            }
         }
     }
 }
@@ -1300,4 +2356,375 @@ bool client::is_host() const {
 
 void client::set_host_status(bool status) {
     host_status = status;
+}
+
+std::string client::get_game_identifier() const {
+    char identifier[100];
+    sprintf_s(identifier, sizeof(identifier), "%08X-%08X-C:%X", me->rom.crc1, me->rom.crc2, (unsigned char)me->rom.country_code);
+    return std::string(identifier);
+}
+
+std::string client::sanitize_filename(const std::string& filename) const {
+    std::string sanitized = filename;
+    
+    // Remove or replace invalid filename characters
+    const std::string invalid_chars = "<>:\"/\\|?*";
+    for (char& c : sanitized) {
+        if (invalid_chars.find(c) != std::string::npos) {
+            c = '_'; // Replace invalid chars with underscore
+        }
+    }
+    
+    // Remove leading/trailing spaces and dots
+    while (!sanitized.empty() && (sanitized.front() == ' ' || sanitized.front() == '.')) {
+        sanitized.erase(0, 1);
+    }
+    while (!sanitized.empty() && (sanitized.back() == ' ' || sanitized.back() == '.')) {
+        sanitized.pop_back();
+    }
+    
+    // If empty after sanitization, use a default
+    if (sanitized.empty()) {
+        sanitized = "Unknown";
+    }
+    
+    // Limit length to avoid filesystem issues
+    if (sanitized.length() > 200) {
+        sanitized = sanitized.substr(0, 200);
+    }
+    
+    return sanitized;
+}
+
+std::string client::get_cheat_file_path() const {
+    std::string config_path = get_config_path();
+    config_path += "Cheats\\";
+    
+    // Ensure Cheats directory exists
+    std::filesystem::create_directories(config_path);
+    
+    // Use ROM's internal name for game-specific cheat file
+    if (!me->rom.name.empty()) {
+        std::string rom_name = sanitize_filename(me->rom.name);
+        config_path += rom_name + ".cht";
+    } else {
+        // Fallback to game identifier if name is empty
+        config_path += get_game_identifier() + ".cht";
+    }
+    
+    return config_path;
+}
+
+std::string client::get_cheat_enabled_file_path() const {
+    std::string config_path = get_config_path();
+    config_path += "Cheats\\";
+    
+    // Ensure Cheats directory exists
+    std::filesystem::create_directories(config_path);
+    
+    // Use ROM's internal name for game-specific cheat enabled file (same as cheat file)
+    if (!me->rom.name.empty()) {
+        std::string rom_name = sanitize_filename(me->rom.name);
+        config_path += rom_name + ".cht";
+    } else {
+        // Fallback to game identifier if name is empty
+        config_path += get_game_identifier() + ".cht";
+    }
+    
+    return config_path;
+}
+
+std::vector<cheat_info> client::load_cheats() {
+    std::vector<cheat_info> cheats;
+    
+    try {
+        std::string cheat_file = get_cheat_file_path();
+        std::string game_id = get_game_identifier();
+        std::wstring wcheat_file = utf8_to_wstring(cheat_file);
+        std::wstring wgame_id = utf8_to_wstring(game_id);
+
+        // Check if cheat file exists
+        if (GetFileAttributes(wcheat_file.c_str()) == INVALID_FILE_ATTRIBUTES) {
+            my_dialog->info("Cheat file does not exist: " + cheat_file);
+            return cheats; // File doesn't exist, return empty
+        }
+
+        // Read up to MaxCheats cheats (50000)
+        for (int i = 0; i < 50000; i++) {
+            std::wstring key = L"Cheat" + std::to_wstring(i);
+            
+            wchar_t cheat_entry[4096];
+            DWORD len = GetPrivateProfileString(wgame_id.c_str(), key.c_str(), L"", cheat_entry, sizeof(cheat_entry) / sizeof(wchar_t), wcheat_file.c_str());
+            
+            if (len == 0) {
+                break; // No more cheats
+            }
+
+            std::string entry = wstring_to_utf8(cheat_entry);
+            if (entry.empty()) {
+                continue;
+            }
+
+            // Parse cheat entry: format is "Name" code1,code2,code3,...
+            // Find the name between quotes
+            size_t name_start = entry.find('"');
+            if (name_start == std::string::npos) {
+                continue;
+            }
+            size_t name_end = entry.find('"', name_start + 1);
+            if (name_end == std::string::npos) {
+                continue;
+            }
+
+            cheat_info cheat;
+            cheat.name = entry.substr(name_start + 1, name_end - name_start - 1);
+            
+            // Get the code part (after the closing quote and space)
+            size_t code_start = name_end + 1;
+            while (code_start < entry.length() && (entry[code_start] == ' ' || entry[code_start] == '\t')) {
+                code_start++;
+            }
+            cheat.code = entry.substr(code_start);
+
+            // Check if cheat is active - read from .cht_enabled file
+            // Wrap in try-catch in case file is locked or corrupted
+            try {
+                std::string enabled_file = get_cheat_enabled_file_path();
+                std::wstring wenabled_file = utf8_to_wstring(enabled_file);
+                std::wstring active_key = L"Cheat" + std::to_wstring(i);
+                wchar_t active_value[16];
+                GetPrivateProfileString(wgame_id.c_str(), active_key.c_str(), L"0", active_value, sizeof(active_value) / sizeof(wchar_t), wenabled_file.c_str());
+                cheat.active = (_wtoi(active_value) != 0);
+            } catch (...) {
+                cheat.active = false; // Default to inactive if we can't read it
+            }
+
+            cheats.push_back(cheat);
+        }
+    } catch (const std::exception& e) {
+        my_dialog->error("Error loading cheats: " + std::string(e.what()));
+        return cheats; // Return whatever we loaded so far
+    } catch (...) {
+        my_dialog->error("Unknown error loading cheats");
+        return cheats; // Return whatever we loaded so far
+    }
+
+    return cheats;
+}
+
+void client::save_cheats(const std::vector<cheat_info>& cheats) {
+    std::string cheat_file = get_cheat_file_path();
+    std::string enabled_file = get_cheat_enabled_file_path();
+    std::string game_id = get_game_identifier();
+    std::wstring wcheat_file = utf8_to_wstring(cheat_file);
+    std::wstring wenabled_file = utf8_to_wstring(enabled_file);
+    std::wstring wgame_id = utf8_to_wstring(game_id);
+
+    // Ensure Config directory exists
+    std::string config_dir = get_config_path();
+    std::filesystem::create_directories(utf8_to_wstring(config_dir));
+
+    // Remove write protection from cheat file if it exists
+    DWORD cheat_attrs = GetFileAttributes(wcheat_file.c_str());
+    if (cheat_attrs != INVALID_FILE_ATTRIBUTES) {
+        if (cheat_attrs & FILE_ATTRIBUTE_READONLY) {
+            SetFileAttributes(wcheat_file.c_str(), cheat_attrs & ~FILE_ATTRIBUTE_READONLY);
+        }
+    }
+
+    // Remove write protection from enabled file if it exists
+    DWORD enabled_attrs = GetFileAttributes(wenabled_file.c_str());
+    if (enabled_attrs != INVALID_FILE_ATTRIBUTES) {
+        if (enabled_attrs & FILE_ATTRIBUTE_READONLY) {
+            SetFileAttributes(wenabled_file.c_str(), enabled_attrs & ~FILE_ATTRIBUTE_READONLY);
+        }
+    }
+
+    // First, clear existing cheats for this game in cheat file
+    for (int i = 0; i < 50000; i++) {
+        std::wstring key = L"Cheat" + std::to_wstring(i);
+        wchar_t value[4096];
+        DWORD len = GetPrivateProfileString(wgame_id.c_str(), key.c_str(), L"", value, sizeof(value) / sizeof(wchar_t), wcheat_file.c_str());
+        if (len == 0) {
+            break;
+        }
+        WritePrivateProfileString(wgame_id.c_str(), key.c_str(), NULL, wcheat_file.c_str());
+    }
+
+    // Combine all active cheats into a single "Netplay" cheat
+    std::string combined_codes;
+    bool has_active_cheats = false;
+
+    for (const auto& cheat : cheats) {
+        if (cheat.active && !cheat.code.empty()) {
+            if (!combined_codes.empty()) {
+                combined_codes += ",";
+            }
+            combined_codes += cheat.code;
+            has_active_cheats = true;
+        }
+    }
+
+    if (has_active_cheats && !combined_codes.empty()) {
+        // Write the combined "Netplay" cheat
+        std::wstring key = L"Cheat0";
+        std::string entry = "\"Netplay\" " + combined_codes;
+        std::wstring wentry = utf8_to_wstring(entry);
+        WritePrivateProfileString(wgame_id.c_str(), key.c_str(), wentry.c_str(), wcheat_file.c_str());
+
+        // Write enabled status (always enabled for the combined cheat)
+        std::wstring enabled_key = L"Cheat0";
+        std::wstring enabled_value = L"1";
+        WritePrivateProfileString(wgame_id.c_str(), enabled_key.c_str(), enabled_value.c_str(), wenabled_file.c_str());
+
+        my_dialog->info("Created combined Netplay cheat with " + std::to_string(combined_codes.length()) + " bytes of codes");
+    } else {
+        my_dialog->info("No active cheats to combine for Netplay");
+    }
+}
+
+void client::apply_cheats(const std::string& cheat_file_content, const std::string& enabled_file_content) {
+    // Queue cheat application to happen asynchronously to avoid blocking network operations
+    my_dialog->info("Queueing cheat application (" + std::to_string(cheat_file_content.length()) + " bytes)");
+    
+    service.post([this, cheat_file_content, enabled_file_content]() {
+        try {
+            apply_cheats_async(cheat_file_content, enabled_file_content);
+        } catch (const std::exception& e) {
+            my_dialog->error("Error applying cheats asynchronously: " + std::string(e.what()));
+        } catch (...) {
+            my_dialog->error("Unknown error applying cheats asynchronously");
+        }
+    });
+}
+
+void client::apply_cheats_async(const std::string& cheat_file_content, const std::string& enabled_file_content) {
+    try {
+        HMODULE hModule = GetModuleHandle(NULL);
+
+        // For non-host clients (p2-4), try to write cheats directly to memory first
+        if (!is_host()) {
+            // Get game identifier
+            std::string game_id = get_game_identifier();
+
+            // Apply cheats directly to memory if function is available
+            if (hModule) {
+                typedef void(__cdecl* ApplyCheatsDirectlyFunc)(const char*, const char*, const char*);
+                ApplyCheatsDirectlyFunc applyCheatsDirectly = (ApplyCheatsDirectlyFunc)GetProcAddress(hModule, "ApplyCheatsDirectlyForNetplay");
+                if (applyCheatsDirectly) {
+                    // Use SEH helper to safely call function pointer
+                    if (SafeApplyCheatsDirectly(applyCheatsDirectly, cheat_file_content.c_str(), enabled_file_content.c_str(), game_id.c_str())) {
+                        my_dialog->info("Cheats applied directly to memory from host (" + std::to_string(cheat_file_content.length()) + " bytes cheat data)");
+                        return;
+                    } else {
+                        my_dialog->error("Exception occurred while applying cheats directly, falling back to file sync");
+                        // Fall through to file sync
+                    }
+                } else {
+                    my_dialog->info("ApplyCheatsDirectlyForNetplay function not found, falling back to file method");
+                }
+            }
+        }
+
+    // Host (p1) or fallback: write to .ini files and reload (original behavior)
+    // First, close the INI file handle so we can write to it
+    if (hModule) {
+        typedef void(__cdecl* CloseCheatFileFunc)(void);
+        CloseCheatFileFunc closeCheatFile = (CloseCheatFileFunc)GetProcAddress(hModule, "CloseCheatFileForNetplay");
+        if (closeCheatFile) {
+            if (!SafeCloseCheatFile(closeCheatFile)) {
+                my_dialog->error("Exception occurred while closing cheat file handle");
+            } else {
+                // Reduced sleep time to minimize blocking
+                Sleep(50);
+            }
+        }
+    }
+
+    bool cheat_file_written = false;
+
+    try {
+        // Write the entire .cht file content (includes enabled status within the file)
+        std::string cheat_file = get_cheat_file_path();
+
+        // Ensure parent directory exists
+        std::filesystem::path cheat_path(cheat_file);
+        std::filesystem::create_directories(cheat_path.parent_path());
+
+        // Write the entire .cht file content (creates file if it doesn't exist)
+        std::ofstream cheat_of(cheat_file.c_str(), std::ofstream::binary | std::ofstream::trunc);
+        if (cheat_of.is_open()) {
+            cheat_of << cheat_file_content;
+            cheat_of.flush();
+            cheat_of.close();
+            cheat_file_written = true;
+        } else {
+            DWORD error = GetLastError();
+            my_dialog->error("Failed to open cheat file for writing: " + cheat_file + " (Error: " + std::to_string(error) + ")");
+        }
+
+        if (cheat_file_written) {
+            my_dialog->info("Cheat file synced from host (" + std::to_string(cheat_file_content.length()) + " bytes)");
+        }
+
+        // Trigger Project64 core to reload cheats from the files
+        // Use safer netplay-specific functions that don't cause connection resets
+        if (hModule && cheat_file_written) {
+            typedef void(__cdecl* TriggerForceCheatReloadFunc)(void);
+            TriggerForceCheatReloadFunc triggerForceCheatReload = (TriggerForceCheatReloadFunc)GetProcAddress(hModule, "TriggerForceCheatReloadForNetplay");
+            if (triggerForceCheatReload) {
+                // Use SEH helper to safely call function pointer
+                if (SafeTriggerCheatReload(triggerForceCheatReload)) {
+                    my_dialog->info("Triggered force cheat reload after writing files");
+                } else {
+                    my_dialog->error("Exception occurred while triggering force cheat reload, trying fallback");
+                    // Try fallback
+                    typedef void(__cdecl* TriggerCheatReloadFunc)(void);
+                    TriggerCheatReloadFunc triggerCheatReload = (TriggerCheatReloadFunc)GetProcAddress(hModule, "TriggerCheatReloadForNetplay");
+                    if (triggerCheatReload) {
+                        if (SafeTriggerCheatReload(triggerCheatReload)) {
+                            my_dialog->info("Triggered cheat reload after writing files (fallback)");
+                        } else {
+                            my_dialog->error("Exception occurred while triggering cheat reload");
+                        }
+                    } else {
+                        my_dialog->info("Could not find cheat reload function (cheats may need manual refresh)");
+                    }
+                }
+            } else {
+                // Fallback to regular reload
+                typedef void(__cdecl* TriggerCheatReloadFunc)(void);
+                TriggerCheatReloadFunc triggerCheatReload = (TriggerCheatReloadFunc)GetProcAddress(hModule, "TriggerCheatReloadForNetplay");
+                if (triggerCheatReload) {
+                    if (SafeTriggerCheatReload(triggerCheatReload)) {
+                        my_dialog->info("Triggered cheat reload after writing files (fallback)");
+                    } else {
+                        my_dialog->error("Exception occurred while triggering cheat reload");
+                    }
+                } else {
+                    my_dialog->info("Could not find cheat reload function (cheats may need manual refresh)");
+                }
+            }
+
+            // Give Project64 core more time to process the file changes
+            // Increased from 200ms to 500ms to prevent network timeouts during cheat reload
+            Sleep(500);
+        }
+
+        if (cheat_file_written) {
+            my_dialog->info("Cheat file written but reload disabled to prevent connection issues");
+        }
+
+        my_dialog->info("Cheats synced from host");
+
+    } catch (const std::exception& e) {
+        my_dialog->error("Error during cheat file sync: " + std::string(e.what()));
+    }
+    } catch (const std::exception& e) {
+        my_dialog->error("Critical error during cheat application: " + std::string(e.what()));
+        // Don't rethrow - we want to continue the netplay session
+    } catch (...) {
+        my_dialog->error("Unknown critical error during cheat application");
+        // Don't rethrow - we want to continue the netplay session
+    }
 }

@@ -64,6 +64,7 @@ enum LanguageStringID
     MENU_RECENT_ROM = 107,
     MENU_RECENT_DIR = 108,
     MENU_EXIT = 109,
+    MENU_OPEN_USER_FOLDER = 110,
 
     //System Menu
     MENU_SYSTEM = 120,
@@ -204,6 +205,7 @@ enum LanguageStringID
     RB_PLAYERS = 317,
     RB_FORCE_FEEDBACK = 318,
     RB_FILE_FORMAT = 319,
+    RB_PLAYTIME = 3114,
 
     //Select Rom
     SELECT_ROM_DIR = 320,
@@ -266,7 +268,7 @@ enum LanguageStringID
     OPTION_CHECK_RUNNING = 467,
     OPTION_UNIQUE_SAVE_DIR = 468,
     OPTION_IPL_ROM_PATH = 469,
-    OPTION_DARK = 5912,
+    OPTION_DARKTHEME = 479,
 
     //Rom Browser Tab
     RB_MAX_ROMS = 480,

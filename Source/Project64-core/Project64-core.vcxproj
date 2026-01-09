@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -37,12 +37,45 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(SolutionDir)Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)Source\3rdParty\discord-rpc\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>cryptopp.lib;discord-rpc.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(SolutionDir)Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)Source\3rdParty\discord-rpc\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>cryptopp.lib;discord-rpc.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(SolutionDir)Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)Source\3rdParty\discord-rpc\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>cryptopp.lib;discord-rpc.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(SolutionDir)Source\3rdParty\cryptopp\cryptopp;$(SolutionDir)Source\3rdParty\discord-rpc\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>cryptopp.lib;discord-rpc.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="3rdParty\7zip.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="AppInit.cpp" />
     <ClCompile Include="Logging.cpp" />
+    <ClCompile Include="MarioPartyNetplay\Discord.cpp" />
     <ClCompile Include="MemoryExceptionFilter.cpp" />
     <ClCompile Include="Multilanguage\LanguageClass.cpp" />
     <ClCompile Include="N64System\CheatClass.cpp" />
@@ -107,6 +140,7 @@
     <ClCompile Include="Settings\SettingType\SettingsType-ApplicationIndex.cpp" />
     <ClCompile Include="Settings\SettingType\SettingsType-ApplicationPath.cpp" />
     <ClCompile Include="Settings\SettingType\SettingsType-Cheats.cpp" />
+    <ClCompile Include="Settings\SettingType\SettingsType-CheatsEnabled.cpp" />
     <ClCompile Include="Settings\SettingType\SettingsType-GameSetting.cpp" />
     <ClCompile Include="Settings\SettingType\SettingsType-GameSettingIndex.cpp" />
     <ClCompile Include="Settings\SettingType\SettingsType-RDBCpuType.cpp" />
@@ -137,6 +171,8 @@
     <ClInclude Include="AppInit.h" />
     <ClInclude Include="ExceptionHandler.h" />
     <ClInclude Include="Logging.h" />
+    <ClInclude Include="MarioPartyNetplay\Discord.h" />
+    <ClInclude Include="MarioPartyNetplay\MarioPartyOverlays.h" />
     <ClInclude Include="Multilanguage.h" />
     <ClInclude Include="Multilanguage\LanguageClass.h" />
     <ClInclude Include="N64System\CheatClass.h" />
@@ -213,6 +249,7 @@
     <ClInclude Include="Settings\SettingType\SettingsType-ApplicationPath.h" />
     <ClInclude Include="Settings\SettingType\SettingsType-Base.h" />
     <ClInclude Include="Settings\SettingType\SettingsType-Cheats.h" />
+    <ClInclude Include="Settings\SettingType\SettingsType-CheatsEnabled.h" />
     <ClInclude Include="Settings\SettingType\SettingsType-GameSetting.h" />
     <ClInclude Include="Settings\SettingType\SettingsType-GameSettingIndex.h" />
     <ClInclude Include="Settings\SettingType\SettingsType-RDBCpuType.h" />
@@ -230,6 +267,7 @@
     <ClInclude Include="Settings\SettingType\SettingsType-TempNumber.h" />
     <ClInclude Include="Settings\SettingType\SettingsType-TempString.h" />
     <ClInclude Include="stdafx.h" />
+    <ClInclude Include="Discord.h" />
     <ClInclude Include="TraceModulesProject64.h" />
   </ItemGroup>
   <ItemGroup>
@@ -240,6 +278,9 @@
       <Project>{3326e128-33af-422c-bb7c-67cc6b915610}</Project>
     </ProjectReference>
     <ProjectReference Include="..\Common\Common.vcxproj" />
+    <ProjectReference Include="..\3rdParty\cryptopp\cryptopp.vcxproj">
+      <Project>{A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D}</Project>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />

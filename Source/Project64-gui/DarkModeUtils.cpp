@@ -1112,16 +1112,16 @@ LPCWSTR get_nm_code_name(UINT code) {
 
 void GetAllWindowsFromProcessID(DWORD dwProcessID, std::vector<HWND>& vhWnds)
 {
-	TCHAR buff[512];
+	wchar_t buff[512];
 #define DBG_HWND(x) \
 	{ \
-	     TCHAR buff[512]; \
-	     GetWindowText(x, buff, 512); \
-	     OutputDebugString(buff); \
-	     OutputDebugString(_T(" - ")); \
-	     GetClassName(x, buff, 512); \
-	     OutputDebugString(buff); \
-	     OutputDebugString(_T("\n")); \
+	     wchar_t buff[512]; \
+	     GetWindowTextW(x, buff, 512); \
+	     OutputDebugStringW(buff); \
+	     OutputDebugStringW(L" - "); \
+	     GetClassNameW(x, buff, 512); \
+	     OutputDebugStringW(buff); \
+	     OutputDebugStringW(L"\n"); \
 	 }
 
 
@@ -1240,9 +1240,9 @@ void dbgMsg(HWND hWnd, UINT_PTR subclass, UINT message, WPARAM wParam, LPARAM lP
 	else {
 		if (dupe_counter) {
 			std::wstringstream str;
-			WCHAR tmp[64];
+			wchar_t tmp[64];
 			swprintf_s(tmp, 64, L"%p", last_hwnd);
-			WCHAR tmp2[8];
+			wchar_t tmp2[8];
 			swprintf_s(tmp2, 8, L" 0x%04x", last_message);
 			str << L" dbgMsg(" << tmp << L"," << last_subclass << L")" << L" Suppressed " << dupe_counter << " sequential messages of the same type" << tmp2 << L" " << get_message_name(last_message) << std::endl;
 			OutputDebugStringW(str.str().c_str());
@@ -1254,21 +1254,21 @@ void dbgMsg(HWND hWnd, UINT_PTR subclass, UINT message, WPARAM wParam, LPARAM lP
 	}
 	if (dupe_counter == 0) {
 		HWND parent = GetParent(hWnd);
-		WCHAR _parent[64];
+		wchar_t _parent[64];
 		swprintf_s(_parent, 64, L" (parent=%p)", parent);
-		WCHAR tmp[64];
+		wchar_t tmp[64];
 		swprintf_s(tmp, 64, L"%p", hWnd);
-		WCHAR tmp2[8];
+		wchar_t tmp2[8];
 		swprintf_s(tmp2, 8, L" 0x%04x", message);
 
-		WCHAR tmp_style[64];
+		wchar_t tmp_style[64];
 		DWORD style = GetWindowLongPtr(hWnd, GWL_STYLE);
 		swprintf_s(tmp_style, 64, L" (style=0x%08x)", style);
 
-		TCHAR wtxt[512];
-		TCHAR wcls[512];
-		GetWindowText(hWnd, wtxt, 512);
-		GetClassName(hWnd, wcls, 512);
+		wchar_t wtxt[512];
+		wchar_t wcls[512];
+		GetWindowTextW(hWnd, wtxt, 512);
+		GetClassNameW(hWnd, wcls, 512);
 
 		std::wstringstream str;
 		str << L" dbgMsg(" << tmp << L"," << subclass << L") '" << wcls << L"'(" << wtxt << L") " << get_message_name(message) << tmp2 << L"(" << message << L"), " \

@@ -15,6 +15,7 @@
 #include "SettingType/SettingsType-ApplicationPath.h"
 #include "SettingType/SettingsType-ApplicationIndex.h"
 #include "SettingType/SettingsType-Cheats.h"
+#include "SettingType/SettingsType-CheatsEnabled.h"
 #include "SettingType/SettingsType-GameSetting.h"
 #include "SettingType/SettingsType-GameSettingIndex.h"
 #include "SettingType/SettingsType-RelativePath.h"
@@ -47,6 +48,7 @@ CSettings::~CSettings()
     CSettingTypeRomDatabase::CleanUp();
     CSettingTypeGame::CleanUp();
     CSettingTypeCheats::CleanUp();
+    CSettingTypeCheatsEnabled::CleanUp();
 
     for (SETTING_MAP::iterator iter = m_SettingInfo.begin(); iter != m_SettingInfo.end(); iter++)
     {
@@ -90,18 +92,22 @@ void CSettings::AddHowToHandleSetting(const char * BaseDirectory)
     AddHandler(Cmd_RomFile, new CSettingTypeTempString(""));
 
     //Support Files
+    AddHandler(SupportFile_Playtime, new CSettingTypeApplicationPath("Settings", "Playtime", SupportFile_PlaytimeDefault));
+    AddHandler(SupportFile_PlaytimeDefault, new CSettingTypeRelativePath("User", "Playtime.rdn"));
     AddHandler(SupportFile_Settings, new CSettingTypeApplicationPath("", "ConfigFile", SupportFile_SettingsDefault));
-    AddHandler(SupportFile_SettingsDefault, new CSettingTypeRelativePath("Config", "Project64.cfg"));
+    AddHandler(SupportFile_SettingsDefault, new CSettingTypeRelativePath("User", "Project64.cfg"));
     AddHandler(SupportFile_RomDatabase, new CSettingTypeApplicationPath("", "RomDatabase", SupportFile_RomDatabaseDefault));
-    AddHandler(SupportFile_RomDatabaseDefault, new CSettingTypeRelativePath("Config", "Project64.rdb"));
+    AddHandler(SupportFile_RomDatabaseDefault, new CSettingTypeRelativePath("User", "Project64.rdb"));
     AddHandler(SupportFile_Glide64RDB, new CSettingTypeApplicationPath("", "Glide64RDB", SupportFile_Glide64RDBDefault));
-    AddHandler(SupportFile_Glide64RDBDefault, new CSettingTypeRelativePath("Config", "Glide64.rdb"));
+    AddHandler(SupportFile_Glide64RDBDefault, new CSettingTypeRelativePath("User", "Glide64.rdb"));
     AddHandler(SupportFile_Cheats, new CSettingTypeApplicationPath("", "Cheats", SupportFile_CheatsDefault));
-    AddHandler(SupportFile_CheatsDefault, new CSettingTypeRelativePath("Config", "Project64.cht"));
+    AddHandler(SupportFile_CheatsDefault, new CSettingTypeRelativePath("User/Cheats", "Project64.cht"));
+    AddHandler(SupportFile_CheatsEnabled, new CSettingTypeApplicationPath("", "CheatsEnabled", SupportFile_CheatsEnabledDefault));
+    AddHandler(SupportFile_CheatsEnabledDefault, new CSettingTypeRelativePath("User/Cheats", "Project64.cht_enabled"));
     AddHandler(SupportFile_Notes, new CSettingTypeApplicationPath("", "Notes", SupportFile_NotesDefault));
-    AddHandler(SupportFile_NotesDefault, new CSettingTypeRelativePath("Config", "Project64.rdn"));
+    AddHandler(SupportFile_NotesDefault, new CSettingTypeRelativePath("User", "Project64.rdn"));
     AddHandler(SupportFile_ExtInfo, new CSettingTypeApplicationPath("", "ExtInfo", SupportFile_ExtInfoDefault));
-    AddHandler(SupportFile_ExtInfoDefault, new CSettingTypeRelativePath("Config", "Project64.rdx"));
+    AddHandler(SupportFile_ExtInfoDefault, new CSettingTypeRelativePath("User", "Project64.rdx"));
 
     //Settings location
     AddHandler(Setting_ApplicationName, new CSettingTypeTempString(""));
@@ -112,6 +118,7 @@ void CSettings::AddHowToHandleSetting(const char * BaseDirectory)
     AddHandler(Setting_AutoZipInstantSave, new CSettingTypeApplication("", "Auto Zip Saves", (uint32_t)true));
     AddHandler(Setting_EraseGameDefaults, new CSettingTypeApplication("", "Erase on default", (uint32_t)true));
     AddHandler(Setting_CheckEmuRunning, new CSettingTypeApplication("", "Check Running", (uint32_t)true));
+    AddHandler(Setting_DarkTheme, new CSettingTypeApplication("", "Dark Theme", (uint32_t)false));
 
     AddHandler(Setting_RememberCheats, new CSettingTypeApplication("", "Remember Cheats", (uint32_t)true));
 #ifdef ANDROID
@@ -255,31 +262,31 @@ void CSettings::AddHowToHandleSetting(const char * BaseDirectory)
     AddHandler(Directory_PluginSync, new CSettingTypeSelectedDirectory("Dir:SyncPlugin", Directory_PluginSyncInitial, Directory_PluginSyncSelected, Directory_PluginSyncUseSelected, Directory_PluginSync));
 
     AddHandler(Directory_SnapShot, new CSettingTypeSelectedDirectory("Dir:Snapshot", Directory_SnapShotInitial, Directory_SnapShotSelected, Directory_SnapShotUseSelected, Directory_SnapShot));
-    AddHandler(Directory_SnapShotInitial, new CSettingTypeRelativePath("Screenshots", ""));
+    AddHandler(Directory_SnapShotInitial, new CSettingTypeRelativePath("User/Screenshots", ""));
     AddHandler(Directory_SnapShotSelected, new CSettingTypeApplicationPath("Snap Shot Directory", "Directory", Directory_SnapShotInitial));
     AddHandler(Directory_SnapShotUseSelected, new CSettingTypeApplication("Snap Shot Directory", "Use Selected", false));
 
     AddHandler(Directory_NativeSave, new CSettingTypeSelectedDirectory("Dir:NativeSave", Directory_NativeSaveInitial, Directory_NativeSaveSelected, Directory_NativeSaveUseSelected, Directory_NativeSave));
-    AddHandler(Directory_NativeSaveInitial, new CSettingTypeRelativePath("Save", ""));
+    AddHandler(Directory_NativeSaveInitial, new CSettingTypeRelativePath("User/Save", ""));
     AddHandler(Directory_NativeSaveSelected, new CSettingTypeApplicationPath("Native Save Directory", "Directory", Directory_NativeSaveInitial));
     AddHandler(Directory_NativeSaveUseSelected, new CSettingTypeApplication("Native Save Directory", "Use Selected", false));
 
     AddHandler(Directory_InstantSave, new CSettingTypeSelectedDirectory("Dir:InstantSave", Directory_InstantSaveInitial, Directory_InstantSaveSelected, Directory_InstantSaveUseSelected, Directory_InstantSave));
-    AddHandler(Directory_InstantSaveInitial, new CSettingTypeRelativePath("Save", ""));
+    AddHandler(Directory_InstantSaveInitial, new CSettingTypeRelativePath("User/Save", ""));
     AddHandler(Directory_InstantSaveSelected, new CSettingTypeApplicationPath("Instant Save Directory", "Directory", Directory_InstantSaveInitial));
     AddHandler(Directory_InstantSaveUseSelected, new CSettingTypeApplication("Instant Save Directory", "Use Selected", false));
 
     AddHandler(Directory_Texture, new CSettingTypeSelectedDirectory("Dir:Texture", Directory_TextureInitial, Directory_TextureSelected, Directory_TextureUseSelected, Directory_Texture));
-    AddHandler(Directory_TextureInitial, new CSettingTypeRelativePath("Textures", ""));
+    AddHandler(Directory_TextureInitial, new CSettingTypeRelativePath("User/Textures", ""));
     AddHandler(Directory_TextureSelected, new CSettingTypeApplicationPath("Texture Directory", "Directory", Directory_InstantSaveInitial));
     AddHandler(Directory_TextureUseSelected, new CSettingTypeApplication("Texture Directory", "Use Selected", false));
 
     AddHandler(Directory_Log, new CSettingTypeSelectedDirectory("Dir:Log", Directory_LogInitial, Directory_LogSelected, Directory_LogUseSelected, Directory_Log));
-    AddHandler(Directory_LogInitial, new CSettingTypeRelativePath("Logs", ""));
+    AddHandler(Directory_LogInitial, new CSettingTypeRelativePath("User/Logs", ""));
     AddHandler(Directory_LogSelected, new CSettingTypeApplicationPath("Log Directory", "Directory", Directory_InstantSaveInitial));
     AddHandler(Directory_LogUseSelected, new CSettingTypeApplication("Log Directory", "Use Selected", false));
 
-    AddHandler(RomList_RomListCacheDefault, new CSettingTypeRelativePath("Config", "Project64.cache3"));
+    AddHandler(RomList_RomListCacheDefault, new CSettingTypeRelativePath("User/Cache", "Project64.cache3"));
     AddHandler(RomList_RomListCache, new CSettingTypeApplicationPath("", "RomListCache", RomList_RomListCacheDefault));
     AddHandler(RomList_GameDir, new CSettingTypeSelectedDirectory("Dir:Game", RomList_GameDirInitial, RomList_GameDirSelected, RomList_GameDirUseSelected, RomList_GameDir));
     AddHandler(RomList_GameDirInitial, new CSettingTypeRelativePath("Game Directory", ""));
@@ -287,7 +294,7 @@ void CSettings::AddHowToHandleSetting(const char * BaseDirectory)
     AddHandler(RomList_GameDirUseSelected, new CSettingTypeApplication("Game Directory", "Use Selected", false));
     AddHandler(RomList_GameDirRecursive, new CSettingTypeApplication("Game Directory", "Recursive", false));
     AddHandler(RomList_7zipCache, new CSettingTypeApplicationPath("", "7zipCache", RomList_7zipCacheDefault));
-    AddHandler(RomList_7zipCacheDefault, new CSettingTypeRelativePath("Config", "Project64.zcache"));
+    AddHandler(RomList_7zipCacheDefault, new CSettingTypeRelativePath("User/Cache", "Project64.zcache"));
 
     AddHandler(GameRunning_LoadingInProgress, new CSettingTypeTempBool(false));
     AddHandler(GameRunning_CPU_Running, new CSettingTypeTempBool(false));
@@ -343,7 +350,7 @@ void CSettings::AddHowToHandleSetting(const char * BaseDirectory)
     AddHandler(Plugin_RSP_Current, new CSettingTypeApplication("Plugin", "RSP Dll", "RSP\\RSP 1.7.dll"));
     AddHandler(Plugin_GFX_Current, new CSettingTypeApplication("Plugin", "Graphics Dll", "GFX\\GLideN64.dll"));
     AddHandler(Plugin_AUDIO_Current, new CSettingTypeApplication("Plugin", "Audio Dll", "Audio\\Jabo_Dsound.dll"));
-    AddHandler(Plugin_CONT_Current, new CSettingTypeApplication("Plugin", "Controller Dll", "Input\\netplay_input_plugin.dll"));
+    AddHandler(Plugin_CONT_Current, new CSettingTypeApplication("Plugin", "Controller Dll", "NetPlay\\Project64-Netplay.dll"));
 #else
     AddHandler(Plugin_RSP_Current, new CSettingTypeApplication("Plugin", "RSP Dll", "libProject64-rsp-hle.so"));
     AddHandler(Plugin_GFX_Current, new CSettingTypeApplication("Plugin", "Graphics Dll", "libProject64-gfx-glide64.so"));
@@ -392,8 +399,8 @@ void CSettings::AddHowToHandleSetting(const char * BaseDirectory)
 
     // cheats
     AddHandler(Cheat_Entry, new CSettingTypeCheats(""));
-    AddHandler(Cheat_Active, new CSettingTypeGameIndex("Cheat", "", (uint32_t)false));
-    AddHandler(Cheat_Extension, new CSettingTypeGameIndex("Cheat", ".exten", "??? - Not Set"));
+    AddHandler(Cheat_Active, new CSettingTypeCheatsEnabled("", false));
+    AddHandler(Cheat_Extension, new CSettingTypeCheats("_EXT"));
     AddHandler(Cheat_Notes, new CSettingTypeCheats("_N"));
     AddHandler(Cheat_Options, new CSettingTypeCheats("_O"));
     AddHandler(Cheat_Range, new CSettingTypeCheats("_R"));
@@ -441,6 +448,7 @@ uint32_t CSettings::FindSetting(CSettings * _this, const char * Name)
 void CSettings::FlushSettings(CSettings * /*_this*/)
 {
     CSettingTypeCheats::FlushChanges();
+    CSettingTypeCheatsEnabled::FlushChanges();
     CSettingTypeApplication::Flush();
 }
 
@@ -628,6 +636,7 @@ bool CSettings::Initialize(const char * BaseDirectory, const char * AppName)
     CSettingTypeRomDatabase::Initialize();
     CSettingTypeGame::Initialize();
     CSettingTypeCheats::Initialize();
+    CSettingTypeCheatsEnabled::Initialize();
 
     g_Settings->SaveString(Setting_ApplicationName, AppName);
     WriteTrace(TraceAppInit, TraceDebug, "Done");

@@ -9,6 +9,7 @@
 *                                                                           *
 ****************************************************************************/
 #include "stdafx.h"
+#include "DarkModeUtils.h"
 
 BOOL CPartialGroupBox::Attach(HWND hWnd)
 {
@@ -62,8 +63,12 @@ void CPartialGroupBox::OnPaint(HDC /*hDC*/)
 
 	dc.SelectFont(font);
 	dc.SetMapMode(MM_TEXT);
-	dc.SelectBrush(GetSysColorBrush(COLOR_BTNFACE));
-
+	if (g_Settings->LoadBool(Setting_DarkTheme)) {
+		dc.SelectBrush(load_config()->menubaritem_bgbrush);
+	}
+	else {
+		dc.SelectBrush(GetSysColorBrush(COLOR_BTNFACE));
+	}
 	wchar_t grptext[500];
 	GetWindowTextW(m_hWnd, grptext, sizeof(grptext) / sizeof(grptext[0]));
 

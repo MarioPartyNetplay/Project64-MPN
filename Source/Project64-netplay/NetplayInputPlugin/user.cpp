@@ -96,19 +96,19 @@ void user::on_receive(packet& p, bool udp) {
             std::array<save_info, 5> original_saves = info.saves; // Store original saves
 
             std::array<save_info, 5> new_saves;
-            for (int i = 0; i < info.saves.size(); i++) {
+            for (size_t i = 0; i < info.saves.size(); i++) {
                 auto save = p.read<save_info>();
                 new_saves[i] = save;
-                log("[" + my_room->get_id() + "] Syncing room with save. Hash: " + save.sha1_data);
             }
 
             info.saves = new_saves;
 
             bool no_syncs = true;
+            int sync_count = 0;
             for (auto& user : my_room->user_list) {
                 bool send_sync = false;
 
-                for (int i = 0; i < info.saves.size(); i++) {
+                for (size_t i = 0; i < info.saves.size(); i++) {
                     auto& save = user->info.saves[i];
                     auto& upstream_save = new_saves[i];
                     if (save.sha1_data != upstream_save.sha1_data) {
@@ -118,14 +118,66 @@ void user::on_receive(packet& p, bool udp) {
                 }
 
                 if (send_sync) {
+                    // Add delay between sending syncs to different clients to prevent overwhelming
+                    if (sync_count > 0) {
+                        Sleep(300);  // 300ms delay between clients
+                    }
                     user->send_save_sync(new_saves);
                     no_syncs = false;
+                    sync_count++;
                 }
             }
             if (no_syncs)
                 my_room->check_save_data();
             break;
         }
+
+        // Cheat syncing disabled for now
+        /*
+        case CHEAT_SYNC: {
+            // Forward cheat sync to all other users in the room
+            std::string cheat_file_content = "";
+            std::string enabled_file_content = "";
+            
+            // Try to read both strings, but don't let exceptions escape
+            try {
+                if (p.available() > 0) {
+                    cheat_file_content = p.read<std::string>();
+                }
+            } catch (...) {
+                cheat_file_content = "";
+            }
+            
+            try {
+                if (p.available() > 0) {
+                    enabled_file_content = p.read<std::string>();
+                }
+            } catch (...) {
+                enabled_file_content = "";
+            }
+            
+            // Always forward, even if both are empty (to clear client cheats)
+            try {
+                packet cheat_packet;
+                cheat_packet << CHEAT_SYNC;
+                cheat_packet << cheat_file_content;
+                cheat_packet << enabled_file_content;
+
+                log("[" + my_room->get_id() + "] Forwarding cheat sync");
+
+                // Send to all other users (if any)
+                for (auto& user : my_room->user_list) {
+                    if (user->id != id) {
+                        user->send(cheat_packet);
+                    }
+                }
+            } catch (...) {
+                // If forwarding fails, just log and continue - don't disconnect
+                log("[" + my_room->get_id() + "] Error forwarding cheat sync packet");
+            }
+            break;
+        }
+        */
 
         case ROOM_CHECK: {
             my_room->send_info("Rechecking all room checks");

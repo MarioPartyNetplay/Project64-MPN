@@ -422,21 +422,96 @@ void CIniFileBase::OpenIniFile(bool bCreate)
 {
     //Open for reading/Writing
     m_ReadOnly = false;
-    if (!m_File.Open(m_FileName.c_str(), CFileBase::modeReadWrite | CFileBase::shareDenyWrite))
+    
+    // Remove write protection from cheat files (.cht and .cht_enabled)
+    // This ensures cheat files can always be written to, even if they're read-only
+    stdstr fileName = m_FileName;
+    if (fileName.length() >= 4)
     {
-        if (!m_File.Open(m_FileName.c_str(), CFileBase::modeRead))
+        stdstr ext = fileName.substr(fileName.length() - 4);
+        if (_stricmp(ext.c_str(), ".cht") == 0)
         {
-            if (bCreate)
+            // Check if file exists and is read-only
+            DWORD attrs = GetFileAttributes(fileName.c_str());
+            if (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_READONLY))
             {
-                if (!m_File.Open(m_FileName.c_str(), CFileBase::modeReadWrite | CFileBase::modeCreate | CFileBase::shareDenyWrite))
-                {
-                    return;
-                }
+                SetFileAttributes(fileName.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
             }
         }
-        else
+    }
+    if (fileName.length() >= 12)
+    {
+        stdstr ext = fileName.substr(fileName.length() - 12);
+        if (_stricmp(ext.c_str(), ".cht_enabled") == 0)
         {
-            m_ReadOnly = true;
+            // Check if file exists and is read-only
+            DWORD attrs = GetFileAttributes(fileName.c_str());
+            if (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_READONLY))
+            {
+                SetFileAttributes(fileName.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
+            }
+        }
+    }
+    
+    // For cheat files, allow shared write access so netplay can sync them
+    bool is_cheat_file = false;
+    if (fileName.length() >= 4)
+    {
+        stdstr ext = fileName.substr(fileName.length() - 4);
+        if (_stricmp(ext.c_str(), ".cht") == 0)
+        {
+            is_cheat_file = true;
+        }
+    }
+    if (!is_cheat_file && fileName.length() >= 12)
+    {
+        stdstr ext = fileName.substr(fileName.length() - 12);
+        if (_stricmp(ext.c_str(), ".cht_enabled") == 0)
+        {
+            is_cheat_file = true;
+        }
+    }
+    
+    if (is_cheat_file)
+    {
+        // Open cheat files with shared write access (no shareDenyWrite)
+        if (!m_File.Open(m_FileName.c_str(), CFileBase::modeReadWrite))
+        {
+            if (!m_File.Open(m_FileName.c_str(), CFileBase::modeRead))
+            {
+                if (bCreate)
+                {
+                    if (!m_File.Open(m_FileName.c_str(), CFileBase::modeReadWrite | CFileBase::modeCreate))
+                    {
+                        return;
+                    }
+                }
+            }
+            else
+            {
+                m_ReadOnly = true;
+            }
+        }
+    }
+    else
+    {
+        // For non-cheat files, use exclusive write access as before
+        if (!m_File.Open(m_FileName.c_str(), CFileBase::modeReadWrite | CFileBase::shareDenyWrite))
+        {
+            if (!m_File.Open(m_FileName.c_str(), CFileBase::modeRead))
+            {
+                if (bCreate)
+                {
+                    if (!m_File.Open(m_FileName.c_str(), CFileBase::modeReadWrite | CFileBase::modeCreate | CFileBase::shareDenyWrite))
+                    {
+                        return;
+                    }
+                }
+            }
+            else
+            {
+                m_ReadOnly = true;
+            }
         }
     }
     m_File.Seek(0, CFileBase::begin);
@@ -839,4 +914,71 @@ void CIniFileBase::GetVectorOfSections(SectionList & sections)
     {
         sections.push_back(iter->first);
     }
+}
+
+void CIniFileBase::CloseFile(void)
+{
+    CGuard Guard(m_CS);
+    
+    // Save current section before closing
+    SaveCurrentSection();
+    
+    // Close the file to release the handle
+    if (m_File.IsOpen())
+    {
+        m_File.Close();
+    }
+    
+    // Clear the section position cache and current section data
+    m_SectionsPos.clear();
+    m_lastSectionSearch = 0;
+    m_CurrentSection.clear();
+    m_CurrentSectionDirty = false;
+    m_CurrentSectionFilePos = 0;
+    m_CurrentSectionData.clear();
+}
+
+void CIniFileBase::ReloadFile(void)
+{
+    CGuard Guard(m_CS);
+    
+    // Close the file first
+    CloseFile();
+    
+    // Small delay to ensure file handle is fully released
+    Sleep(50);
+    
+    // Reopen the file - this will read fresh from disk
+    // Use OpenIniFile with bCreate=false since the file should exist
+    // If it doesn't exist, OpenIniFile will handle it
+    OpenIniFile(false);
+}
+
+void CIniFileBase::ForceReloadFile(void)
+{
+    CGuard Guard(m_CS);
+    
+    // Save current section before closing
+    SaveCurrentSection();
+    
+    // Close the file to release the handle
+    if (m_File.IsOpen())
+    {
+        m_File.Close();
+    }
+    
+    // Aggressively clear ALL caches - force complete re-scan
+    m_SectionsPos.clear();
+    m_lastSectionSearch = 0;
+    m_CurrentSection.clear();
+    m_CurrentSectionDirty = false;
+    m_CurrentSectionFilePos = 0;
+    m_CurrentSectionData.clear();
+    
+    // Longer delay to ensure file handle is fully released and file system cache is cleared
+    Sleep(200);
+    
+    // Reopen the file - this will force a complete re-scan from the beginning
+    // Use OpenIniFile with bCreate=false since the file should exist
+    OpenIniFile(false);
 }

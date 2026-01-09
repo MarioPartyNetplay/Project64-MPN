@@ -19,6 +19,7 @@
 #define VER_FILE_VERSION_STR        "MPN"
 
 #define VER_COMPILE_TIME			__DATE__
+#define GIT_HASH                    "GIT_HASH_PLACEHOLDER"
 
 
 #define VER_PRODUCTNAME_STR         "Project64 MPN"

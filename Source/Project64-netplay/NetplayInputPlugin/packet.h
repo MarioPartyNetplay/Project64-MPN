@@ -6,6 +6,14 @@ class packet : public std::vector<uint8_t> {
 public:
     constexpr static size_t MAX_SIZE = 0xFFFF;
 
+    static size_t var_size(size_t value) {
+        size_t size = 1;
+        for (; value > 0b01111111; value >>= 7) {
+            size++;
+        }
+        return size;
+    }
+
     packet() { }
     packet(size_t size) : std::vector<uint8_t>(size) { }
 
@@ -113,11 +121,14 @@ public:
     T read_var() {
         uint8_t byte, shift = 0;
         T result = 0;
+        int count = 0;
 
         do {
+            if (count >= 10) throw std::runtime_error("variable length integer too long");
             byte = read<uint8_t>();
             result |= static_cast<T>(byte & 0b01111111) << shift;
             shift += 7;
+            count++;
         } while (byte & 0b10000000);
 
         return result;
@@ -136,9 +147,10 @@ public:
     std::string& read(std::string& string) {
         auto size = read_var<size_t>();
         if (size > MAX_SIZE) throw std::runtime_error("string too large");
+        if (pos + size > this->size()) throw std::runtime_error("string extends beyond packet");
         string.resize(size);
         for (size_t i = 0; i < string.length(); i++) {
-            string[i] = at(pos++);
+            string[i] = (*this)[pos++];
         }
         return string;
     }
@@ -194,6 +206,10 @@ public:
 
     size_t available() const {
         return pos > size() ? 0 : size() - pos;
+    }
+
+    size_t get_pos() const {
+        return pos;
     }
     
     packet& reset(size_t size = 0) {

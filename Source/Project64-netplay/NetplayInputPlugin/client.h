@@ -16,6 +16,9 @@ class client: public service_wrapper, public connection {
         client(std::shared_ptr<client_dialog> dialog);
         ~client();
         void load_public_server_list();
+        void fetch_server_list_from_web();
+        void fetch_servers_from_github();
+        void load_servers_from_file();
         void get_external_address();
         std::string get_name();
         void set_name(const std::string& name);
@@ -25,13 +28,17 @@ class client: public service_wrapper, public connection {
         void set_save_info(const std::string& save_path);
         void process_input(std::array<BUTTONS, 4>& input);
         bool wait_until_start();
+        bool has_started() const; // Check if game has started without blocking
         void post_close();
         void revert_save_data();
         void move_original_saves_to_temp();
         void ensure_save_directories();
+        void restore_leftover_backups();
+        std::string get_config_path() const;
         client_dialog& get_dialog();
         virtual void on_receive(packet& packet, bool udp);
         virtual void on_error(const std::error_code& error);
+        void handle_desync_detection(const char* hash);
     private:
         constexpr static uint32_t MARIO_GOLF_MASK = 0xFFFFF0F0;
         bool is_host() const;
@@ -99,10 +106,36 @@ class client: public service_wrapper, public connection {
         void send_request_authority(uint32_t user_id, uint32_t authority_id);
         void send_delegate_authority(uint32_t user_id, uint32_t authority_id);
         void send_savesync();
+        void send_cheatsync();
+        void send_file_in_chunks(const std::string& content, const std::string& file_type, size_t chunk_size);
         void update_save_info();
+        void compare_all_players_save_hashes();
+        void compare_all_players_cheat_file_hashes();
+        void compare_all_players_state_hashes();
+        void compare_all_players_desync_hashes();
+        void log_player_cheat_info(std::shared_ptr<user_info> user);
+        void update_state_hash();
         std::vector<std::string> find_rom_save_files(const std::string& path);
         std::string sha1_save_info(const save_info& saveInfo);
+        std::string calculate_cheat_file_hash();
+        std::string calculate_state_hash();
         std::string slurp(const std::string& file);
         std::string slurp2(const std::string& file);
-        void replace_save_file(const save_info& save_data);
+        bool replace_save_file(const save_info& save_data);
+        std::string get_game_identifier() const;
+        std::string sanitize_filename(const std::string& filename) const;
+        std::string get_cheat_file_path() const;
+        std::string get_cheat_enabled_file_path() const;
+        std::vector<cheat_info> load_cheats();
+        void save_cheats(const std::vector<cheat_info>& cheats);
+        void apply_cheats(const std::string& cheat_file_content, const std::string& enabled_file_content);
+        void apply_cheats_async(const std::string& cheat_file_content, const std::string& enabled_file_content);
+        void store_cheat_chunk(const std::string& chunk_info, const std::string& content);
+        void process_collected_cheat_chunks();
+
+        // Chunk storage for large cheat files
+        std::map<std::string, std::string> cheat_chunks;
+        std::map<std::string, std::string> enabled_chunks;
+        std::map<std::string, int> chunk_counts;
 };
+    

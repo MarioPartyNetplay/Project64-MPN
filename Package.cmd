@@ -60,13 +60,6 @@ copy "%base_dir%\Source\UserFiles\Plugin\GFX\hires_texture\MarioParty3\*.*" "%ba
 
 copy "%base_dir%\Source\UserFiles\Plugin\Input\*" "%base_dir%\Bin\Package\Plugin%VSPlatform%\Input"
 copy "%base_dir%\Bin\Release%VSPlatform%\Plugin\RSP\RSP 1.7.dll" "%base_dir%\Bin\Package\Plugin%VSPlatform%\RSP"
-copy "%base_dir%\Source\UserFiles\Plugin\Updater\*" "%base_dir%\Bin\Package\Plugin%VSPlatform%\Updater"
-
-copy "%base_dir%\Source\UserFiles\Save\*" "%base_dir%\Bin\Package\Save\"
-
-copy "%base_dir%\Source\UserFiles\Replace.bat" "%base_dir%\Bin\Package\"
-copy "%base_dir%\Source\UserFiles\UpdateEmulator.bat" "%base_dir%\Bin\Package\"
-
 
 cd %base_dir%\Bin\Package
 "%zip%" a -tzip -r "%base_dir%\Package\%ZipFileName%" *

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Resource Files">
@@ -44,6 +44,9 @@
     <Filter Include="3rd Party\Zlib">
       <UniqueIdentifier>{1478740a-b66b-41bd-833c-917c0cb85047}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Mario Party Netplay">
+      <UniqueIdentifier>{de0fa7e2-f674-4dd0-9776-59275bf4587e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Settings\SettingType\SettingsType-Application.cpp">
@@ -56,6 +59,9 @@
       <Filter>Settings\SettingType</Filter>
     </ClCompile>
     <ClCompile Include="Settings\SettingType\SettingsType-Cheats.cpp">
+      <Filter>Settings\SettingType</Filter>
+    </ClCompile>
+    <ClCompile Include="Settings\SettingType\SettingsType-CheatsEnabled.cpp">
       <Filter>Settings\SettingType</Filter>
     </ClCompile>
     <ClCompile Include="Settings\SettingType\SettingsType-GameSetting.cpp">
@@ -287,6 +293,9 @@
     <ClCompile Include="Logging.cpp" />
     <ClCompile Include="MemoryExceptionFilter.cpp" />
     <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="MarioPartyNetplay\Discord.cpp">
+      <Filter>Mario Party Netplay</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\3rdParty\zlib\zconf.h">
@@ -311,6 +320,7 @@
     <ClInclude Include="N64System\Recompiler\RegBase.h" />
     <ClInclude Include="N64System\SpeedLimiterClass.h" />
     <ClInclude Include="stdafx.h" />
+    <ClInclude Include="Discord.h" />
     <ClInclude Include="TraceModulesProject64.h" />
     <ClInclude Include="3rdParty\7zip.h">
       <Filter>3rd Party</Filter>
@@ -525,6 +535,9 @@
     <ClInclude Include="Settings\SettingType\SettingsType-Cheats.h">
       <Filter>Settings\SettingType</Filter>
     </ClInclude>
+    <ClInclude Include="Settings\SettingType\SettingsType-CheatsEnabled.h">
+      <Filter>Settings\SettingType</Filter>
+    </ClInclude>
     <ClInclude Include="Settings\SettingType\SettingsType-GameSetting.h">
       <Filter>Settings\SettingType</Filter>
     </ClInclude>
@@ -578,6 +591,12 @@
     </ClInclude>
     <ClInclude Include="..\..\..\project64-mpn\Source\Project64-core\3rdParty\mario_party_netplay.h">
       <Filter>3rd Party</Filter>
+    </ClInclude>
+    <ClInclude Include="MarioPartyNetplay\Discord.h">
+      <Filter>Mario Party Netplay</Filter>
+    </ClInclude>
+    <ClInclude Include="MarioPartyNetplay\MarioPartyOverlays.h">
+      <Filter>Mario Party Netplay</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

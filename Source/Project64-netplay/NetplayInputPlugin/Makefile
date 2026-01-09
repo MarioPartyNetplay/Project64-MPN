@@ -7,7 +7,7 @@ PROG = $(BUILD_DIR)/netplay_server
 CXX = g++
 LD = $(CXX)
 
-CXXFLAGS = -std=c++17 -g -Og -isystem ../asio/asio/include
+CXXFLAGS = -std=c++17 -g -Og -isystem ../asio/asio/include -DBUILD_SERVER
 LDFLAGS = -pthread
 SRCS = $(SERVER_SRC)
 OBJS = $(addprefix $(BUILD_DIR)/,$(subst .cpp,.o,$(SRCS)))

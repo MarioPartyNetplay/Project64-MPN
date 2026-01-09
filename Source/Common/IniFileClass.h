@@ -84,6 +84,9 @@ public:
 
     void GetVectorOfSections(SectionList & sections);
     const stdstr &GetFileName() { return m_FileName; }
+    void ReloadFile(void); // Force reload by closing and reopening the file
+    void CloseFile(void); // Close file handle without reopening (for external writes)
+    void ForceReloadFile(void); // Aggressive reload: clear all caches and force full file re-scan
 };
 
 template <class CFileStorage>

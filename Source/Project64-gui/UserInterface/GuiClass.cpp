@@ -13,6 +13,7 @@
 
 #include <commctrl.h>
 #include <Project64-core/Settings/SettingType/SettingsType-Application.h>
+#include <Project64-core/Version.h>
 
 #include "Discord.h"
 #include "DarkModeUtils.h"
@@ -154,7 +155,7 @@ void CMainGui::SetWindowCaption(const wchar_t * title)
     static const size_t TITLE_SIZE = 256;
     wchar_t WinTitle[TITLE_SIZE];
 
-    _snwprintf(WinTitle, TITLE_SIZE, L"%s - %s", title, stdstr(g_Settings->LoadStringVal(Setting_ApplicationName)).ToUTF16().c_str());
+    _snwprintf(WinTitle, TITLE_SIZE, L"%s - %s (%s)", title, stdstr(g_Settings->LoadStringVal(Setting_ApplicationName)).ToUTF16().c_str(), stdstr(GIT_HASH).ToUTF16().c_str());
     WinTitle[TITLE_SIZE - 1] = 0;
     Caption(WinTitle);
 }
@@ -221,10 +222,22 @@ void CMainGui::GamePaused(CMainGui * Gui)
     Gui->RefreshMenu();
 }
 
+void CMainGui::SavePlaytime()
+{
+    if (m_CurrentPlaytime.second)
+    {
+        auto Now = std::chrono::steady_clock::now();
+        auto ElapsedPlaytime = std::chrono::duration_cast<std::chrono::seconds>(Now - m_CurrentPlaytime.first).count();
+        CRomList::SavePlaytime(static_cast<uint32_t>(ElapsedPlaytime));
+        m_CurrentPlaytime.second = false;
+    }
+}
+
 void CMainGui::GameCpuRunning(CMainGui * Gui)
 {
     if (g_Settings->LoadBool(GameRunning_CPU_Running))
     {
+        Gui->m_CurrentPlaytime = {std::chrono::steady_clock::now(), true};
         Gui->MakeWindowOnTop(UISettingsLoadBool(UserInterface_AlwaysOnTop));
         Gui->HideRomList();
         if (UISettingsLoadBool(Setting_AutoFullscreen))
@@ -245,6 +258,7 @@ void CMainGui::GameCpuRunning(CMainGui * Gui)
     }
     else
     {
+        Gui->SavePlaytime();
         PostMessage(Gui->m_hMainWindow, WM_GAME_CLOSED, 0, 0);
     }
 }

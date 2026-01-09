@@ -13,6 +13,9 @@
 
 #include <commctrl.h>
 #include <shlobj.h>
+#include <shobjidl.h>
+#include <comdef.h>
+#include "DarkModeUtils.h"
 
 std::string CRomBrowser::m_UnknownGoodName;
 
@@ -67,7 +70,7 @@ void CRomBrowser::GetFieldInfo(ROMBROWSER_FIELDS_LIST & Fields, bool UseDefault 
     AddField(Fields, "Players", -1, RB_Players, 100, RB_PLAYERS, UseDefault);
     AddField(Fields, "Force Feedback", -1, RB_ForceFeedback, 100, RB_FORCE_FEEDBACK, UseDefault);
     AddField(Fields, "File Format", -1, RB_FileFormat, 100, RB_FILE_FORMAT, UseDefault);
-}
+    AddField(Fields, "Playtime", -1, RB_Playtime, 200, RB_PLAYTIME, UseDefault);}
 
 int32_t CRomBrowser::CalcSortPosition(uint32_t lParam)
 {
@@ -483,7 +486,13 @@ bool CRomBrowser::RomListDrawItem(int32_t idCtrl, uint32_t lParam)
     RECT rcItem, rcDraw;
     wchar_t String[300];
     LVITEMW lvItem;
-    HBRUSH hBrush = (HBRUSH)(COLOR_WINDOW + 1);
+    HBRUSH hBrush;
+    if (g_Settings->LoadBool(Setting_DarkTheme)) {
+        hBrush = (HBRUSH)load_config()->menubar_bgbrush;
+    }
+    else {
+        hBrush = (HBRUSH)(COLOR_WINDOW + 1);
+    }
     LV_COLUMN lvc;
     int32_t nColumn;
 
@@ -502,23 +511,32 @@ bool CRomBrowser::RomListDrawItem(int32_t idCtrl, uint32_t lParam)
     {
         return true;
     }
-    if (bSelected)
-    {
-        HBRUSH_MAP::iterator itr = m_Brushes.find(pRomInfo->SelColor);
-        if (itr != m_Brushes.end())
+    if (g_Settings->LoadBool(Setting_DarkTheme)) {
+        SetTextColor(ditem->hDC, load_config()->menubar_textcolor);
+        if (bSelected)
         {
-            hBrush = itr->second;
+            hBrush = load_config()->menubaritem_bgbrush_selected;
+        }
+    }
+    else {
+        if (bSelected)
+        {
+            HBRUSH_MAP::iterator itr = m_Brushes.find(pRomInfo->SelColor);
+            if (itr != m_Brushes.end())
+            {
+                hBrush = itr->second;
+            }
+            else
+            {
+                std::pair<HBRUSH_MAP::iterator, bool> res = m_Brushes.insert(HBRUSH_MAP::value_type(pRomInfo->SelColor, CreateSolidBrush(pRomInfo->SelColor)));
+                hBrush = res.first->second;
+            }
+            SetTextColor(ditem->hDC, pRomInfo->SelTextColor);
         }
         else
         {
-            std::pair<HBRUSH_MAP::iterator, bool> res = m_Brushes.insert(HBRUSH_MAP::value_type(pRomInfo->SelColor, CreateSolidBrush(pRomInfo->SelColor)));
-            hBrush = res.first->second;
+            SetTextColor(ditem->hDC, pRomInfo->TextColor);
         }
-        SetTextColor(ditem->hDC, pRomInfo->SelTextColor);
-    }
-    else
-    {
-        SetTextColor(ditem->hDC, pRomInfo->TextColor);
     }
     FillRect(ditem->hDC, &ditem->rcItem, hBrush);
     SetBkMode(ditem->hDC, TRANSPARENT);
@@ -702,7 +720,7 @@ void CRomBrowser::RomList_GetDispInfo(uint32_t pnmh)
 
     switch (m_FieldType[lpdi->item.iSubItem])
     {
-    case RB_FileName: wcsncpy(lpdi->item.pszText, stdstr(pRomInfo->FileName).ToUTF16(CP_ACP).c_str(), lpdi->item.cchTextMax); break;
+    case RB_FileName: wcsncpy(lpdi->item.pszText, stdstr(pRomInfo->FileName).ToUTF16().c_str(), lpdi->item.cchTextMax); break;
     case RB_InternalName: wcsncpy(lpdi->item.pszText, stdstr(pRomInfo->InternalName).ToUTF16(stdstr::CODEPAGE_932).c_str(), lpdi->item.cchTextMax / sizeof(wchar_t)); break;
     case RB_GoodName: wcsncpy(lpdi->item.pszText, stdstr(pRomInfo->GoodName).ToUTF16().c_str(), lpdi->item.cchTextMax / sizeof(wchar_t)); break;
     case RB_CoreNotes: wcsncpy(lpdi->item.pszText, stdstr(pRomInfo->CoreNotes).ToUTF16().c_str(), lpdi->item.cchTextMax / sizeof(wchar_t)); break;
@@ -776,6 +794,13 @@ void CRomBrowser::RomList_GetDispInfo(uint32_t pnmh)
         default: swprintf(lpdi->item.pszText, lpdi->item.cchTextMax / sizeof(wchar_t), L"Unknown (%X)", pRomInfo->FileFormat); break;
         }
         break;
+    case RB_Playtime:
+    {
+        auto RomIdent = stdstr_f("%08X-%08X-C:%X", pRomInfo->CRC1, pRomInfo->CRC2, pRomInfo->Country);
+        auto Playtime = LoadPlaytime(RomIdent);
+        swprintf(lpdi->item.pszText, lpdi->item.cchTextMax / sizeof(wchar_t), L"%02d:%02d:%02d", Playtime / 3600, (Playtime / 60) % 60, Playtime % 60);
+        break;
+    }
     default: wcsncpy(lpdi->item.pszText, L" ", lpdi->item.cchTextMax);
     }
     if (lpdi->item.pszText == NULL || wcslen(lpdi->item.pszText) == 0) { lpdi->item.pszText = L" "; }
@@ -943,64 +968,107 @@ void CRomBrowser::SaveRomListColoumnInfo(void)
     WriteTrace(TraceUserInterface, TraceDebug, "Done");
 }
 
-int32_t CALLBACK CRomBrowser::SelectRomDirCallBack(HWND hwnd, uint32_t uMsg, uint32_t /*lp*/, uint32_t lpData)
-{
-    switch (uMsg)
-    {
-    case BFFM_INITIALIZED:
-        // WParam is TRUE since you are passing a path.
-        // It would be FALSE if you were passing a pidl.
-        if (lpData)
-        {
-            SendMessage(hwnd, BFFM_SETSELECTION, TRUE, lpData);
-            SetWindowTextW(hwnd, wGS(DIR_SELECT_ROM).c_str());
-        }
-        break;
-    }
-    return 0;
-}
-
 void CRomBrowser::SelectRomDir(void)
 {
-    wchar_t SelectedDir[MAX_PATH];
-    LPITEMIDLIST pidl;
-    BROWSEINFOW bi;
-
-    std::wstring title = wGS(SELECT_ROM_DIR);
-
-    WriteTrace(TraceUserInterface, TraceDebug, "1");
-    stdstr RomDir = g_Settings->LoadStringVal(RomList_GameDir).c_str();
-    bi.hwndOwner = m_MainWindow;
-    bi.pidlRoot = NULL;
-    bi.pszDisplayName = SelectedDir;
-    bi.lpszTitle = title.c_str();
-    bi.ulFlags = BIF_RETURNFSANCESTORS | BIF_RETURNONLYFSDIRS;
-    bi.lpfn = (BFFCALLBACK)SelectRomDirCallBack;
-    bi.lParam = (uint32_t)RomDir.c_str();
-    WriteTrace(TraceUserInterface, TraceDebug, "2");
-    if ((pidl = SHBrowseForFolderW(&bi)) != NULL)
+    // Use modern IFileDialog API (Windows Vista+)
+    IFileDialog *pFileDialog = NULL;
+    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pFileDialog));
+    
+    if (FAILED(hr))
     {
-        WriteTrace(TraceUserInterface, TraceDebug, "3");
-        char Directory[_MAX_PATH];
-        if (SHGetPathFromIDList(pidl, Directory))
-        {
-            int32_t len = strlen(Directory);
+        // Fallback to old API if COM initialization fails
+        wchar_t SelectedDir[MAX_PATH];
+        LPITEMIDLIST pidl;
+        BROWSEINFOW bi;
 
-            WriteTrace(TraceUserInterface, TraceDebug, "4");
-            if (Directory[len - 1] != '\\')
+        std::wstring title = wGS(SELECT_ROM_DIR);
+        stdstr RomDir = g_Settings->LoadStringVal(RomList_GameDir).c_str();
+        bi.hwndOwner = m_MainWindow;
+        bi.pidlRoot = NULL;
+        bi.pszDisplayName = SelectedDir;
+        bi.lpszTitle = title.c_str();
+        bi.ulFlags = BIF_RETURNFSANCESTORS | BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
+        bi.lpfn = NULL;
+        bi.lParam = 0;
+        
+        if ((pidl = SHBrowseForFolderW(&bi)) != NULL)
+        {
+            char Directory[_MAX_PATH];
+            if (SHGetPathFromIDList(pidl, Directory))
             {
-                strcat(Directory, "\\");
+                int32_t len = strlen(Directory);
+                if (Directory[len - 1] != '\\')
+                {
+                    strcat(Directory, "\\");
+                }
+                g_Settings->SaveString(RomList_GameDir, Directory);
+                Notify().AddRecentDir(Directory);
+                RefreshRomList();
             }
-            WriteTrace(TraceUserInterface, TraceDebug, "5");
-            WriteTrace(TraceUserInterface, TraceDebug, "6");
-            g_Settings->SaveString(RomList_GameDir, Directory);
-            WriteTrace(TraceUserInterface, TraceDebug, "7");
-            Notify().AddRecentDir(Directory);
-            WriteTrace(TraceUserInterface, TraceDebug, "8");
-            RefreshRomList();
-            WriteTrace(TraceUserInterface, TraceDebug, "9");
+            CoTaskMemFree(pidl);
+        }
+        return;
+    }
+
+    // Set options for folder picker
+    DWORD dwOptions;
+    hr = pFileDialog->GetOptions(&dwOptions);
+    if (SUCCEEDED(hr))
+    {
+        hr = pFileDialog->SetOptions(dwOptions | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
+    }
+
+    // Set title
+    std::wstring title = wGS(SELECT_ROM_DIR);
+    pFileDialog->SetTitle(title.c_str());
+
+    // Set initial directory
+    stdstr RomDir = g_Settings->LoadStringVal(RomList_GameDir).c_str();
+    if (!RomDir.empty())
+    {
+        IShellItem *pShellItem = NULL;
+        std::wstring wRomDir = std::wstring(RomDir.begin(), RomDir.end());
+        hr = SHCreateItemFromParsingName(wRomDir.c_str(), NULL, IID_PPV_ARGS(&pShellItem));
+        if (SUCCEEDED(hr))
+        {
+            pFileDialog->SetFolder(pShellItem);
+            pShellItem->Release();
         }
     }
+
+    // Show the dialog
+    hr = pFileDialog->Show(m_MainWindow);
+    if (SUCCEEDED(hr))
+    {
+        IShellItem *pShellItem = NULL;
+        hr = pFileDialog->GetResult(&pShellItem);
+        if (SUCCEEDED(hr))
+        {
+            PWSTR pszPath = NULL;
+            hr = pShellItem->GetDisplayName(SIGDN_FILESYSPATH, &pszPath);
+            if (SUCCEEDED(hr))
+            {
+                // Convert wide string to multibyte
+                char Directory[_MAX_PATH];
+                WideCharToMultiByte(CP_ACP, 0, pszPath, -1, Directory, _MAX_PATH, NULL, NULL);
+                
+                int32_t len = strlen(Directory);
+                if (Directory[len - 1] != '\\')
+                {
+                    strcat(Directory, "\\");
+                }
+                
+                g_Settings->SaveString(RomList_GameDir, Directory);
+                Notify().AddRecentDir(Directory);
+                RefreshRomList();
+                
+                CoTaskMemFree(pszPath);
+            }
+            pShellItem->Release();
+        }
+    }
+
+    pFileDialog->Release();
 }
 
 void CRomBrowser::FixRomListWindow(void)
@@ -1091,8 +1159,7 @@ void CRomBrowser::HideRomList(void)
 
     if (UISettingsLoadBool(RomBrowser_Maximized)) { ShowWindow(m_MainWindow, SW_RESTORE); }
 
-    //Change the window style
-    long Style = GetWindowLong(m_MainWindow, GWL_STYLE) &	~(WS_SIZEBOX | WS_MAXIMIZEBOX);
+    long Style = GetWindowLong(m_MainWindow, GWL_STYLE) | WS_SIZEBOX | WS_MAXIMIZEBOX;
     SetWindowLong(m_MainWindow, GWL_STYLE, Style);
 
     //Move window to correct location

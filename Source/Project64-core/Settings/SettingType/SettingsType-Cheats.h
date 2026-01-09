@@ -47,12 +47,19 @@ public:
     static void Initialize   ( void );
     static void CleanUp      ( void );
     static void FlushChanges ( void );
+    static void ReloadCheatFile ( void );
+    static void CloseCheatFile ( void ); // Close file handle to allow external writes
+    static void ForceReloadCheatFile ( void ); // Aggressive reload: clear all caches and force full re-scan
 
 protected:
     static CIniFile * m_CheatIniFile;
     static stdstr   * m_SectionIdent;
     const char * const m_PostFix;
+    static stdstr GetGameSpecificCheatFilePath(const stdstr& extension);
     static void GameChanged ( void * /*Data */ );
+
+public:
+    static stdstr SanitizeRomNameForFilename(const stdstr& romName);
 
 private:
     CSettingTypeCheats(void);                                   // Disable default constructor

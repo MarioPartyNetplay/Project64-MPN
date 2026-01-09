@@ -4,6 +4,7 @@
 
 #include <windows.h>
 #include <commdlg.h>
+#include <shellapi.h>
 
 #include "Discord.h"
 
@@ -248,6 +249,20 @@ void CMainMenu::OnSettings(HWND hWnd)
     SettingConfig.Display(hWnd);
 }
 
+void CMainMenu::OnOpenUserFolder(HWND hWnd)
+{
+    CPath UserFolderPath(g_Settings->LoadStringVal(Cmd_BaseDirectory).c_str(), "User\\");
+    stdstr folderPath = (std::string)UserFolderPath;
+
+    // Use ShellExecuteEx for better control and error handling
+    SHELLEXECUTEINFOW sei = { sizeof(sei) };
+    sei.fMask = SEE_MASK_INVOKEIDLIST | SEE_MASK_FLAG_NO_UI;
+    sei.hwnd = hWnd;
+    sei.lpVerb = L"explore";
+    sei.lpFile = stdstr(folderPath.c_str()).ToUTF16().c_str();
+    sei.nShow = SW_SHOWNORMAL;
+}
+
 bool CMainMenu::ProcessMessage(HWND hWnd, DWORD /*FromAccelerator*/, DWORD MenuID)
 {
     switch (MenuID)
@@ -276,6 +291,7 @@ bool CMainMenu::ProcessMessage(HWND hWnd, DWORD /*FromAccelerator*/, DWORD MenuI
         break;
     case ID_FILE_REFRESHROMLIST: m_Gui->RefreshRomList(); break;
     case ID_FILE_EXIT:           DestroyWindow((HWND)hWnd); break;
+    case ID_FILE_OPEN_USER_FOLDER: OnOpenUserFolder(hWnd); break;
     case ID_SYSTEM_RESET_SOFT:
         WriteTrace(TraceUserInterface, TraceDebug, "ID_SYSTEM_RESET_SOFT");
         g_BaseSystem->ExternalEvent(SysEvent_ResetCPU_Soft);
@@ -718,7 +734,7 @@ void CMainMenu::FillOutMenu(HMENU hMenu)
         }
         stdstr_f MenuString("&%d %s", (count + 1) % 10, LastRom.c_str());
 
-        RecentRomMenu.push_back(MENU_ITEM(ID_RECENT_ROM_START + count, EMPTY_STRING, EMPTY_STDSTR, NULL, MenuString.ToUTF16(CP_ACP).c_str()));
+        RecentRomMenu.push_back(MENU_ITEM(ID_RECENT_ROM_START + count, EMPTY_STRING, EMPTY_STDSTR, NULL, MenuString.ToUTF16().c_str()));
     }
 
     /* Recent Dir
@@ -736,7 +752,7 @@ void CMainMenu::FillOutMenu(HMENU hMenu)
 
         stdstr_f MenuString("&%d %s", (count + 1) % 10, LastDir.c_str());
 
-        RecentDirMenu.push_back(MENU_ITEM(ID_RECENT_DIR_START + count, EMPTY_STRING, EMPTY_STDSTR, NULL, MenuString.ToUTF16(CP_ACP).c_str()));
+        RecentDirMenu.push_back(MENU_ITEM(ID_RECENT_DIR_START + count, EMPTY_STRING, EMPTY_STDSTR, NULL, MenuString.ToUTF16().c_str()));
     }
 
     /* File Menu
@@ -800,6 +816,8 @@ void CMainMenu::FillOutMenu(HMENU hMenu)
     }
     FileMenu.push_back(MENU_ITEM(SPLITER));
     FileMenu.push_back(MENU_ITEM(ID_FILE_EXIT, MENU_EXIT, m_ShortCuts.ShortCutString(ID_FILE_EXIT, AccessLevel)));
+    FileMenu.push_back(MENU_ITEM(SPLITER));
+    FileMenu.push_back(MENU_ITEM(ID_FILE_OPEN_USER_FOLDER, MENU_OPEN_USER_FOLDER, m_ShortCuts.ShortCutString(ID_FILE_OPEN_USER_FOLDER, AccessLevel)));
 
     /* Current Save
     ****************/
@@ -933,7 +951,19 @@ void CMainMenu::FillOutMenu(HMENU hMenu)
     OptionMenu.push_back(Item);
 
     OptionMenu.push_back(MENU_ITEM(SPLITER));
-    OptionMenu.push_back(MENU_ITEM(ID_SYSTEM_CHEAT, MENU_CHEAT, m_ShortCuts.ShortCutString(ID_SYSTEM_CHEAT, AccessLevel)));
+    Item.Reset(ID_SYSTEM_CHEAT, MENU_CHEAT, m_ShortCuts.ShortCutString(ID_SYSTEM_CHEAT, AccessLevel));
+    // Disable cheats menu when netplay is active (cheats are synced from host)
+    if (CPURunning && g_Plugins && g_Plugins->Control())
+    {
+        // Check if netplay plugin is active
+        const char* pluginName = g_Plugins->Control()->PluginName();
+        bool isNetplayActive = (pluginName != NULL && strstr(pluginName, "NetPlay") != NULL);
+        if (isNetplayActive)
+        {
+            Item.SetItemEnabled(false);
+        }
+    }
+    OptionMenu.push_back(Item);
     OptionMenu.push_back(MENU_ITEM(SPLITER));
     if (!inBasicMode)
     {

@@ -3,11 +3,11 @@
 #include "UAHMenuBar.h"
 #include "DoubleBuffer.h"
 #include "DarkModeUtils.h"
-#include "DarkMode.h"
 
 #include <dwmapi.h>
 #include <uxtheme.h>
 #include <vsstyle.h>
+#include <commctrl.h>
 
 #include <sstream>
 
@@ -49,11 +49,11 @@ void UAHDrawMenuNCBottomLine(HWND hWnd)
 }
 
 #ifndef NDEBUG
-static TCHAR __debug_buff[512];
+static wchar_t __debug_buff[512];
 #undef DBG_HWND
 #define DBG_HWND(x,y) \
         { \
-            swprintf_s(__debug_buff, 512, "%p", x); \
+            swprintf_s(__debug_buff, 512, L"%p", x); \
             std::wstringstream ss; \
             ss << " DBG_HWND(0x" << __debug_buff << ") " << L#y << " "; \
             GetWindowText(x, __debug_buff, 512); \
@@ -204,7 +204,8 @@ static bool needsToBePatched(HWND hwnd)
         || wndName == "ComboBox"
         // pick some widgets that aren't theme-able and leave the others alone
         || (wndName == "SysListView32" && (style & WS_CHILDWINDOW))
-        || (wndName == "SysTreeView32" && (style & WS_CHILDWINDOW));
+        || (wndName == "SysTreeView32" && (style & WS_CHILDWINDOW))
+        || (wndName == "SysHeader32" && (style & WS_CHILDWINDOW));
 }
 
 LRESULT CALLBACK CBTProc(int nCode,
@@ -570,6 +571,15 @@ LRESULT CALLBACK CallWndSubClassProc(HWND hWnd, UINT uMsg, WPARAM wParam,
         }
         if (name == "SysListView32") {
             SetWindowTheme(hWnd, L"ItemsView", nullptr); // DarkMode
+            // Also theme the header control for dark mode
+            HWND hHeader = (HWND)SendMessage(hWnd, LVM_GETHEADER, 0, 0);
+            if (hHeader) {
+                SetWindowTheme(hHeader, L"ItemsView", nullptr);
+                allowDarkMode(hHeader);
+            }
+        }
+        if (name == "SysHeader32") {
+            SetWindowTheme(hWnd, L"ItemsView", nullptr); // DarkMode for header
         }
         if (name == "Button") {
             DWORD style = GetWindowLongPtr(hWnd, GWL_STYLE);
@@ -605,6 +615,42 @@ LRESULT CALLBACK CallWndSubClassProc(HWND hWnd, UINT uMsg, WPARAM wParam,
     }
     case WM_NOTIFY:
     {
+        LPNMHDR nmhdr = reinterpret_cast<LPNMHDR>(lParam);
+        if (nmhdr->code == NM_CUSTOMDRAW) {
+            auto childName = getClass(nmhdr->hwndFrom);
+            // Handle header custom draw for dark mode
+            if (childName == "SysHeader32") {
+                LPNMCUSTOMDRAW nmcd = reinterpret_cast<LPNMCUSTOMDRAW>(lParam);
+                switch (nmcd->dwDrawStage) {
+                case CDDS_PREPAINT:
+                    return CDRF_NOTIFYITEMDRAW;
+                case CDDS_ITEMPREPAINT:
+                {
+                    // Fill background with dark color
+                    FillRect(nmcd->hdc, &nmcd->rc, load_config()->menubar_bgbrush);
+                    
+                    // Get header item text
+                    HDITEMW hdi = { 0 };
+                    wchar_t szText[256] = { 0 };
+                    hdi.mask = HDI_TEXT;
+                    hdi.pszText = szText;
+                    hdi.cchTextMax = 256;
+                    SendMessageW(nmhdr->hwndFrom, HDM_GETITEMW, nmcd->dwItemSpec, (LPARAM)&hdi);
+                    
+                    // Draw text with white color for visibility
+                    SetBkMode(nmcd->hdc, TRANSPARENT);
+                    SetTextColor(nmcd->hdc, RGB(255, 255, 255));
+                    
+                    RECT rcText = nmcd->rc;
+                    rcText.left += 6; // Add some padding
+                    DrawTextW(nmcd->hdc, szText, -1, &rcText, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+                    
+                    return CDRF_SKIPDEFAULT;
+                }
+                }
+            }
+        }
+
         auto name = getClass(hWnd);
         if (name == "SysListView32") { // left pane of FX dialog
             LPNMCUSTOMDRAW nmcd = reinterpret_cast<LPNMCUSTOMDRAW>(lParam);
@@ -707,13 +753,12 @@ LRESULT CALLBACK CallWndSubClassProc(HWND hWnd, UINT uMsg, WPARAM wParam,
 
             const HBRUSH* pbrBackground = &load_config()->menubaritem_bgbrush;
             // get the menu item string
-
+            wchar_t menuString[256] = { 0 };
             MENUITEMINFO mii = { sizeof(mii), MIIM_STRING };
             char menuStringA[256] = { 0 };  // Separate ANSI buffer
             mii.dwTypeData = menuStringA;
             mii.cch = sizeof(menuStringA) - 1; // Byte count for ANSI
             GetMenuItemInfoA(pUDMI->um.hmenu, pUDMI->umi.iPosition, TRUE, &mii);
-
             // get the item state for drawing
             DWORD dwFlags = DT_CENTER | DT_SINGLELINE | DT_VCENTER;
             int iTextStateID = 0;
@@ -751,7 +796,7 @@ LRESULT CALLBACK CallWndSubClassProc(HWND hWnd, UINT uMsg, WPARAM wParam,
 
             DTTOPTS opts = { sizeof(opts), DTT_TEXTCOLOR, iTextStateID != MPI_DISABLED ? load_config()->menubar_textcolor : load_config()->menubar_textcolor_disabled };
             FillRect(pUDMI->um.hdc, &pUDMI->dis.rcItem, *pbrBackground);
-            //DrawThemeTextEx(g_menuTheme, pUDMI->um.hdc, MENU_BARITEM, MBI_NORMAL, menuStringA, mii.cch, dwFlags, &pUDMI->dis.rcItem, &opts);
+            DrawThemeTextEx(g_menuTheme, pUDMI->um.hdc, MENU_BARITEM, MBI_NORMAL, menuString, mii.cch, dwFlags, &pUDMI->dis.rcItem, &opts);
             return true;
         }
         break;

@@ -27,6 +27,8 @@ enum SettingID
     Cmd_ShowHelp,
 
     //Support Files
+    SupportFile_Playtime,
+    SupportFile_PlaytimeDefault,
     SupportFile_Settings,
     SupportFile_SettingsDefault,
     SupportFile_RomDatabase,
@@ -35,6 +37,8 @@ enum SettingID
     SupportFile_Glide64RDBDefault,
     SupportFile_Cheats,
     SupportFile_CheatsDefault,
+    SupportFile_CheatsEnabled,
+    SupportFile_CheatsEnabledDefault,
     SupportFile_Notes,
     SupportFile_NotesDefault,
     SupportFile_ExtInfo,
@@ -47,6 +51,7 @@ enum SettingID
     Setting_CN64TimeCritical,
     Setting_AutoStart,
     Setting_CheckEmuRunning,
+    Setting_DarkTheme,
     Setting_EraseGameDefaults,
 
     Setting_AutoZipInstantSave,

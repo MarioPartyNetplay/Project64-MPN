@@ -28,6 +28,7 @@ ShowCFB(NULL),
 UpdateScreen(NULL),
 ViStatusChanged(NULL),
 ViWidthChanged(NULL),
+ResizeVideoOutput(NULL),
 SoftReset(NULL),
 GetRomBrowserMenu(NULL),
 OnRomBrowserMenuItem(NULL),
@@ -57,6 +58,7 @@ bool CGfxPlugin::LoadFunctions(void)
     LoadFunction(UpdateScreen);
     LoadFunction(ViStatusChanged);
     LoadFunction(ViWidthChanged);
+    LoadFunction(ResizeVideoOutput);
     LoadFunction(SoftReset);
 #ifdef ANDROID
     LoadFunction(SurfaceCreated);
@@ -79,6 +81,7 @@ bool CGfxPlugin::LoadFunctions(void)
     if (UpdateScreen == NULL)    { UnloadPlugin(); return false; }
     if (ViStatusChanged == NULL) { ViStatusChanged = DummyViStatusChanged; }
     if (ViWidthChanged == NULL)  { ViWidthChanged = DummyViWidthChanged; }
+    if (ResizeVideoOutput == NULL) { ResizeVideoOutput = DummyResizeVideoOutput; }
     if (SoftReset == NULL)       { SoftReset = DummySoftReset; }
 
     if (m_PluginInfo.Version >= 0x0103)
@@ -294,6 +297,7 @@ void CGfxPlugin::UnloadPluginDetails(void)
     UpdateScreen = NULL;
     ViStatusChanged = NULL;
     ViWidthChanged = NULL;
+    ResizeVideoOutput = NULL;
     GetRomBrowserMenu = NULL;
     OnRomBrowserMenuItem = NULL;
     WriteTrace(TraceGFXPlugin, TraceDebug, "Done");

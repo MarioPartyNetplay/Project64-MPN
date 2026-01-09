@@ -18,21 +18,28 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v5
     # Submoudle
     - name: Checkout Submodles
       run: git submodule update --init --recursive
+    # Update Git Hash in Version Header
+    - name: Update Git Hash
+      run: |
+        $gitHash = git rev-parse --short=7 HEAD
+        $versionFile = "Source/Project64-core/Version.h"
+        (Get-Content $versionFile) -replace 'GIT_HASH_PLACEHOLDER', $gitHash | Set-Content $versionFile
+        Write-Host "Updated git hash to: $gitHash"
     # Setup MSBuild For Later Usage
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v1.0.2
       with:
         vs-version: '16.6.2'
-    # Run MSBuild
-    - name: Build Solution
-      run: msbuild "D:\a\project64-mpn-src\project64-mpn-src\Project64-MPN.sln" /verbosity:minimal /property:Configuration=Release  /property:Platform=Win32
+    # Build Main Project
+    - name: Build Project64-MPN
+      run: msbuild "Project64-MPN.sln" /verbosity:minimal /property:Configuration=Release /property:Platform=Win32
     # Upload Artifact
     - name: Upload Build Artifact
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: PJ64Netplay-dev
-        path: D:\a\project64-mpn-src\project64-mpn-src\Bin\
+        path: Bin\

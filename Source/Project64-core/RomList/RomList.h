@@ -14,6 +14,8 @@
 #include <Common/md5.h>
 #include <Common/Thread.h>
 #include <Project64-core/N64System/N64Types.h>
+#include <memory>
+#include <string>
 
 class CRomList
 {
@@ -58,6 +60,8 @@ public:
 
     void RefreshRomList(void);
     void LoadRomList(void);
+    uint32_t LoadPlaytime(const std::string & RomIniKey);
+    void SavePlaytime(uint32_t ElapsedPlaytime);
 
 protected:
     typedef std::vector<ROM_INFO> ROMINFO_LIST;
@@ -89,6 +93,7 @@ private:
     CIniFile * m_NotesIniFile;
     CIniFile * m_ExtIniFile;
     CIniFile * m_RomIniFile;
+    std::unique_ptr<CIniFile> m_PlaytimeFile;
 #ifdef _WIN32
     CIniFile * m_ZipIniFile;
 #endif

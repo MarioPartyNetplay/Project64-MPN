@@ -40,7 +40,7 @@ class room: public std::enable_shared_from_this<room> {
         rom_info rom;
         bool started = false;
         uint8_t lag = 5;
-        bool autolag = true;
+        bool autolag = false;
         bool golf = false;
 
         friend class user;

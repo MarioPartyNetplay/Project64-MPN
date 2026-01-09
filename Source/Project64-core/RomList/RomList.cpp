@@ -51,6 +51,7 @@ CRomList::CRomList() :
         m_NotesIniFile = new CIniFile(g_Settings->LoadStringVal(SupportFile_Notes).c_str());
         m_ExtIniFile = new CIniFile(g_Settings->LoadStringVal(SupportFile_ExtInfo).c_str());
         m_RomIniFile = new CIniFile(g_Settings->LoadStringVal(SupportFile_RomDatabase).c_str());
+        m_PlaytimeFile = std::make_unique<CIniFile>(g_Settings->LoadStringVal(SupportFile_Playtime).c_str());
 #ifdef _WIN32
         m_ZipIniFile = new CIniFile(g_Settings->LoadStringVal(RomList_7zipCache).c_str());
 #endif
@@ -90,6 +91,21 @@ CRomList::~CRomList()
         g_Settings->UnregisterChangeCB(RomList_GameDir, this, (CSettings::SettingChangedFunc)RefreshSettings);
     }
     WriteTrace(TraceRomList, TraceVerbose, "Done");
+}
+
+
+uint32_t CRomList::LoadPlaytime(const std::string & RomIniKey)
+{
+    return m_PlaytimeFile->GetNumber(RomIniKey.c_str(), "Playtime", 0);
+}
+
+void CRomList::SavePlaytime(uint32_t ElapsedPlaytime)
+{
+    auto RomIniKey = g_Settings->LoadStringVal(Game_IniKey);
+    auto CurrentPlaytime = LoadPlaytime(RomIniKey);
+    auto RomGoodName = g_Settings->LoadStringVal(Rdb_GoodName);
+    m_PlaytimeFile->SaveString(RomIniKey.c_str(), "Name", RomGoodName.c_str());
+    m_PlaytimeFile->SaveNumber(RomIniKey.c_str(), "Playtime", CurrentPlaytime + ElapsedPlaytime);
 }
 
 void CRomList::RefreshRomList(void)
@@ -495,29 +511,56 @@ void CRomList::FillRomExtensionInfo(ROM_INFO * pRomInfo)
 	}    strncpy(pRomInfo->PluginNotes, m_RomIniFile->GetString(Identifier, "Plugin Note", "").c_str(), sizeof(pRomInfo->PluginNotes) / sizeof(char));
 
     //Get the text color
-    stdstr String = m_RomIniFile->GetString("Rom Status", pRomInfo->Status, "000000");
-    pRomInfo->TextColor = (strtoul(String.c_str(), 0, 16) & 0xFFFFFF);
-    pRomInfo->TextColor = (pRomInfo->TextColor & 0x00FF00) | ((pRomInfo->TextColor >> 0x10) & 0xFF) | ((pRomInfo->TextColor & 0xFF) << 0x10);
+    stdstr String = m_RomIniFile->GetString("Rom Status", pRomInfo->Status, "A0A0A0");
+    if (g_Settings->LoadBool(Setting_DarkTheme)) {
+        // For dark theme, use light text colors (default to white/light gray)
+        String = m_RomIniFile->GetString("Rom Status", pRomInfo->Status, "E0E0E0");
+        pRomInfo->TextColor = (strtoul(String.c_str(), 0, 16) & 0xFFFFFF);
+        pRomInfo->TextColor = (pRomInfo->TextColor & 0x00FF00) | ((pRomInfo->TextColor >> 0x10) & 0xFF) | ((pRomInfo->TextColor & 0xFF) << 0x10);
+        // Get the selected color
+        String.Format("%s.Sel", pRomInfo->Status);
+        String = m_RomIniFile->GetString("Rom Status", String.c_str(), "2D2D2D2D");
+        uint32_t selcol = strtoul(String.c_str(), nullptr, 16);
+        if (selcol & 0x80000000)
+        {
+            pRomInfo->SelColor = -1;
+        }
+        else
+        {
+            selcol = (selcol & 0x00FF00) | ((selcol >> 0x10) & 0xFF) | ((selcol & 0xFF) << 0x10);
+            pRomInfo->SelColor = selcol;
+        }
 
-    //Get the selected color
-    String.Format("%s.Sel", pRomInfo->Status);
-    String = m_RomIniFile->GetString("Rom Status", String.c_str(), "FFFFFFFF");
-    uint32_t selcol = strtoul(String.c_str(), NULL, 16);
-    if (selcol & 0x80000000)
-    {
-        pRomInfo->SelColor = -1;
+        // Get the selected text color (use light color for dark theme)
+        String.Format("%s.Seltext", pRomInfo->Status);
+        String = m_RomIniFile->GetString("Rom Status", String.c_str(), "FFFFFF");
+        pRomInfo->SelTextColor = (strtoul(String.c_str(), 0, 16) & 0xFFFFFF);
+        pRomInfo->SelTextColor = (pRomInfo->SelTextColor & 0x00FF00) | ((pRomInfo->SelTextColor >> 0x10) & 0xFF) | ((pRomInfo->SelTextColor & 0xFF) << 0x10);
     }
-    else
-    {
-        selcol = (selcol & 0x00FF00) | ((selcol >> 0x10) & 0xFF) | ((selcol & 0xFF) << 0x10);
-        pRomInfo->SelColor = selcol;
+    else {
+        pRomInfo->TextColor = (strtoul(String.c_str(), 0, 16) & 0xFFFFFF);
+        pRomInfo->TextColor = (pRomInfo->TextColor & 0x00FF00) | ((pRomInfo->TextColor >> 0x10) & 0xFF) | ((pRomInfo->TextColor & 0xFF) << 0x10);
+        // Get the selected color
+        String.Format("%s.Sel", pRomInfo->Status);
+        String = m_RomIniFile->GetString("Rom Status", String.c_str(), "FFFFFFFF");
+        uint32_t selcol = strtoul(String.c_str(), nullptr, 16);
+        if (selcol & 0x80000000)
+        {
+            pRomInfo->SelColor = -1;
+        }
+        else
+        {
+            selcol = (selcol & 0x00FF00) | ((selcol >> 0x10) & 0xFF) | ((selcol & 0xFF) << 0x10);
+            pRomInfo->SelColor = selcol;
+        }
+
+        // Get the selected text color
+        String.Format("%s.Seltext", pRomInfo->Status);
+        String = m_RomIniFile->GetString("Rom Status", String.c_str(), "FFFFFF");
+        pRomInfo->SelTextColor = (strtoul(String.c_str(), 0, 16) & 0xFFFFFF);
+        pRomInfo->SelTextColor = (pRomInfo->SelTextColor & 0x00FF00) | ((pRomInfo->SelTextColor >> 0x10) & 0xFF) | ((pRomInfo->SelTextColor & 0xFF) << 0x10);
     }
 
-    //Get the selected text color
-    String.Format("%s.Seltext", pRomInfo->Status);
-    String = m_RomIniFile->GetString("Rom Status", String.c_str(), "FFFFFF");
-    pRomInfo->SelTextColor = (strtoul(String.c_str(), 0, 16) & 0xFFFFFF);
-    pRomInfo->SelTextColor = (pRomInfo->SelTextColor & 0x00FF00) | ((pRomInfo->SelTextColor >> 0x10) & 0xFF) | ((pRomInfo->SelTextColor & 0xFF) << 0x10);
 }
 
 void CRomList::ByteSwapRomData(uint8_t * Data, int32_t DataLen)
