@@ -88,9 +88,6 @@
     <ClCompile Include="Settings\UISettings.cpp">
       <Filter>Settings</Filter>
     </ClCompile>
-    <ClCompile Include="UserInterface\Discord.cpp">
-      <Filter>UI</Filter>
-    </ClCompile>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="UserInterface\Settings\SettingsPage.cpp">
@@ -144,9 +141,6 @@
       <Filter>UI\Settings</Filter>
     </ClInclude>
     <ClInclude Include="UserInterface\CheatClassUI.h">
-      <Filter>UI</Filter>
-    </ClInclude>
-    <ClInclude Include="UserInterface\Discord.h">
       <Filter>UI</Filter>
     </ClInclude>
     <ClInclude Include="UserInterface\GuiClass.h">

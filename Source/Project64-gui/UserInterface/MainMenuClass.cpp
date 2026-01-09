@@ -6,7 +6,7 @@
 #include <commdlg.h>
 #include <shellapi.h>
 
-#include "Discord.h"
+#include <Project64-core/MarioPartyNetplay/Discord.h>
 
 
 CMainMenu::CMainMenu(CMainGui * hMainWindow) :
@@ -160,8 +160,6 @@ void CMainMenu::OnEndEmulation(void)
         g_BaseSystem->CloseCpu();
     }
     m_Gui->SaveWindowLoc();
-
-    CDiscord::Update(false);
 }
 
 void CMainMenu::OnScreenShot(void)

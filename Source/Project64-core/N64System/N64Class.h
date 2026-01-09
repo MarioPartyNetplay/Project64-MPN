@@ -102,6 +102,10 @@ public:
     void   SyncCPUPC(CN64System * const SecondCPU);
     void   SyncSystem();
     void   SyncSystemPC();
+    
+    // MPN Make public
+    CMipsMemoryVM   m_MMU_VM;   //Memory of the n64
+
 private:
     //Make sure plugins can directly access this information
     friend class CGfxPlugin;
@@ -145,7 +149,6 @@ private:
     CPlugins      * const m_Plugins;  //The plugin container
     CPlugins      * m_SyncPlugins;
     CN64System    * m_SyncCPU;
-    CMipsMemoryVM   m_MMU_VM;   //Memory of the n64
     CTLB            m_TLB;
     CRegisters      m_Reg;
     CMempak         m_Mempak;

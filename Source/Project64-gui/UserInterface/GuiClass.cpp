@@ -14,8 +14,8 @@
 #include <commctrl.h>
 #include <Project64-core/Settings/SettingType/SettingsType-Application.h>
 #include <Project64-core/Version.h>
+#include <Project64-core/MarioPartyNetplay/Discord.h>
 
-#include "Discord.h"
 #include "DarkModeUtils.h"
 
 void EnterLogOptions(HWND hwndOwner);
@@ -25,9 +25,9 @@ void EnterLogOptions(HWND hwndOwner);
 DWORD CALLBACK AboutBoxProc(HWND WndHandle, DWORD uMsg, DWORD wParam, DWORD lParam);
 LRESULT CALLBACK MainGui_Proc(HWND WndHandle, DWORD uMsg, DWORD wParam, DWORD lParam);
 
-extern BOOL set_about_field(HWND hDlg, int nIDDlgItem, const wchar_t * config_string, const wchar_t * language_string);
+extern BOOL set_about_field(HWND hDlg, int nIDDlgItem, const wchar_t* config_string, const wchar_t* language_string);
 
-CMainGui::CMainGui(bool bMainWindow, const char * WindowTitle) :
+CMainGui::CMainGui(bool bMainWindow, const char* WindowTitle) :
     CRomBrowser(m_hMainWindow, m_hStatusWnd),
     m_ThreadId(GetCurrentThreadId()),
     m_bMainWindow(bMainWindow),
@@ -58,9 +58,9 @@ CMainGui::CMainGui(bool bMainWindow, const char * WindowTitle) :
         g_Settings->RegisterChangeCB(GameRunning_CPU_Running, this, (CSettings::SettingChangedFunc)GameCpuRunning);
         g_Settings->RegisterChangeCB(GameRunning_CPU_Paused, this, (CSettings::SettingChangedFunc)GamePaused);
         g_Settings->RegisterChangeCB(Game_File, this, (CSettings::SettingChangedFunc)GameLoaded);
-        
+
         CDiscord::Init();
-        CDiscord::Update(false);
+        CDiscord::Update();
     }
 
     //if this fails then it has already been created
@@ -109,7 +109,7 @@ bool CMainGui::RegisterWinClass(void)
     return true;
 }
 
-void CMainGui::AddRecentRom(const char * ImagePath)
+void CMainGui::AddRecentRom(const char* ImagePath)
 {
     if (HIWORD(ImagePath) == NULL) { return; }
 
@@ -150,7 +150,7 @@ void CMainGui::AddRecentRom(const char * ImagePath)
     }
 }
 
-void CMainGui::SetWindowCaption(const wchar_t * title)
+void CMainGui::SetWindowCaption(const wchar_t* title)
 {
     static const size_t TITLE_SIZE = 256;
     wchar_t WinTitle[TITLE_SIZE];
@@ -168,12 +168,8 @@ void CMainGui::ShowRomBrowser(void)
         HighLightLastRom();
     }
 }
-void DiscordRPCChanged(CMainGui*)
-{
-CDiscord::Init();
-CDiscord::Update();
-}
-void RomBowserEnabledChanged(CMainGui * Gui)
+
+void RomBowserEnabledChanged(CMainGui* Gui)
 {
     if (Gui && UISettingsLoadBool(RomBrowser_Enabled))
     {
@@ -191,7 +187,7 @@ void RomBowserEnabledChanged(CMainGui * Gui)
     }
 }
 
-void CMainGui::LoadingInProgressChanged(CMainGui * Gui)
+void CMainGui::LoadingInProgressChanged(CMainGui* Gui)
 {
     Gui->RefreshMenu();
     if (!g_Settings->LoadBool(GameRunning_LoadingInProgress) && g_Settings->LoadStringVal(Game_File).length() == 0)
@@ -205,7 +201,7 @@ void CMainGui::LoadingInProgressChanged(CMainGui * Gui)
     }
 }
 
-void CMainGui::GameLoaded(CMainGui * Gui)
+void CMainGui::GameLoaded(CMainGui* Gui)
 {
     stdstr FileLoc = g_Settings->LoadStringVal(Game_File);
     if (FileLoc.length() > 0)
@@ -213,11 +209,12 @@ void CMainGui::GameLoaded(CMainGui * Gui)
         WriteTrace(TraceUserInterface, TraceDebug, "Add Recent Rom");
         Gui->AddRecentRom(FileLoc.c_str());
         Gui->SetWindowCaption(stdstr(g_Settings->LoadStringVal(Game_GoodName)).ToUTF16().c_str());
-        CDiscord::Update();
+        // Force Discord update on ROM load so presence updates immediately
+        CDiscord::Update(true);
     }
 }
 
-void CMainGui::GamePaused(CMainGui * Gui)
+void CMainGui::GamePaused(CMainGui* Gui)
 {
     Gui->RefreshMenu();
 }
@@ -233,11 +230,11 @@ void CMainGui::SavePlaytime()
     }
 }
 
-void CMainGui::GameCpuRunning(CMainGui * Gui)
+void CMainGui::GameCpuRunning(CMainGui* Gui)
 {
     if (g_Settings->LoadBool(GameRunning_CPU_Running))
     {
-        Gui->m_CurrentPlaytime = {std::chrono::steady_clock::now(), true};
+        Gui->m_CurrentPlaytime = { std::chrono::steady_clock::now(), true };
         Gui->MakeWindowOnTop(UISettingsLoadBool(UserInterface_AlwaysOnTop));
         Gui->HideRomList();
         if (UISettingsLoadBool(Setting_AutoFullscreen))
@@ -255,20 +252,26 @@ void CMainGui::GameCpuRunning(CMainGui * Gui)
         }
         Gui->RefreshMenu();
         Gui->BringToTop();
+
+        // Netplay may kick the CPU to start — force Discord update when CPU starts
+        CDiscord::Update(true);
     }
     else
     {
         Gui->SavePlaytime();
         PostMessage(Gui->m_hMainWindow, WM_GAME_CLOSED, 0, 0);
+
+        // CPU stopped => update Discord to Not in-game
+        CDiscord::Update(true);
     }
 }
 
-void RomBowserColoumnsChanged(CMainGui * Gui)
+void RomBowserColoumnsChanged(CMainGui* Gui)
 {
     Gui->ResetRomBrowserColomuns();
 }
 
-void RomBrowserRecursiveChanged(CMainGui * Gui)
+void RomBrowserRecursiveChanged(CMainGui* Gui)
 {
     Gui->RefreshRomList();
     Gui->HighLightLastRom();
@@ -298,7 +301,7 @@ void CMainGui::ChangeWinSize(long width, long height)
     MoveWindow(m_hMainWindow, wndpl.rcNormalPosition.left, wndpl.rcNormalPosition.top, rc1.right - rc1.left, rc1.bottom - rc1.top, TRUE);
 }
 
-void * CMainGui::GetModuleInstance(void) const
+void* CMainGui::GetModuleInstance(void) const
 {
     return GetModuleHandle(NULL);
 }
@@ -319,99 +322,99 @@ DWORD CALLBACK AboutIniBoxProc(HWND hDlg, DWORD uMsg, DWORD wParam, DWORD /*lPar
 
     switch (uMsg) {
     case WM_INITDIALOG:
+    {
+        wchar_t String[200];
+
+        //Title
+        SetWindowTextW(hDlg, wGS(INI_TITLE).c_str());
+
+        //Language
+        SetDlgItemTextW(hDlg, IDC_LAN, wGS(INI_CURRENT_LANG).c_str());
+        set_about_field(hDlg, IDC_LAN_AUTHOR, wGS(INI_AUTHOR).c_str(), wGS(LANGUAGE_AUTHOR).c_str());
+        set_about_field(hDlg, IDC_LAN_VERSION, wGS(INI_VERSION).c_str(), wGS(LANGUAGE_VERSION).c_str());
+        set_about_field(hDlg, IDC_LAN_DATE, wGS(INI_DATE).c_str(), wGS(LANGUAGE_DATE).c_str());
+        if (wcslen(wGS(LANGUAGE_NAME).c_str()) == 0)
         {
-            wchar_t String[200];
-
-            //Title
-            SetWindowTextW(hDlg, wGS(INI_TITLE).c_str());
-
-            //Language
-            SetDlgItemTextW(hDlg, IDC_LAN, wGS(INI_CURRENT_LANG).c_str());
-            set_about_field(hDlg, IDC_LAN_AUTHOR, wGS(INI_AUTHOR).c_str(), wGS(LANGUAGE_AUTHOR).c_str());
-            set_about_field(hDlg, IDC_LAN_VERSION, wGS(INI_VERSION).c_str(), wGS(LANGUAGE_VERSION).c_str());
-            set_about_field(hDlg, IDC_LAN_DATE, wGS(INI_DATE).c_str(), wGS(LANGUAGE_DATE).c_str());
-            if (wcslen(wGS(LANGUAGE_NAME).c_str()) == 0)
-            {
-                EnableWindow(GetDlgItem(hDlg, IDC_LAN), FALSE);
-                EnableWindow(GetDlgItem(hDlg, IDC_LAN_AUTHOR), FALSE);
-                EnableWindow(GetDlgItem(hDlg, IDC_LAN_VERSION), FALSE);
-                EnableWindow(GetDlgItem(hDlg, IDC_LAN_DATE), FALSE);
-            }
-            //RDB
-            CIniFile RdbIniFile(g_Settings->LoadStringVal(SupportFile_RomDatabase).c_str());
-            wcsncpy(String, RdbIniFile.GetString("Meta", "Author", "").ToUTF16().c_str(), sizeof(String) / sizeof(String[0]));
-            if (wcslen(String) == 0)
-            {
-                EnableWindow(GetDlgItem(hDlg, IDC_RDB), FALSE);
-                EnableWindow(GetDlgItem(hDlg, IDC_RDB_AUTHOR), FALSE);
-                EnableWindow(GetDlgItem(hDlg, IDC_RDB_VERSION), FALSE);
-                EnableWindow(GetDlgItem(hDlg, IDC_RDB_DATE), FALSE);
-                EnableWindow(GetDlgItem(hDlg, IDC_RDB_HOME), FALSE);
-            }
-
-            set_about_field(hDlg, IDC_RDB_AUTHOR, wGS(INI_AUTHOR).c_str(), String);
-
-            wcsncpy(String, RdbIniFile.GetString("Meta", "Version", "").ToUTF16().c_str(), sizeof(String) / sizeof(String[0]));
-            set_about_field(hDlg, IDC_RDB_VERSION, wGS(INI_VERSION).c_str(), String);
-            wcsncpy(String, RdbIniFile.GetString("Meta", "Date", "").ToUTF16().c_str(), sizeof(String) / sizeof(String[0]));
-            set_about_field(hDlg, IDC_RDB_DATE, wGS(INI_DATE).c_str(), String);
-            wcsncpy(RDBHomePage, RdbIniFile.GetString("Meta", "Homepage", "").ToUTF16().c_str(), sizeof(RDBHomePage) / sizeof(RDBHomePage[0]));
-            SetDlgItemTextW(hDlg, IDC_RDB_HOME, wGS(INI_HOMEPAGE).c_str());
-            if (wcslen(RDBHomePage) == 0)
-            {
-                EnableWindow(GetDlgItem(hDlg, IDC_RDB_HOME), FALSE);
-            }
-
-            //Cheat
-            SetDlgItemTextW(hDlg, IDC_CHT, wGS(INI_CURRENT_CHT).c_str());
-            CIniFile CheatIniFile(g_Settings->LoadStringVal(SupportFile_Cheats).c_str());
-            wcsncpy(String, CheatIniFile.GetString("Meta", "Author", "").ToUTF16().c_str(), sizeof(String) / sizeof(String[0]));
-            if (wcslen(String) == 0)
-            {
-                EnableWindow(GetDlgItem(hDlg, IDC_CHT), FALSE);
-                EnableWindow(GetDlgItem(hDlg, IDC_CHT_AUTHOR), FALSE);
-                EnableWindow(GetDlgItem(hDlg, IDC_CHT_VERSION), FALSE);
-                EnableWindow(GetDlgItem(hDlg, IDC_CHT_DATE), FALSE);
-                EnableWindow(GetDlgItem(hDlg, IDC_CHT_HOME), FALSE);
-            }
-            set_about_field(hDlg, IDC_CHT_AUTHOR, wGS(INI_AUTHOR).c_str(), String);
-            wcsncpy(String, CheatIniFile.GetString("Meta", "Version", "").ToUTF16().c_str(), sizeof(String) / sizeof(String[0]));
-            set_about_field(hDlg, IDC_CHT_VERSION, wGS(INI_VERSION).c_str(), String);
-            wcsncpy(String, CheatIniFile.GetString("Meta", "Date", "").ToUTF16().c_str(), sizeof(String) / sizeof(String[0]));
-            set_about_field(hDlg, IDC_CHT_DATE, wGS(INI_DATE).c_str(), String);
-            wcsncpy(CHTHomePage, CheatIniFile.GetString("Meta", "Homepage", "").ToUTF16().c_str(), sizeof(CHTHomePage) / sizeof(CHTHomePage[0]));
-            SetDlgItemTextW(hDlg, IDC_CHT_HOME, wGS(INI_HOMEPAGE).c_str());
-            if (wcslen(CHTHomePage) == 0)
-            {
-                EnableWindow(GetDlgItem(hDlg, IDC_CHT_HOME), FALSE);
-            }
-
-            //Extended Info
-            SetDlgItemTextW(hDlg, IDC_RDX, wGS(INI_CURRENT_RDX).c_str());
-            CIniFile RdxIniFile(g_Settings->LoadStringVal(SupportFile_ExtInfo).c_str());
-            wcsncpy(String, RdxIniFile.GetString("Meta", "Author", "").ToUTF16().c_str(), sizeof(String) / sizeof(String[0]));
-            if (wcslen(String) == 0)
-            {
-                EnableWindow(GetDlgItem(hDlg, IDC_RDX), FALSE);
-                EnableWindow(GetDlgItem(hDlg, IDC_RDX_AUTHOR), FALSE);
-                EnableWindow(GetDlgItem(hDlg, IDC_RDX_VERSION), FALSE);
-                EnableWindow(GetDlgItem(hDlg, IDC_RDX_DATE), FALSE);
-                EnableWindow(GetDlgItem(hDlg, IDC_RDX_HOME), FALSE);
-            }
-            set_about_field(hDlg, IDC_RDX_AUTHOR, wGS(INI_AUTHOR).c_str(), String);
-            wcsncpy(String, RdxIniFile.GetString("Meta", "Version", "").ToUTF16().c_str(), sizeof(String) / sizeof(String[0]));
-            set_about_field(hDlg, IDC_RDX_VERSION, wGS(INI_VERSION).c_str(), String);
-            wcsncpy(String, RdxIniFile.GetString("Meta", "Date", "").ToUTF16().c_str(), sizeof(String) / sizeof(String[0]));
-            set_about_field(hDlg, IDC_RDX_DATE, wGS(INI_DATE).c_str(), String);
-            wcsncpy(RDXHomePage, RdxIniFile.GetString("Meta", "Homepage", "").ToUTF16().c_str(), sizeof(RDXHomePage) / sizeof(RDXHomePage[0]));
-            SetDlgItemTextW(hDlg, IDC_RDX_HOME, wGS(INI_HOMEPAGE).c_str());
-            if (wcslen(RDXHomePage) == 0)
-            {
-                EnableWindow(GetDlgItem(hDlg, IDC_RDX_HOME), FALSE);
-            }
-            SetDlgItemTextW(hDlg, IDOK, wGS(CHEAT_OK).c_str());
+            EnableWindow(GetDlgItem(hDlg, IDC_LAN), FALSE);
+            EnableWindow(GetDlgItem(hDlg, IDC_LAN_AUTHOR), FALSE);
+            EnableWindow(GetDlgItem(hDlg, IDC_LAN_VERSION), FALSE);
+            EnableWindow(GetDlgItem(hDlg, IDC_LAN_DATE), FALSE);
         }
-        break;
+        //RDB
+        CIniFile RdbIniFile(g_Settings->LoadStringVal(SupportFile_RomDatabase).c_str());
+        wcsncpy(String, RdbIniFile.GetString("Meta", "Author", "").ToUTF16().c_str(), sizeof(String) / sizeof(String[0]));
+        if (wcslen(String) == 0)
+        {
+            EnableWindow(GetDlgItem(hDlg, IDC_RDB), FALSE);
+            EnableWindow(GetDlgItem(hDlg, IDC_RDB_AUTHOR), FALSE);
+            EnableWindow(GetDlgItem(hDlg, IDC_RDB_VERSION), FALSE);
+            EnableWindow(GetDlgItem(hDlg, IDC_RDB_DATE), FALSE);
+            EnableWindow(GetDlgItem(hDlg, IDC_RDB_HOME), FALSE);
+        }
+
+        set_about_field(hDlg, IDC_RDB_AUTHOR, wGS(INI_AUTHOR).c_str(), String);
+
+        wcsncpy(String, RdbIniFile.GetString("Meta", "Version", "").ToUTF16().c_str(), sizeof(String) / sizeof(String[0]));
+        set_about_field(hDlg, IDC_RDB_VERSION, wGS(INI_VERSION).c_str(), String);
+        wcsncpy(String, RdbIniFile.GetString("Meta", "Date", "").ToUTF16().c_str(), sizeof(String) / sizeof(String[0]));
+        set_about_field(hDlg, IDC_RDB_DATE, wGS(INI_DATE).c_str(), String);
+        wcsncpy(RDBHomePage, RdbIniFile.GetString("Meta", "Homepage", "").ToUTF16().c_str(), sizeof(RDBHomePage) / sizeof(RDBHomePage[0]));
+        SetDlgItemTextW(hDlg, IDC_RDB_HOME, wGS(INI_HOMEPAGE).c_str());
+        if (wcslen(RDBHomePage) == 0)
+        {
+            EnableWindow(GetDlgItem(hDlg, IDC_RDB_HOME), FALSE);
+        }
+
+        //Cheat
+        SetDlgItemTextW(hDlg, IDC_CHT, wGS(INI_CURRENT_CHT).c_str());
+        CIniFile CheatIniFile(g_Settings->LoadStringVal(SupportFile_Cheats).c_str());
+        wcsncpy(String, CheatIniFile.GetString("Meta", "Author", "").ToUTF16().c_str(), sizeof(String) / sizeof(String[0]));
+        if (wcslen(String) == 0)
+        {
+            EnableWindow(GetDlgItem(hDlg, IDC_CHT), FALSE);
+            EnableWindow(GetDlgItem(hDlg, IDC_CHT_AUTHOR), FALSE);
+            EnableWindow(GetDlgItem(hDlg, IDC_CHT_VERSION), FALSE);
+            EnableWindow(GetDlgItem(hDlg, IDC_CHT_DATE), FALSE);
+            EnableWindow(GetDlgItem(hDlg, IDC_CHT_HOME), FALSE);
+        }
+        set_about_field(hDlg, IDC_CHT_AUTHOR, wGS(INI_AUTHOR).c_str(), String);
+        wcsncpy(String, CheatIniFile.GetString("Meta", "Version", "").ToUTF16().c_str(), sizeof(String) / sizeof(String[0]));
+        set_about_field(hDlg, IDC_CHT_VERSION, wGS(INI_VERSION).c_str(), String);
+        wcsncpy(String, CheatIniFile.GetString("Meta", "Date", "").ToUTF16().c_str(), sizeof(String) / sizeof(String[0]));
+        set_about_field(hDlg, IDC_CHT_DATE, wGS(INI_DATE).c_str(), String);
+        wcsncpy(CHTHomePage, CheatIniFile.GetString("Meta", "Homepage", "").ToUTF16().c_str(), sizeof(CHTHomePage) / sizeof(CHTHomePage[0]));
+        SetDlgItemTextW(hDlg, IDC_CHT_HOME, wGS(INI_HOMEPAGE).c_str());
+        if (wcslen(CHTHomePage) == 0)
+        {
+            EnableWindow(GetDlgItem(hDlg, IDC_CHT_HOME), FALSE);
+        }
+
+        //Extended Info
+        SetDlgItemTextW(hDlg, IDC_RDX, wGS(INI_CURRENT_RDX).c_str());
+        CIniFile RdxIniFile(g_Settings->LoadStringVal(SupportFile_ExtInfo).c_str());
+        wcsncpy(String, RdxIniFile.GetString("Meta", "Author", "").ToUTF16().c_str(), sizeof(String) / sizeof(String[0]));
+        if (wcslen(String) == 0)
+        {
+            EnableWindow(GetDlgItem(hDlg, IDC_RDX), FALSE);
+            EnableWindow(GetDlgItem(hDlg, IDC_RDX_AUTHOR), FALSE);
+            EnableWindow(GetDlgItem(hDlg, IDC_RDX_VERSION), FALSE);
+            EnableWindow(GetDlgItem(hDlg, IDC_RDX_DATE), FALSE);
+            EnableWindow(GetDlgItem(hDlg, IDC_RDX_HOME), FALSE);
+        }
+        set_about_field(hDlg, IDC_RDX_AUTHOR, wGS(INI_AUTHOR).c_str(), String);
+        wcsncpy(String, RdxIniFile.GetString("Meta", "Version", "").ToUTF16().c_str(), sizeof(String) / sizeof(String[0]));
+        set_about_field(hDlg, IDC_RDX_VERSION, wGS(INI_VERSION).c_str(), String);
+        wcsncpy(String, RdxIniFile.GetString("Meta", "Date", "").ToUTF16().c_str(), sizeof(String) / sizeof(String[0]));
+        set_about_field(hDlg, IDC_RDX_DATE, wGS(INI_DATE).c_str(), String);
+        wcsncpy(RDXHomePage, RdxIniFile.GetString("Meta", "Homepage", "").ToUTF16().c_str(), sizeof(RDXHomePage) / sizeof(RDXHomePage[0]));
+        SetDlgItemTextW(hDlg, IDC_RDX_HOME, wGS(INI_HOMEPAGE).c_str());
+        if (wcslen(RDXHomePage) == 0)
+        {
+            EnableWindow(GetDlgItem(hDlg, IDC_RDX_HOME), FALSE);
+        }
+        SetDlgItemTextW(hDlg, IDOK, wGS(CHEAT_OK).c_str());
+    }
+    break;
     case WM_COMMAND:
         switch (LOWORD(wParam))
         {
@@ -429,7 +432,7 @@ DWORD CALLBACK AboutIniBoxProc(HWND hDlg, DWORD uMsg, DWORD wParam, DWORD /*lPar
     return TRUE;
 }
 
-bool CMainGui::ResetPluginsInUiThread(CPlugins * plugins, CN64System * System)
+bool CMainGui::ResetPluginsInUiThread(CPlugins* plugins, CN64System* System)
 {
     RESET_PLUGIN info;
     info.system = System;
@@ -478,7 +481,7 @@ void CMainGui::Caption(LPCWSTR Caption)
     SetWindowTextW(m_hMainWindow, Caption);
 }
 
-void CMainGui::Create(const char * WindowTitle)
+void CMainGui::Create(const char* WindowTitle)
 {
     stdstr_f VersionDisplay("Project64 Netplay %s", VER_FILE_VERSION_STR);
     m_hMainWindow = CreateWindowExW(WS_EX_ACCEPTFILES, VersionDisplay.ToUTF16().c_str(), stdstr(WindowTitle).ToUTF16().c_str(), WS_OVERLAPPED | WS_CLIPCHILDREN |
@@ -602,7 +605,7 @@ void CMainGui::SetPos(int X, int Y)
     SetWindowPos(m_hMainWindow, NULL, X, Y, 0, 0, SWP_NOZORDER | SWP_NOSIZE);
 }
 
-void CMainGui::SetWindowMenu(CBaseMenu * Menu)
+void CMainGui::SetWindowMenu(CBaseMenu* Menu)
 {
     m_AttachingMenu = true;
 
@@ -627,7 +630,7 @@ void CMainGui::RefreshMenu(void)
     m_Menu->ResetMenu();
 }
 
-void CMainGui::SetStatusText(int Panel, const wchar_t * Text)
+void CMainGui::SetStatusText(int Panel, const wchar_t* Text)
 {
     static wchar_t Message[2][500];
     if (Panel >= 2)
@@ -635,7 +638,7 @@ void CMainGui::SetStatusText(int Panel, const wchar_t * Text)
         g_Notify->BreakPoint(__FILE__, __LINE__);
         return;
     }
-    wchar_t * Msg = Message[Panel];
+    wchar_t* Msg = Message[Panel];
 
     memset(Msg, 0, sizeof(Message[0]));
     _snwprintf(Msg, sizeof(Message[0]) / sizeof(Message[0][0]), L"%s", Text);
@@ -702,7 +705,10 @@ LRESULT CALLBACK CMainGui::MainGui_Proc(HWND hWnd, DWORD uMsg, DWORD wParam, DWO
 
             _this->SetPos(X, Y);
 
+            CDiscord::Init();
+
             _this->ChangeWinSize(640, 480);
+
         }
         break;
     case WM_SYSCOMMAND:
