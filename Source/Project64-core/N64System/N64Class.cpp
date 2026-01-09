@@ -566,14 +566,25 @@ CDiscord* g_Discord = nullptr;
 
 void CN64System::getNumberControllers()
 {
-    CONTROL* Controllers = g_Plugins->Control()->PluginControllers();
-    uint8_t playerCount = 0;
-    for (uint8_t i = 0; i < sizeof(Controllers); i++)
-        if (Controllers[i].Present != 0)
-            playerCount++;
+    if (!g_Plugins || !g_Plugins->Control()) return;
 
-    if (g_Discord)
+    CONTROL* Controllers = g_Plugins->Control()->PluginControllers();
+    if (Controllers == nullptr) return;
+
+    uint8_t playerCount = 0;
+    // The N64 always has exactly 4 ports. 
+    // sizeof(Controllers) would return the size of a pointer (4 or 8), not the array.
+    for (int i = 0; i < 4; i++)
+    {
+        if (Controllers[i].Present != 0) {
+            playerCount++;
+        }
+    }
+
+    // This updates m_CurrentPlayers in the Discord class
+    if (g_Discord) {
         g_Discord->SetPlayerCount(playerCount);
+    }
 }
 
 void CN64System::StartEmulation(bool NewThread)
@@ -2277,6 +2288,8 @@ void CN64System::SyncToAudio()
 
 void CN64System::RefreshScreen()
 {
+    CDiscord::Update(false);
+
     PROFILE_TIMERS CPU_UsageAddr = Timer_None/*, ProfilingAddr = Timer_None*/;
     uint32_t VI_INTR_TIME = 500000;
 
@@ -2387,9 +2400,9 @@ void CN64System::RefreshScreen()
     // Update Discord presence
     if (g_Discord)
     {
+        getNumberControllers();
         g_Discord->UpdatePresence();
     }
-    //    if (bProfiling)    { m_Profile.StartTimer(ProfilingAddr != Timer_None ? ProfilingAddr : Timer_R4300); }
 }
 
 void CN64System::TLB_Mapped(uint32_t VAddr, uint32_t Len, uint32_t PAddr, bool bReadOnly)
