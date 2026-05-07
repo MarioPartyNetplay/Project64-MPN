@@ -9,7 +9,7 @@
 
 #include <algorithm>
 #include <array>
-#include <asio.hpp>
+#include "../../3rdParty/asio/asio/include/asio.hpp"
 #include <cctype>
 #include <chrono>
 #include <cmath>
@@ -35,10 +35,10 @@
 
 #ifdef _WIN32
 #if !defined(__MINGW32__) && !defined(__MINGW64__)
-#include <Windows.h>
+#include <atlbase.h>
 #else
 #define QOS_NON_ADAPTIVE_FLOW 0x00000002
-typedef UINT32 QOS_FLOWID, * PQOS_FLOWID;
+typedef UINT32 QOS_FLOWID, *PQOS_FLOWID;
 #endif
 #include <commctrl.h>
 #include <qos2.h>

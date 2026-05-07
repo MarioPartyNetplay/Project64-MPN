@@ -7,22 +7,16 @@
 #include "input_plugin.h"
 #include "client.h"
 #include "util.h"
+#include "version.h"
 
 using namespace std;
 
 #if defined(__cplusplus)
-string get_parent_directory(string dir) {
-    int index = dir.find_last_of("/\\");
-    if (index == dir.length() - 1)
-        dir = dir.substr(0, dir.length() - 1);
-    return dir.substr(0, dir.find_last_of("/\\"));
-}
 extern "C" {
 #endif
 
 static bool loaded = false;
 static bool rom_open = false;
-static bool plugin_opened = false; // Track if plugin has been opened (delayed for netplay)
 static HMODULE this_dll = NULL;
 static CONTROL_INFO control_info = { NULL, NULL, FALSE, NULL, NULL };
 static bool controllers_initiated = false;
@@ -30,10 +24,6 @@ static shared_ptr<settings> my_settings;
 static shared_ptr<input_plugin> my_plugin;
 static shared_ptr<client> my_client;
 static string my_location;
-static string my_input_location;
-static string my_project64_location;
-static string my_saves_location;
-static string my_plugins_location;
 static array<bool, 4> port_already_visited;
 static rom_info rom;
 
@@ -68,21 +58,10 @@ void load() {
     wcsrchr(my_location_array, L'\\')[1] = 0;
     my_location = wstring_to_utf8(my_location_array);
 
-    // Set input plugin location to ../Input/ relative to netplay plugin location
-    my_plugins_location = get_parent_directory(wstring_to_utf8(my_location_array));
-    my_input_location = my_plugins_location;
-    if (!my_input_location.empty() && my_input_location.back() != '\\') {
-        my_input_location += "\\";
-    }
-    my_input_location += "Input\\";
-
-    my_project64_location = get_parent_directory(my_plugins_location).append("\\");
-    my_saves_location = my_project64_location.append("User\\Save\\");
-
-    my_settings = make_shared<settings>(my_location + "netplay.ini");
+    my_settings = make_shared<settings>(my_location + "netplay_input_plugin.ini");
 
     try {
-        my_plugin = make_shared<input_plugin>(my_input_location + my_settings->get_plugin_dll());
+        my_plugin = make_shared<input_plugin>(my_location + my_settings->get_plugin_dll());
     } catch (const exception&) {
         my_plugin.reset();
     }
@@ -120,8 +99,9 @@ EXPORT void CALL ControllerCommand( int Control, BYTE * Command) {
 
 EXPORT void CALL DllAbout ( HWND hParent ) {
     load();
-    std::string message = "Project64 NetPlay Input Plugin\n\n"
-                          "This plugin enables online multiplayer netplay for Project64.";
+
+    string message = string(APP_NAME) + "\n\nVersion: " + string(APP_VERSION) + "\n\nAuthor: @CoderTimZ (aka AQZ)\n\nWebsite: www.play64.com";
+
     MessageBox(hParent, utf8_to_wstring(message).c_str(), L"About", MB_OK | MB_ICONINFORMATION);
 }
 
@@ -150,7 +130,7 @@ EXPORT void CALL DllConfig ( HWND hParent ) {
     } else {
         my_plugin.reset();
 
-        plugin_dialog dialog(this_dll, hParent, my_input_location, my_settings->get_plugin_dll(), control_info);
+        plugin_dialog dialog(this_dll, hParent, my_location, my_settings->get_plugin_dll(), control_info);
 
         if (dialog.ok_clicked()) {
             my_settings->set_plugin_dll(dialog.get_plugin_dll());
@@ -158,7 +138,7 @@ EXPORT void CALL DllConfig ( HWND hParent ) {
 
         if (!my_settings->get_plugin_dll().empty()) {
             try {
-                my_plugin = make_shared<input_plugin>(my_input_location + my_settings->get_plugin_dll());
+                my_plugin = make_shared<input_plugin>(my_location + my_settings->get_plugin_dll());
                 my_plugin->initiate_controllers(control_info);
             } catch (exception& e) {
                 MessageBox(hParent, utf8_to_wstring(e.what()).c_str(), L"Error", MB_OK | MB_ICONERROR);
@@ -181,7 +161,7 @@ EXPORT void CALL GetDllInfo ( PLUGIN_INFO * PluginInfo ) {
     PluginInfo->Version = 0x0101;
     PluginInfo->Type = PLUGIN_TYPE_CONTROLLER;
 
-    strncpy(PluginInfo->Name, "NetPlay", sizeof PLUGIN_INFO::Name);
+    strncpy(PluginInfo->Name, APP_NAME_AND_VERSION, sizeof PLUGIN_INFO::Name);
 }
 
 EXPORT void CALL GetKeys(int Control, BUTTONS* Keys) {
@@ -193,41 +173,10 @@ EXPORT void CALL GetKeys(int Control, BUTTONS* Keys) {
         return;
     }
 
-    // Wait for game to start, and open plugin if it hasn't been opened yet
-    bool just_started = my_client->wait_until_start();
-    
-    if (just_started && !plugin_opened && my_plugin) {
-        // Game just started, now load cheats that have been synchronized
-        HMODULE hModule = GetModuleHandle(NULL);
-        if (hModule) {
-            typedef void(__cdecl* TriggerDeferredCheatLoadFunc)(void);
-            TriggerDeferredCheatLoadFunc triggerDeferredCheatLoad = (TriggerDeferredCheatLoadFunc)GetProcAddress(hModule, "TriggerDeferredCheatLoadForNetplay");
-            if (triggerDeferredCheatLoad) {
-                triggerDeferredCheatLoad();
-            }
-        }
-
-        // Now open the plugin (cheats should be synced by now)
-        my_plugin->RomOpen();
-        plugin_opened = true;
-
-        // Reload cheats to ensure they're loaded from the synchronized file
-        if (hModule) {
-            typedef void(__cdecl* TriggerCheatReloadFunc)(void);
-            TriggerCheatReloadFunc triggerCheatReload = (TriggerCheatReloadFunc)GetProcAddress(hModule, "TriggerCheatReloadForNetplay");
-            if (triggerCheatReload) {
-                triggerCheatReload();
-            }
-        }
-
-        my_client->set_src_controllers(my_plugin->controls);
-    }
-    
-    if (!my_plugin) {
-        if (just_started) {
+    if (my_client->wait_until_start()) {
+        if (!my_plugin) {
             my_client->get_dialog().error("No base input plugin");
         }
-        return;
     }
 
     if (my_plugin && port_already_visited[Control]) {
@@ -292,53 +241,37 @@ EXPORT void CALL RomClosed (void) {
     if (my_client) {
         my_settings->set_name(my_client->get_name());
         my_client->post_close();
-        my_client->revert_save_data();
         my_client.reset();
     }
 
-    if (my_plugin && plugin_opened) {
+    if (my_plugin) {
         my_plugin->RomClosed();
-        plugin_opened = false;
     }
 
     rom_open = false;
 }
 
-EXPORT void CALL RomOpen(void) {
+EXPORT void CALL RomOpen (void) {
     load();
 
     assert(control_info.hMainWindow);
 
     rom_open = true;
-    plugin_opened = false; // Reset flag
 
     if (!my_plugin) {
         DllConfig(control_info.hMainWindow);
     }
 
     if (my_plugin) {
-        auto dialog = std::make_shared<client_dialog>(this_dll, control_info.hMainWindow);
-
         my_client = make_shared<client>(make_shared<client_dialog>(this_dll, control_info.hMainWindow));
         my_client->set_name(my_settings->get_name());
         my_client->set_rom_info(rom);
-        my_client->set_save_info(my_saves_location);
-        my_client->ensure_save_directories();
-        my_client->restore_leftover_backups(); // Restore any backups from force-closed sessions
         my_client->set_dst_controllers(control_info.Controls);
         my_client->load_public_server_list();
         my_client->get_external_address();
 
-        // Delay plugin RomOpen() until game starts (so cheats are synced first)
-        // If not in netplay or game already started, open immediately
-        // Otherwise, plugin will be opened in GetKeys() when game starts (after cheat sync)
-        if (!my_client->is_open() || my_client->has_started()) {
-            // Not in netplay or game already started, open immediately
-            my_plugin->RomOpen();
-            plugin_opened = true;
-            my_client->set_src_controllers(my_plugin->controls);
-        }
-        // Otherwise, plugin will be opened when game starts in GetKeys() (after cheat sync)
+        my_plugin->RomOpen();
+        my_client->set_src_controllers(my_plugin->controls);
     }
 
     port_already_visited.fill(true);
@@ -357,15 +290,6 @@ EXPORT void CALL WM_KeyUp( WPARAM wParam, LPARAM lParam ) {
 
     if (my_plugin) {
         my_plugin->WM_KeyUp(wParam, lParam);
-    }
-}
-
-EXPORT void CALL HandleNetplayDesyncDetection(const char* hash)
-{
-    load();
-
-    if (my_client) {
-        my_client->handle_desync_detection(hash);
     }
 }
 

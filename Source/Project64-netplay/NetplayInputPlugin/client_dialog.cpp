@@ -79,31 +79,6 @@ void client_dialog::info(const string& text) {
     }), NULL);
 }
 
-void client_dialog::warn(const string& text) {
-    unique_lock<mutex> lock(mut);
-    if (destroyed) return;
-
-    PostMessage(hwndDlg, WM_TASK, (WPARAM) new function<void(void)>([=] {
-        HWND output_box = GetDlgItem(hwndDlg, IDC_OUTPUT_EDIT);
-        SendMessage(output_box, WM_SETREDRAW, FALSE, NULL);
-
-        bool at_bottom = scroll_at_bottom();
-
-        append_timestamp();
-
-        insert_text("[WARN] " + text);
-
-        if (at_bottom) {
-            scroll_to_bottom();
-        }
-
-        alert_user(false);
-
-        SendMessage(output_box, WM_SETREDRAW, TRUE, NULL);
-        RedrawWindow(output_box, NULL, NULL, RDW_ERASE | RDW_FRAME | RDW_INVALIDATE | RDW_ALLCHILDREN);
-        }), NULL);
-}
-
 void client_dialog::error(const string& text) {
     unique_lock<mutex> lock(mut);
     if (destroyed) return;
@@ -442,8 +417,8 @@ INT_PTR CALLBACK client_dialog::DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wPara
             GetClientRect(hwndDlg, &dialog->initial_rect);
             dialog->set_window_scale(GetDlgItem(hwndDlg, IDC_OUTPUT_EDIT), { 0.0f, 0.6f, 1.0f, 1.0f });
             dialog->set_window_scale(GetDlgItem(hwndDlg, IDC_INPUT_EDIT), { 0.0f, 1.0f, 1.0f, 1.0f });
-            dialog->set_window_scale(GetDlgItem(hwndDlg, IDC_USER_LIST), { 0.0f, 0.0f, 0.5f, 0.6f });
-            dialog->set_window_scale(GetDlgItem(hwndDlg, IDC_SERVER_LIST), { 0.5f, 0.0f, 1.0f, 0.8f });
+            dialog->set_window_scale(GetDlgItem(hwndDlg, IDC_USER_LIST), { 0.0f, 0.0f, 0.6f, 0.6f });
+            dialog->set_window_scale(GetDlgItem(hwndDlg, IDC_SERVER_LIST), { 0.6f, 0.0f, 1.0f, 0.6f });
 
             LVCOLUMN column;
             ZeroMemory(&column, sizeof(column));
@@ -457,15 +432,15 @@ INT_PTR CALLBACK client_dialog::DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wPara
             ListView_InsertColumn(user_view, 1, &column);
             column.pszText = (LPWSTR)L"Name";
             ListView_InsertColumn(user_view, 2, &column);
-            column.pszText = (LPWSTR)L"P1";
+            column.pszText = (LPWSTR)L"1P";
             ListView_InsertColumn(user_view, 3, &column);
-            column.pszText = (LPWSTR)L"P2";
+            column.pszText = (LPWSTR)L"2P";
             ListView_InsertColumn(user_view, 4, &column);
-            column.pszText = (LPWSTR)L"P3";
+            column.pszText = (LPWSTR)L"3P";
             ListView_InsertColumn(user_view, 5, &column);
-            column.pszText = (LPWSTR)L"P4";
+            column.pszText = (LPWSTR)L"4P";
             ListView_InsertColumn(user_view, 6, &column);
-            column.pszText = (LPWSTR)L"Buffer";
+            column.pszText = (LPWSTR)L"Lag";
             ListView_InsertColumn(user_view, 7, &column);
             column.pszText = (LPWSTR)L"Ping";
             ListView_InsertColumn(user_view, 8, &column);
@@ -479,14 +454,10 @@ INT_PTR CALLBACK client_dialog::DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wPara
             ListView_InsertColumn(server_view, 1, &column);
             column.pszText = (LPWSTR)L"Ping";
             ListView_InsertColumn(server_view, 2, &column);
-
-            // Hide the "Location" column
             dialog->set_column_scale(server_view, { 120, 96, 72 });
 
             dialog->scale_columns();
 
-            ListView_SetColumnWidth(server_view, 0, 1);  // Width is now 1
-            ListView_SetColumnWidth(server_view, 1, 210);  // Width is now 1
             return TRUE;
         }
 

@@ -31,15 +31,14 @@ input_plugin::input_plugin(string path) {
         throw runtime_error("Plugin is not an input plugin");
     }
 
-    if (info.Version < 0x0100 || info.Version > 0x0103) {
+    if (info.Version != 0x0100 && info.Version != 0x0101) {
         FreeLibrary(dll);
-        throw runtime_error("Plugin must be version 1.0, 1.1, 1.2, or 1.3");
+        throw runtime_error("Plugin must be version 1.0 or 1.1");
     }
 
     if (info.Version == 0x0100) {
         InitiateControllers0100 = (void(*)(HWND hMainWindow, CONTROL Controls[4])) GetProcAddress(dll, "InitiateControllers");
-    } else {
-        // Version 1.1, 1.2, and 1.3 all use the same InitiateControllers signature
+    } else if (info.Version == 0x0101) {
         InitiateControllers0101 = (void(*)(CONTROL_INFO Controls)) GetProcAddress(dll, "InitiateControllers");
     }
     CloseDLL                 = (void(*)(void))                                   GetProcAddress(dll, "CloseDLL");

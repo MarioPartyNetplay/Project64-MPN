@@ -1,4 +1,5 @@
 #include "stdafx.h"
+
 #include "user.h"
 #include "common.h"
 #include "util.h"
@@ -11,6 +12,7 @@ user::user(server* server) :
 
 void user::set_room(room* room) {
     this->my_room = room;
+
     send(packet() << PATH << ("/" + room->get_id()));
 }
 
@@ -74,114 +76,6 @@ void user::on_receive(packet& p, bool udp) {
                 if (s.expired()) return;
                 my_server->on_user_join(this, room);
             });
-            break;
-        }
-
-        case SAVE_INFO: {
-            for (unsigned int i = 0; i < saves.size(); i++) {
-                save_info old_save = saves[i];
-                auto new_save = p.read<save_info>();
-                info.saves[i] = new_save;
-                log("[" + my_room->get_id() + "] " + "old save hash[" + old_save.sha1_data + "] is now [" + info.saves[i].sha1_data + "]");
-            }
-            for (auto& user : my_room->user_list) {
-                if (user->id == id) continue;
-                user->send_save_info(id, saves);
-            }
-            my_room->check_save_data();
-            break;
-        }
-
-        case SAVE_SYNC: {
-            std::array<save_info, 5> original_saves = info.saves; // Store original saves
-
-            std::array<save_info, 5> new_saves;
-            for (size_t i = 0; i < info.saves.size(); i++) {
-                auto save = p.read<save_info>();
-                new_saves[i] = save;
-            }
-
-            info.saves = new_saves;
-
-            bool no_syncs = true;
-            int sync_count = 0;
-            for (auto& user : my_room->user_list) {
-                bool send_sync = false;
-
-                for (size_t i = 0; i < info.saves.size(); i++) {
-                    auto& save = user->info.saves[i];
-                    auto& upstream_save = new_saves[i];
-                    if (save.sha1_data != upstream_save.sha1_data) {
-                        send_sync = true;
-                        break;
-                    }
-                }
-
-                if (send_sync) {
-                    // Add delay between sending syncs to different clients to prevent overwhelming
-                    if (sync_count > 0) {
-                        Sleep(300);  // 300ms delay between clients
-                    }
-                    user->send_save_sync(new_saves);
-                    no_syncs = false;
-                    sync_count++;
-                }
-            }
-            if (no_syncs)
-                my_room->check_save_data();
-            break;
-        }
-
-        // Cheat syncing disabled for now
-        /*
-        case CHEAT_SYNC: {
-            // Forward cheat sync to all other users in the room
-            std::string cheat_file_content = "";
-            std::string enabled_file_content = "";
-            
-            // Try to read both strings, but don't let exceptions escape
-            try {
-                if (p.available() > 0) {
-                    cheat_file_content = p.read<std::string>();
-                }
-            } catch (...) {
-                cheat_file_content = "";
-            }
-            
-            try {
-                if (p.available() > 0) {
-                    enabled_file_content = p.read<std::string>();
-                }
-            } catch (...) {
-                enabled_file_content = "";
-            }
-            
-            // Always forward, even if both are empty (to clear client cheats)
-            try {
-                packet cheat_packet;
-                cheat_packet << CHEAT_SYNC;
-                cheat_packet << cheat_file_content;
-                cheat_packet << enabled_file_content;
-
-                log("[" + my_room->get_id() + "] Forwarding cheat sync");
-
-                // Send to all other users (if any)
-                for (auto& user : my_room->user_list) {
-                    if (user->id != id) {
-                        user->send(cheat_packet);
-                    }
-                }
-            } catch (...) {
-                // If forwarding fails, just log and continue - don't disconnect
-                log("[" + my_room->get_id() + "] Error forwarding cheat sync packet");
-            }
-            break;
-        }
-        */
-
-        case ROOM_CHECK: {
-            my_room->send_info("Rechecking all room checks");
-            my_room->check_save_data();
             break;
         }
 
@@ -409,24 +303,6 @@ void user::send_accept() {
         } else {
             p << false;
         }
-    }
-    send(p);
-}
-
-void user::send_save_sync(const std::array<save_info, 5>& saves) {
-    packet p;
-    p << SAVE_SYNC;
-    for (auto& save : saves) {
-        p << save;
-    }
-    send(p);
-}
-
-void user::send_save_info(uint32_t id, const std::array<save_info, 5>& saves) {
-    packet p;
-    p << SAVE_INFO << id;
-    for (auto& save : saves) {
-        p << save;
     }
     send(p);
 }

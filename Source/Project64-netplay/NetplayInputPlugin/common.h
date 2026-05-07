@@ -3,7 +3,7 @@
 #include "stdafx.h"
 #include "packet.h"
 
-constexpr static uint32_t PROTOCOL_VERSION = 48;
+constexpr static uint32_t PROTOCOL_VERSION = 47;
 constexpr static uint32_t INPUT_HISTORY_LENGTH = 12;
 
 enum packet_type : uint8_t {
@@ -15,13 +15,9 @@ enum packet_type : uint8_t {
     PONG,
     QUIT,
     NAME,
-    SAVE_INFO,
-    ROOM_CHECK,
     LATENCY,
     MESSAGE,
     LAG,
-    SAVE_SYNC,
-    CHEAT_SYNC,
     AUTOLAG,
     CONTROLLERS,
     START,
@@ -290,64 +286,11 @@ inline controller packet::read<controller>() {
     return c;
 }
 
-struct save_info {
-    std::string rom_name;
-    std::string save_name;
-    std::string save_data;
-    std::string sha1_data;
-};
-
-template<>
-inline save_info packet::read<save_info>() {
-    save_info saveInfo;
-    saveInfo.rom_name = read<std::string>();
-    saveInfo.save_name = read<std::string>();
-    saveInfo.save_data = read<std::string>();
-    saveInfo.sha1_data = read<std::string>();
-    return saveInfo;
-}
-
-template<>
-inline packet& packet::write<save_info>(const save_info& saveInfo) {
-    write(saveInfo.rom_name);
-    write(saveInfo.save_name);
-    write(saveInfo.save_data);
-    write(saveInfo.sha1_data);
-    return *this;
-}
-
-struct cheat_info {
-    std::string name;
-    std::string code;
-    bool active;
-};
-
-template<>
-inline cheat_info packet::read<cheat_info>() {
-    cheat_info cheat;
-    cheat.name = read<std::string>();
-    cheat.code = read<std::string>();
-    cheat.active = read<bool>();
-    return cheat;
-}
-
-template<>
-inline packet& packet::write<cheat_info>(const cheat_info& cheat) {
-    write(cheat.name);
-    write(cheat.code);
-    write(cheat.active);
-    return *this;
-}
-
 struct user_info {
     uint32_t id = 0xFFFFFFFF;
     uint32_t authority = 0xFFFFFFFF;
     std::string name;
     rom_info rom;
-    std::array<save_info, 5> saves;
-    std::string cheat_file_hash;
-    std::string state_hash;  // SHA256 hash of emulator state (RDRAM, CPU registers, RSP memory) for desync detection
-    std::string desync_hash;  // SHA256 hash of stable memory regions (CPU regs + RDRAM + RSP mem + TLB) for desync detection
     uint8_t lag = 5;
     double latency = NAN;
     std::array<controller, 4> controllers;
@@ -378,14 +321,6 @@ inline packet& packet::write<user_info>(const user_info& info) {
     write(info.authority);
     write(info.name);
     write(info.rom);
-    write(info.saves[0]);
-    write(info.saves[1]);
-    write(info.saves[2]);
-    write(info.saves[3]);
-    write(info.saves[4]);
-    write(info.cheat_file_hash);
-    write(info.state_hash);
-    write(info.desync_hash);
     write(info.lag);
     write(info.latency);
     write(info.controllers[0]);
@@ -404,14 +339,6 @@ inline user_info packet::read<user_info>() {
     info.authority = read<uint32_t>();
     info.name = read<std::string>();
     info.rom = read<rom_info>();
-    info.saves[0] = read<save_info>();
-    info.saves[1] = read<save_info>();
-    info.saves[2] = read<save_info>();
-    info.saves[3] = read<save_info>();
-    info.saves[4] = read<save_info>();
-    info.cheat_file_hash = read<std::string>();
-    info.state_hash = read<std::string>();
-    info.desync_hash = read<std::string>();
     info.lag = read<uint8_t>();
     info.latency = read<double>();
     info.controllers[0] = read<controller>();

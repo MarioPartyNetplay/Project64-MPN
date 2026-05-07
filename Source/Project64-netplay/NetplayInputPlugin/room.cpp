@@ -21,33 +21,6 @@ void room::close() {
     my_server->on_room_close(this);
 }
 
-void room::check_save_data() {
-    if (user_list.size() <= 1)
-        return;
-
-    std::array<string, 5> first_hashes;
-    bool run_once = true;
-    for (auto& u : user_list) {
-        if (run_once) {
-            for (size_t i = 0; i < u->info.saves.size(); i++) {
-                auto& save = u->info.saves[i];
-                first_hashes[i] = save.sha1_data;
-            }
-            run_once = false;
-        }
-
-
-        for (size_t i = 0; i < u->info.saves.size(); i++) {
-            auto& save_data = u->info.saves[i];
-            auto& hash = first_hashes[i];
-            if (save_data.sha1_data != hash) {
-                return;
-            }
-        }
-
-    }
-}
-
 void room::on_user_join(user* user) {
     if (started) {
         user->send_error("Game is already in progress");
@@ -65,7 +38,6 @@ void room::on_user_join(user* user) {
     user->authority = user->id;
     user->has_authority = true;
     user->join_timestamp = timestamp();
-    
     for (auto& u : user_list) {
         u->send_join(dynamic_cast<user_info&>(*user));
     }
@@ -87,8 +59,6 @@ void room::on_user_join(user* user) {
     }
 
     user->send(packet() << GOLF << golf);
-
-    check_save_data();
 }
 
 void room::on_user_quit(user* user) {
