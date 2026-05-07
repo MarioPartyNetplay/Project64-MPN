@@ -10,7 +10,6 @@
 ****************************************************************************/
 #include "stdafx.h"
 #include "N64Class.h"
-#include <Project64-core/MarioPartyNetplay/Discord.h>
 #include <Project64-core/3rdParty/zip.h>
 #include <Project64-core/N64System/Recompiler/RecompilerCodeLog.h>
 #include <Project64-core/N64System/SystemGlobals.h>
@@ -28,8 +27,8 @@
 #if defined(ANDROID)
 #include <utime.h>
 #endif
-#define NOMINMAX
 #include <ShlDisp.h>
+#include <3rdParty/mario_party_netplay.h>
 #include <shellapi.h>
 #include <sha.h>
 #include <hex.h>
@@ -37,42 +36,42 @@
 #include <filters.h>
 #include <cryptlib.h>
 #include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <vector>
 #include <Project64-core/N64System/Mips/TLBClass.h>
 
 #pragma warning(disable:4355) // Disable 'this' : used in base member initializer list
 
-CN64System::CN64System(CPlugins * Plugins, bool SavesReadOnly, bool SyncSystem) :
-CSystemEvents(this, Plugins),
-m_EndEmulation(false),
-m_SaveUsing((SAVE_CHIP_TYPE)g_Settings->LoadDword(Game_SaveChip)),
-m_Plugins(Plugins),
-m_SyncCPU(NULL),
-m_SyncPlugins(NULL),
-m_MMU_VM(SavesReadOnly),
-m_TLB(this),
-m_Reg(this, this),
-m_Recomp(NULL),
-m_InReset(false),
-m_NextTimer(0),
-m_SystemTimer(m_NextTimer),
-m_bCleanFrameBox(true),
-m_bInitialized(false),
-m_RspBroke(true),
-m_DMAUsed(false),
-m_TestTimer(false),
-m_NextInstruction(0),
-m_JumpToLocation(0),
-m_TLBLoadAddress(0),
-m_TLBStoreAddress(0),
-m_SyncCount(0),
-m_thread(NULL),
-m_hPauseEvent(true),
-m_CheatsSlectionChanged(false),
-m_HasAutosaved(false),
-m_DesyncFrameCounter(0),
-m_SyncCpu(SyncSystem)
+CN64System::CN64System(CPlugins* Plugins, bool SavesReadOnly, bool SyncSystem) :
+    CSystemEvents(this, Plugins),
+    m_EndEmulation(false),
+    m_SaveUsing((SAVE_CHIP_TYPE)g_Settings->LoadDword(Game_SaveChip)),
+    m_Plugins(Plugins),
+    m_SyncCPU(NULL),
+    m_SyncPlugins(NULL),
+    m_MMU_VM(SavesReadOnly),
+    m_TLB(this),
+    m_Reg(this, this),
+    m_Recomp(NULL),
+    m_InReset(false),
+    m_NextTimer(0),
+    m_SystemTimer(m_NextTimer),
+    m_bCleanFrameBox(true),
+    m_bInitialized(false),
+    m_RspBroke(true),
+    m_DMAUsed(false),
+    m_TestTimer(false),
+    m_NextInstruction(0),
+    m_JumpToLocation(0),
+    m_TLBLoadAddress(0),
+    m_TLBStoreAddress(0),
+    m_SyncCount(0),
+    m_thread(NULL),
+    m_hPauseEvent(true),
+    m_CheatsSlectionChanged(false),
+    m_HasAutosaved(false),
+    m_SyncCpu(SyncSystem)
 {
     WriteTrace(TraceN64System, TraceDebug, "Start");
     uint32_t gameHertz = g_Settings->LoadDword(Game_ScreenHertz);
@@ -83,7 +82,6 @@ m_SyncCpu(SyncSystem)
     m_Limiter.SetHertz(gameHertz);
     g_Settings->SaveDword(GameRunning_ScreenHertz, gameHertz);
     m_Cheats.LoadCheats(!g_Settings->LoadDword(Setting_RememberCheats), Plugins);
-    
     WriteTrace(TraceN64System, TraceDebug, "Setting up system");
     CInterpreterCPU::BuildCPU();
 
@@ -115,6 +113,7 @@ m_SyncCpu(SyncSystem)
         }
     }
     WriteTrace(TraceN64System, TraceDebug, "Done");
+    discordInit();
 }
 
 CN64System::~CN64System()
@@ -197,9 +196,9 @@ void CN64System::ExternalEvent(SystemEvent action)
             QueueEvent(action);
         }
         break;
-	case SysEvent_PauseCPU_Settings:
-	case SysEvent_PauseCPU_Cheats:
-		break;
+    case SysEvent_PauseCPU_Settings:
+    case SysEvent_PauseCPU_Cheats:
+        break;
     case SysEvent_ResumeCPU_FromMenu:
         // always resume if from menu
         m_hPauseEvent.Trigger();
@@ -258,7 +257,7 @@ void CN64System::ExternalEvent(SystemEvent action)
     }
 }
 
-bool CN64System::LoadFileImage(const char * FileLoc)
+bool CN64System::LoadFileImage(const char* FileLoc)
 {
     WriteTrace(TraceN64System, TraceDebug, "Start (FileLoc: %s)", FileLoc);
     CloseSystem();
@@ -331,7 +330,7 @@ bool CN64System::LoadFileImage(const char * FileLoc)
     return true;
 }
 
-bool CN64System::RunFileImage(const char * FileLoc)
+bool CN64System::RunFileImage(const char* FileLoc)
 {
     if (!LoadFileImage(FileLoc))
     {
@@ -348,7 +347,8 @@ bool CN64System::RunFileImage(const char * FileLoc)
 void CN64System::RunLoadedImage(void)
 {
     WriteTrace(TraceN64System, TraceDebug, "Start");
-    ShellExecute(NULL, "open", "Replace.bat", NULL, NULL, SW_SHOWDEFAULT);
+    // On auto-launch, show replace prompts for changed saves but skip final summary dialog.
+    CN64System::ReplaceSaves(true, false);
     g_BaseSystem = new CN64System(g_Plugins, false, false);
     if (g_BaseSystem)
     {
@@ -359,6 +359,220 @@ void CN64System::RunLoadedImage(void)
         WriteTrace(TraceN64System, TraceError, "Failed to create CN64System");
     }
     WriteTrace(TraceN64System, TraceDebug, "Done");
+}
+
+void CN64System::ReplaceSaves(bool interactive, bool showSummary)
+{
+    WriteTrace(TraceN64System, TraceDebug, "ReplaceSaves: Start (interactive=%d, showSummary=%d)", interactive, showSummary);
+
+    auto normalizeName = [](const std::string & value) -> std::string
+    {
+        std::string normalized;
+        normalized.reserve(value.size());
+        for (size_t i = 0; i < value.size(); i++)
+        {
+            unsigned char ch = static_cast<unsigned char>(value[i]);
+            if (std::isalnum(ch))
+            {
+                normalized.push_back((char)std::tolower(ch));
+            }
+        }
+        return normalized;
+    };
+
+    auto fileBaseName = [](const std::string & fileName) -> std::string
+    {
+        size_t dotPos = fileName.find_last_of('.');
+        return dotPos == std::string::npos ? fileName : fileName.substr(0, dotPos);
+    };
+
+    auto hasSupportedSaveExt = [](const std::string & fileName) -> bool
+    {
+        size_t dotPos = fileName.find_last_of('.');
+        if (dotPos == std::string::npos)
+        {
+            return false;
+        }
+        std::string ext = fileName.substr(dotPos + 1);
+        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+        return ext == "eep" || ext == "sra" || ext == "fla" || ext == "mpk";
+    };
+
+    std::vector<std::string> gameKeys;
+    gameKeys.push_back(normalizeName(g_Settings->LoadStringVal(Game_GameName).c_str()));
+    gameKeys.push_back(normalizeName(g_Settings->LoadStringVal(Game_GoodName).c_str()));
+    gameKeys.erase(std::remove_if(gameKeys.begin(), gameKeys.end(), [](const std::string & s) { return s.empty(); }), gameKeys.end());
+    gameKeys.erase(std::unique(gameKeys.begin(), gameKeys.end()), gameKeys.end());
+
+    if (gameKeys.empty())
+    {
+        WriteTrace(TraceN64System, TraceError, "ReplaceSaves: Cannot detect current game name");
+        if (interactive && showSummary)
+        {
+            MessageBoxA(NULL, "Unable to detect the current game for save mapping.", "Replace Saves", MB_OK | MB_ICONWARNING);
+        }
+        return;
+    }
+
+    std::string base = g_Settings->LoadStringVal(Cmd_BaseDirectory).c_str();
+    if (!base.empty() && base.back() != '\\' && base.back() != '/')
+    {
+        base.push_back('\\');
+    }
+
+    std::string backupDir = base + "User\\Save\\Backup\\";
+    std::string saveDir = base + "User\\Save\\";
+    std::string search = backupDir + "*.*";
+
+    WIN32_FIND_DATAA fd;
+    HANDLE hFind = FindFirstFileA(search.c_str(), &fd);
+    if (hFind == INVALID_HANDLE_VALUE)
+    {
+        WriteTrace(TraceN64System, TraceDebug, "ReplaceSaves: No backup files found");
+        if (interactive)
+        {
+            MessageBoxA(NULL, "No backup files found in Config\\Backup.", "Replace Saves", MB_OK | MB_ICONINFORMATION);
+        }
+        return;
+    }
+
+    int differentTotal = 0;
+    int replacedCount = 0;
+    int mappedFiles = 0;
+    do
+    {
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            continue;
+
+        std::string filename = fd.cFileName;
+        if (!hasSupportedSaveExt(filename))
+        {
+            continue;
+        }
+
+        std::string normalizedBackupBase = normalizeName(fileBaseName(filename));
+        bool mappedToCurrentGame = false;
+        for (size_t i = 0; i < gameKeys.size(); i++)
+        {
+            const std::string & key = gameKeys[i];
+            if (normalizedBackupBase.find(key) != std::string::npos || key.find(normalizedBackupBase) != std::string::npos)
+            {
+                mappedToCurrentGame = true;
+                break;
+            }
+        }
+        if (!mappedToCurrentGame)
+        {
+            continue;
+        }
+
+        mappedFiles++;
+        std::string backupFile = backupDir + filename;
+        std::string saveFile = saveDir + filename;
+
+        HANDLE hBackup = CreateFileA(backupFile.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
+            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+        if (hBackup == INVALID_HANDLE_VALUE)
+            continue;
+
+        HANDLE hSave = CreateFileA(saveFile.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
+            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+
+        bool different = false;
+        if (hSave == INVALID_HANDLE_VALUE)
+        {
+            different = true;
+        }
+        else
+        {
+            DWORD sizeBackup = GetFileSize(hBackup, NULL);
+            DWORD sizeSave = GetFileSize(hSave, NULL);
+            if (sizeBackup != sizeSave)
+            {
+                different = true;
+            }
+            else
+            {
+                const DWORD BUF = 4096;
+                BYTE buf1[BUF];
+                BYTE buf2[BUF];
+                DWORD r1 = 0, r2 = 0;
+                SetFilePointer(hBackup, 0, NULL, FILE_BEGIN);
+                SetFilePointer(hSave, 0, NULL, FILE_BEGIN);
+                while (ReadFile(hBackup, buf1, BUF, &r1, NULL) && ReadFile(hSave, buf2, BUF, &r2, NULL) && r1 > 0)
+                {
+                    if (r1 != r2 || memcmp(buf1, buf2, r1) != 0)
+                    {
+                        different = true;
+                        break;
+                    }
+                }
+            }
+            CloseHandle(hSave);
+        }
+
+        CloseHandle(hBackup);
+
+        if (different)
+        {
+            differentTotal++;
+            if (interactive)
+            {
+                std::string msg = "Your " + filename + " has been changed. Replace?";
+                int res = MessageBoxA(NULL, msg.c_str(), "Replace Save", MB_YESNO | MB_ICONQUESTION);
+                if (res == IDYES)
+                {
+                    if (CopyFileA(backupFile.c_str(), saveFile.c_str(), FALSE))
+                    {
+                        replacedCount++;
+                        MessageBoxA(NULL, (filename + " replaced successfully.").c_str(), "Replace Save", MB_OK | MB_ICONINFORMATION);
+                    }
+                    else
+                    {
+                        MessageBoxA(NULL, ("There was an error replacing " + filename + ".").c_str(), "Replace Save", MB_OK | MB_ICONERROR);
+                    }
+                }
+            }
+            else
+            {
+                // non-interactive: auto-replace
+                if (CopyFileA(backupFile.c_str(), saveFile.c_str(), FALSE))
+                {
+                    replacedCount++;
+                    WriteTrace(TraceN64System, TraceDebug, "ReplaceSaves: %s replaced", filename.c_str());
+                }
+                else
+                {
+                    WriteTrace(TraceN64System, TraceError, "ReplaceSaves: failed to replace %s", filename.c_str());
+                }
+            }
+        }
+
+    } while (FindNextFileA(hFind, &fd));
+
+    FindClose(hFind);
+
+    WriteTrace(TraceN64System, TraceDebug, "ReplaceSaves: Done (mapped=%d, different=%d, replaced=%d)", mappedFiles, differentTotal, replacedCount);
+    if (interactive && showSummary)
+    {
+        if (mappedFiles == 0)
+        {
+            MessageBoxA(NULL, "No mapped saves found for this game.", "Replace Saves", MB_OK | MB_ICONINFORMATION);
+        }
+        else if (differentTotal == 0)
+        {
+            MessageBoxA(NULL, "No saves to replace.", "Replace Saves", MB_OK | MB_ICONINFORMATION);
+        }
+        else if (replacedCount == 0)
+        {
+            MessageBoxA(NULL, "No files were replaced.", "Replace Saves", MB_OK | MB_ICONINFORMATION);
+        }
+        else
+        {
+            std::string doneMsg = std::to_string(replacedCount) + " file(s) replaced.";
+            MessageBoxA(NULL, doneMsg.c_str(), "Replace Saves", MB_OK | MB_ICONINFORMATION);
+        }
+    }
 }
 
 bool CN64System::RunFileImageIPL(const char * FileLoc)
@@ -418,7 +632,7 @@ bool CN64System::RunFileImageIPL(const char * FileLoc)
     return true;
 }
 
-bool CN64System::RunDiskImage(const char * FileLoc)
+bool CN64System::RunDiskImage(const char* FileLoc)
 {
     CloseSystem();
     if (g_Settings->LoadBool(GameRunning_LoadingInProgress))
@@ -474,7 +688,7 @@ void CN64System::CloseSystem()
     WriteTrace(TraceN64System, TraceDebug, "Done");
 }
 
-bool CN64System::EmulationStarting(CThread * thread)
+bool CN64System::EmulationStarting(CThread* thread)
 {
     WriteTrace(TraceN64System, TraceDebug, "Starting (hThread: %p ThreadId: %d)", thread, thread->ThreadID());
     bool bRes = true;
@@ -563,18 +777,448 @@ void CN64System::StartEmulation2(bool NewThread)
     WriteTrace(TraceN64System, TraceDebug, "Done");
 }
 
-CDiscord* g_Discord = nullptr;
+static void handleDiscordReady(void)
+{
+    printf("\nDiscord: ready\n");
+}
+
+static void handleDiscordDisconnected(int errcode, const char* message)
+{
+    printf("\nDiscord: disconnected (%d: %s)\n", errcode, message);
+}
+
+static void handleDiscordError(int errcode, const char* message)
+{
+    printf("\nDiscord: error (%d: %s)\n", errcode, message);
+}
+
+static void handleDiscordJoin(const char* secret)
+{
+    printf("\nDiscord: join (%s)\n", secret);
+}
+
+static void handleDiscordSpectate(const char* secret)
+{
+    printf("\nDiscord: spectate (%s)\n", secret);
+}
+
+void CN64System::getMk64Rps(uint8_t* Rdram, DiscordRichPresence& discordPresence)
+{
+    const char* Speed = "fug";
+    const char* Track = "fug";
+    bool        Error = false;
+    uint8_t     CupId = Rdram[MK64_MEM_CUP];
+    uint8_t     MusicId = Rdram[MK64_MEM_MUSIC];
+    uint8_t     SpeedId = Rdram[MK64_MEM_SPEED];
+    uint8_t     TrackId = Rdram[MK64_MEM_TRACK];
+
+    if (MusicId > 2)
+    {
+        if (CupId < 5 && TrackId < 5)
+        {
+            Speed = CupId == 4 ? MK64_SPEEDS[4] : MK64_SPEEDS[SpeedId];
+            Track = MK64_TRACKS[CupId * 4 + TrackId];
+        }
+        else Error = true;
+    }
+    else Error = true;
+
+    char RpsResult[128];
+    if (!Error)
+    {
+        snprintf(
+            RpsResult,
+            sizeof(RpsResult),
+            "Players: %d/4 Class: %s",
+            m_DiscordCurrentPlayers,
+            Speed
+        );
+        discordPresence.state = Track;
+    }
+    else
+    {
+        snprintf(
+            RpsResult,
+            sizeof(RpsResult),
+            "Players: %d/4",
+            m_DiscordCurrentPlayers
+        );
+        discordPresence.state = "Setting up...";
+    }
+    RpsResult[sizeof(RpsResult) - 1] = 0;
+    discordPresence.details = RpsResult;
+
+    discordPresence.largeImageKey = "box-mk64";
+    discordPresence.largeImageText = "Mario Kart 64";
+
+    Discord_UpdatePresence(&discordPresence);
+}
+
+void CN64System::getMp1Rps(uint8_t* Rdram, DiscordRichPresence& discordPresence)
+{
+    const char* Board = "fug";
+    const char* BoardThumbnail = "fug";
+    bool        Error = false;
+    uint8_t     BoardId = Rdram[MP1_MEM_BOARD];
+    uint8_t     CurrentTurn = Rdram[MP1_MEM_CURRENT_TURN];
+    uint8_t     GameState = Rdram[MP1_MEM_GAMESTATE];
+    uint8_t     TotalTurns = Rdram[MP1_MEM_TOTAL_TURNS];
+
+    if (BoardId >= 0 && BoardId < sizeof(MP1_BOARDS))
+    {
+        Board = MP1_BOARDS[BoardId];
+        BoardThumbnail = MP1_BOARDS_THUMB[BoardId];
+
+        switch (GameState)
+        {
+        case 0x61:
+        case 0x66:
+        case 0x67:
+        case 0x69:
+        case 0x6a:
+        case 0x6b:
+        case 0x6c:
+        case 0x6d:
+        case 0x6e:
+        case 0x81:
+            Error = true;
+            break;
+        default:
+            if (CurrentTurn > TotalTurns + 1 || TotalTurns == 0 || CurrentTurn == 0)
+                Error = true;
+        }
+    }
+    else Error = true;
+
+    if (GameState == 0x42 && !m_HasAutosaved)
+    {
+        SaveState();
+        m_HasAutosaved = true;
+    }
+
+    char RpsResult[128];
+    if (Error)
+    {
+        discordPresence.state = "Setting up...";
+        discordPresence.smallImageKey = NULL;
+        snprintf(
+            RpsResult,
+            sizeof(RpsResult),
+            "Players: %d/4",
+            m_DiscordCurrentPlayers
+        );
+    }
+    else
+    {
+        discordPresence.state = Board;
+        discordPresence.smallImageKey = BoardThumbnail;
+        if (BoardId == 10) //Mini-Game Island
+            snprintf(RpsResult, sizeof(RpsResult), "Story Mode"); //TODO
+        else
+            snprintf(
+                RpsResult,
+                sizeof(RpsResult),
+                "Players: %d/4 Turn: %d/%d",
+                m_DiscordCurrentPlayers,
+                CurrentTurn,
+                TotalTurns
+            );
+    }
+
+    RpsResult[sizeof(RpsResult) - 1] = 0;
+    discordPresence.details = RpsResult;
+    discordPresence.largeImageKey = "box-mp1";
+    discordPresence.largeImageText = "Mario Party";
+    discordPresence.smallImageText = Board;
+
+    Discord_UpdatePresence(&discordPresence);
+}
+
+void CN64System::getMp2Rps(uint8_t* Rdram, DiscordRichPresence& discordPresence)
+{
+    const char* Board = "fug";
+    const char* BoardThumbnail = "fug";
+    bool        Error = false;
+    uint8_t     BoardId = Rdram[MP2_MEM_BOARD];
+    uint8_t     GameState = Rdram[MP2_MEM_GAMESTATE];
+    uint8_t     GameType = Rdram[MP2_MEM_GAMETYPE];
+    uint8_t     CurrentTurn = Rdram[MP2_MEM_CURRENT_TURN];
+    uint8_t     TotalTurns = Rdram[MP2_MEM_TOTAL_TURNS];
+
+    if (BoardId >= 0 && BoardId < sizeof(MP2_BOARDS))
+    {
+        Board = MP2_BOARDS[BoardId];
+        BoardThumbnail = MP2_BOARDS_THUMB[BoardId];
+
+        switch (GameState)
+        {
+        case 0x55:
+        case 0x57:
+        case 0x58:
+        case 0x5b:
+        case 0x5c:
+        case 0x62:
+            Error = true;
+            break;
+        default:
+            if (CurrentTurn > TotalTurns + 1 || TotalTurns == 0 || CurrentTurn == 0)
+                Error = true;
+        }
+    }
+    else Error = true;
+
+    if (GameState == 0x52 && !m_HasAutosaved)
+    {
+        SaveState();
+        m_HasAutosaved = true;
+    }
+
+    char RpsResult[128];
+    if (Error)
+    {
+        discordPresence.state = "Setting up...";
+        discordPresence.smallImageKey = NULL;
+        snprintf(
+            RpsResult,
+            sizeof(RpsResult),
+            "Players: %d/4",
+            m_DiscordCurrentPlayers
+        );
+    }
+    else
+    {
+        if (BoardId == 7) //Mini-Game Coaster
+            snprintf(RpsResult, sizeof(RpsResult), "Story Mode"); //TODO
+        else
+            snprintf(
+                RpsResult,
+                sizeof(RpsResult),
+                "Players: %d/4 Turn: %d/%d",
+                m_DiscordCurrentPlayers,
+                CurrentTurn,
+                TotalTurns
+            );
+        discordPresence.state = Board;
+        discordPresence.smallImageKey = BoardThumbnail;
+    }
+
+    RpsResult[sizeof(RpsResult) - 1] = 0;
+    discordPresence.details = RpsResult;
+    discordPresence.largeImageKey = "box-mp2";
+    discordPresence.largeImageText = "Mario Party 2";
+    discordPresence.smallImageText = Board;
+
+    Discord_UpdatePresence(&discordPresence);
+}
+
+void CN64System::getMp3Rps(uint8_t* Rdram, DiscordRichPresence& discordPresence)
+{
+    const char* Board = "fug";
+    const char* BoardThumbnail = "fug";
+    bool    Error = false;
+    uint8_t BoardId = Rdram[MP3_MEM_BOARD];
+    uint8_t GameState = Rdram[MP3_MEM_GAMESTATE];
+    uint8_t GameType = Rdram[MP3_MEM_GAMETYPE];
+    uint8_t CurrentTurn = Rdram[MP3_MEM_CURRENT_TURN];
+    uint8_t MaxPlayers = 4;
+    uint8_t TotalTurns = Rdram[MP3_MEM_TOTAL_TURNS];
+
+    /* Get info on current board, MP3 has BR and Duel */
+    if (BoardId >= 0 && BoardId < sizeof(MP3_BOARDS))
+    {
+        switch (GameState)
+        {
+        case 0x55:
+        case 0x77:
+        case 0x78:
+        case 0x79:
+        case 0x7a:
+        case 0x7b:
+            Error = true;
+            break;
+        default:
+            if (GameType == 1 || GameType == 5)
+            {
+                Board = MP3_BOARDS[BoardId];
+                BoardThumbnail = MP3_BOARDS_THUMB[BoardId];
+                MaxPlayers = 4;
+            }
+            else if (GameType == 2 || GameType == 6)
+            {
+                Board = MP3_BOARDS_DUEL[BoardId];
+                BoardThumbnail = MP3_BOARDS_DUEL_THUMB[BoardId];
+                MaxPlayers = 2;
+            }
+            else Error = true;
+
+            if (CurrentTurn > TotalTurns + 1 || TotalTurns == 0 || CurrentTurn == 0)
+                Error = true;
+        }
+    }
+    else Error = true;
+
+    if (GameState == 0x4f && !m_HasAutosaved)
+    {
+        SaveState();
+        m_HasAutosaved = true;
+    }
+
+    if (GameState != 0 && GameState < sizeof(MP3_MINIS) / 4)
+        discordPresence.state = MP3_MINIS[GameState];
+    char RpsResult[128];
+    if ((Error) || GameState > 118)
+    {
+        discordPresence.state = "Setting up...";
+        discordPresence.smallImageKey = NULL;
+        snprintf(
+            RpsResult,
+            sizeof(RpsResult),
+            "Players: %d/%d",
+            m_DiscordCurrentPlayers,
+            MaxPlayers
+        );
+    }
+    else
+    {
+        discordPresence.state = Board;
+        discordPresence.smallImageKey = BoardThumbnail;
+        if (GameType == 5 || GameType == 6)
+            snprintf(RpsResult, sizeof(RpsResult), "Story Mode"); //TODO
+        else
+            snprintf(
+                RpsResult,
+                sizeof(RpsResult),
+                "Players: %d/%d Turn: %d/%d",
+                m_DiscordCurrentPlayers,
+                MaxPlayers,
+                CurrentTurn,
+                TotalTurns
+            );
+    }
+
+    RpsResult[sizeof(RpsResult) - 1] = 0;
+    discordPresence.details = RpsResult;
+    discordPresence.largeImageKey = "box-mp3";
+    discordPresence.largeImageText = "Mario Party 3";
+    discordPresence.smallImageText = Board;
+
+    Discord_UpdatePresence(&discordPresence);
+}
+
+void CN64System::getSsbRps(uint8_t* Rdram, DiscordRichPresence& discordPresence)
+{
+    const char* Stage = "fug";
+    const char* Player[4] = { "fug" };
+    const char* StageThumbnail = "fug";
+    bool        Error = false;
+    uint8_t     StageId = Rdram[SSB_MEM_STAGE];
+
+    if (StageId >= 0 && StageId < sizeof(SSB_STAGES) / 4)
+    {
+        Stage = SSB_STAGES[StageId];
+        StageThumbnail = SSB_STAGES_THUMB[StageId];
+        for (uint8_t i = 0; i < m_DiscordCurrentPlayers; i++)
+        {
+            uint8_t Character = Rdram[SSB_MEM_PLAYER + SSB_MEM_PLAYER_OFFSET * i];
+
+            if (Character > sizeof(SSB_CHARACTERS) / 4)
+                Error = true;
+            else
+                Player[i] = SSB_CHARACTERS[Character];
+        }
+    }
+    else Error = true;
+
+    char DetailsResult[128];
+    snprintf(
+        DetailsResult,
+        sizeof(DetailsResult),
+        "Players: %d/4",
+        m_DiscordCurrentPlayers
+    );
+    DetailsResult[sizeof(DetailsResult) - 1] = 0;
+    discordPresence.details = DetailsResult;
+
+    char StatusResult[128];
+    if (!Error)
+    {
+        snprintf(StatusResult, sizeof(StatusResult), "%s", Player[0]);
+        for (uint8_t i = 1; i < m_DiscordCurrentPlayers; i++)
+            snprintf(
+                StatusResult,
+                sizeof(StatusResult),
+                "%s vs. %s",
+                StatusResult,
+                Player[i]
+            );
+        StatusResult[sizeof(StatusResult) - 1] = 0;
+        discordPresence.state = StatusResult;
+    }
+    else
+        discordPresence.state = "Setting up...";
+
+    discordPresence.largeImageKey = "box-ssb";
+    discordPresence.largeImageText = "Super Smash Bros.";
+    discordPresence.smallImageKey = StageThumbnail;
+    discordPresence.smallImageText = Stage;
+
+    Discord_UpdatePresence(&discordPresence);
+}
 
 void CN64System::getNumberControllers()
 {
     CONTROL* Controllers = g_Plugins->Control()->PluginControllers();
-    uint8_t playerCount = 0;
+    m_DiscordCurrentPlayers = 0;
     for (uint8_t i = 0; i < sizeof(Controllers); i++)
         if (Controllers[i].Present != 0)
-            playerCount++;
+            m_DiscordCurrentPlayers++;
+}
 
-    if (g_Discord)
-        g_Discord->SetPlayerCount(playerCount);
+void CN64System::discordInit()
+{
+    m_DiscordApplicationId = "888655408623943731";
+    m_DiscordCurrentPlayers = 0;
+    m_DiscordNextPost = time(0);
+    m_DiscordSendPresence = true;
+    m_DiscordStartTime = time(0);
+
+    DiscordEventHandlers handlers;
+    memset(&handlers, 0, sizeof(handlers));
+    handlers.disconnected = handleDiscordDisconnected;
+    handlers.errored = handleDiscordError;
+    handlers.joinGame = handleDiscordJoin;
+    handlers.spectateGame = handleDiscordSpectate;
+
+    Discord_Initialize(m_DiscordApplicationId, &handlers, 1, NULL);
+}
+
+void CN64System::discordUpdate()
+{
+    if (m_DiscordSendPresence)
+    {
+        if (time(0) > m_DiscordNextPost)
+        {
+            DiscordRichPresence discordPresence;
+            memset(&discordPresence, 0, sizeof(discordPresence));
+
+            getNumberControllers();
+            discordPresence.startTimestamp = m_DiscordStartTime;
+
+            if (strstr(g_Settings->LoadStringVal(Game_GameName).c_str(), "MarioParty2") != NULL)
+                getMp2Rps(m_MMU_VM.Rdram(), discordPresence);
+            else if (strstr(g_Settings->LoadStringVal(Game_GameName).c_str(), "MarioParty3") != NULL)
+                getMp3Rps(m_MMU_VM.Rdram(), discordPresence);
+            else if (strstr(g_Settings->LoadStringVal(Game_GameName).c_str(), "MarioParty") != NULL)
+                getMp1Rps(m_MMU_VM.Rdram(), discordPresence);
+            else if (strstr(g_Settings->LoadStringVal(Game_GameName).c_str(), "SMASH BROTHERS") != NULL)
+                getSsbRps(m_MMU_VM.Rdram(), discordPresence);
+            else if (strstr(g_Settings->LoadStringVal(Game_GameName).c_str(), "MARIOKART64") != NULL)
+                getMk64Rps(m_MMU_VM.Rdram(), discordPresence);
+        }
+    }
+    else
+        Discord_ClearPresence();
+    Discord_RunCallbacks();
 }
 
 void CN64System::StartEmulation(bool NewThread)
@@ -828,7 +1472,7 @@ bool CN64System::SetActiveSystem(bool bActive)
     return bRes;
 }
 
-void CN64System::InitRegisters(bool bPostPif, CMipsMemoryVM & MMU)
+void CN64System::InitRegisters(bool bPostPif, CMipsMemoryVM& MMU)
 {
     m_Reg.Reset();
 
@@ -1094,7 +1738,7 @@ void CN64System::CpuStopped()
     WriteTrace(TraceN64System, TraceDebug, "Done");
 }
 
-void CN64System::UpdateSyncCPU(CN64System * const SecondCPU, uint32_t const Cycles)
+void CN64System::UpdateSyncCPU(CN64System* const SecondCPU, uint32_t const Cycles)
 {
     int CyclesToExecute = Cycles - m_CyclesToSkip;
 
@@ -1112,7 +1756,7 @@ void CN64System::UpdateSyncCPU(CN64System * const SecondCPU, uint32_t const Cycl
     SetActiveSystem(true);
 }
 
-void CN64System::SyncCPUPC(CN64System * const SecondCPU)
+void CN64System::SyncCPUPC(CN64System* const SecondCPU)
 {
     bool ErrorFound = false;
 
@@ -1135,7 +1779,7 @@ void CN64System::SyncCPUPC(CN64System * const SecondCPU)
     m_LastSuccessSyncPC[0] = m_Reg.m_PROGRAM_COUNTER;
 }
 
-void CN64System::SyncCPU(CN64System * const SecondCPU)
+void CN64System::SyncCPU(CN64System* const SecondCPU)
 {
     bool ErrorFound = false;
 
@@ -1276,7 +1920,7 @@ void CN64System::SyncSystemPC()
     SyncCPUPC(g_SyncSystem);
 }
 
-void CN64System::DumpSyncErrors(CN64System * SecondCPU)
+void CN64System::DumpSyncErrors(CN64System* SecondCPU)
 {
     int count;
 
@@ -1395,7 +2039,7 @@ void CN64System::DumpSyncErrors(CN64System * SecondCPU)
             }
         }
 
-        uint32_t * Rdram = (uint32_t *)m_MMU_VM.Rdram(), *Rdram2 = (uint32_t *)SecondCPU->m_MMU_VM.Rdram();
+        uint32_t* Rdram = (uint32_t*)m_MMU_VM.Rdram(), * Rdram2 = (uint32_t*)SecondCPU->m_MMU_VM.Rdram();
         for (int z = 0, n = (RdramSize() >> 2); z < n; z++)
         {
             if (Rdram[z] != Rdram2[z])
@@ -1404,7 +2048,7 @@ void CN64System::DumpSyncErrors(CN64System * SecondCPU)
             }
         }
 
-        uint32_t * Imem = (uint32_t *)m_MMU_VM.Imem(), *Imem2 = (uint32_t *)SecondCPU->m_MMU_VM.Imem();
+        uint32_t* Imem = (uint32_t*)m_MMU_VM.Imem(), * Imem2 = (uint32_t*)SecondCPU->m_MMU_VM.Imem();
         for (int z = 0; z < (0x1000 >> 2); z++)
         {
             if (Imem[z] != Imem2[z])
@@ -1412,7 +2056,7 @@ void CN64System::DumpSyncErrors(CN64System * SecondCPU)
                 Error.LogF("Imem[%X]: %X %X\r\n", z << 2, Imem[z], Imem2[z]);
             }
         }
-        uint32_t * Dmem = (uint32_t *)m_MMU_VM.Dmem(), *Dmem2 = (uint32_t *)SecondCPU->m_MMU_VM.Dmem();
+        uint32_t* Dmem = (uint32_t*)m_MMU_VM.Dmem(), * Dmem2 = (uint32_t*)SecondCPU->m_MMU_VM.Dmem();
         for (int z = 0; z < (0x1000 >> 2); z++)
         {
             if (Dmem[z] != Dmem2[z])
@@ -1496,7 +2140,7 @@ void CN64System::DumpSyncErrors(CN64System * SecondCPU)
             Error.LogF("TLB[%2d], %08X,  %08X, %08X,  %08X\r\n", count,
                 m_TLB.TlbEntry(count).EntryHi.Value, m_TLB.TlbEntry(count).PageMask.Value,
                 SecondCPU->m_TLB.TlbEntry(count).EntryHi.Value, SecondCPU->m_TLB.TlbEntry(count).PageMask.Value
-                );
+            );
         }
         Error.Log("\r\n");
         Error.Log("Code at PC:\r\n");
@@ -1537,7 +2181,7 @@ bool CN64System::SaveState()
 
     CPath SaveFile(g_Settings->LoadStringVal(GameRunning_InstantSaveFile));
     int Slot = 0;
-    if (((const std::string &)SaveFile).empty())
+    if (((const std::string&)SaveFile).empty())
     {
         Slot = g_Settings->LoadDword(Game_CurrentSaveState);
         SaveFile = CPath(g_Settings->LoadStringVal(Directory_InstantSave).c_str(), "");
@@ -1589,22 +2233,22 @@ bool CN64System::SaveState()
         zipWriteInFileInZip(file, g_Rom->GetRomAddress(), 0x40);
         zipWriteInFileInZip(file, &NextViTimer, sizeof(uint32_t));
         zipWriteInFileInZip(file, &m_Reg.m_PROGRAM_COUNTER, sizeof(m_Reg.m_PROGRAM_COUNTER));
-        zipWriteInFileInZip(file, m_Reg.m_GPR, sizeof(int64_t)* 32);
-        zipWriteInFileInZip(file, m_Reg.m_FPR, sizeof(int64_t)* 32);
-        zipWriteInFileInZip(file, m_Reg.m_CP0, sizeof(uint32_t)* 32);
-        zipWriteInFileInZip(file, m_Reg.m_FPCR, sizeof(uint32_t)* 32);
+        zipWriteInFileInZip(file, m_Reg.m_GPR, sizeof(int64_t) * 32);
+        zipWriteInFileInZip(file, m_Reg.m_FPR, sizeof(int64_t) * 32);
+        zipWriteInFileInZip(file, m_Reg.m_CP0, sizeof(uint32_t) * 32);
+        zipWriteInFileInZip(file, m_Reg.m_FPCR, sizeof(uint32_t) * 32);
         zipWriteInFileInZip(file, &m_Reg.m_HI, sizeof(int64_t));
         zipWriteInFileInZip(file, &m_Reg.m_LO, sizeof(int64_t));
-        zipWriteInFileInZip(file, m_Reg.m_RDRAM_Registers, sizeof(uint32_t)* 10);
-        zipWriteInFileInZip(file, m_Reg.m_SigProcessor_Interface, sizeof(uint32_t)* 10);
-        zipWriteInFileInZip(file, m_Reg.m_Display_ControlReg, sizeof(uint32_t)* 10);
-        zipWriteInFileInZip(file, m_Reg.m_Mips_Interface, sizeof(uint32_t)* 4);
-        zipWriteInFileInZip(file, m_Reg.m_Video_Interface, sizeof(uint32_t)* 14);
-        zipWriteInFileInZip(file, m_Reg.m_Audio_Interface, sizeof(uint32_t)* 6);
-        zipWriteInFileInZip(file, m_Reg.m_Peripheral_Interface, sizeof(uint32_t)* 13);
-        zipWriteInFileInZip(file, m_Reg.m_RDRAM_Interface, sizeof(uint32_t)* 8);
-        zipWriteInFileInZip(file, m_Reg.m_SerialInterface, sizeof(uint32_t)* 4);
-        zipWriteInFileInZip(file, (void *const)&m_TLB.TlbEntry(0), sizeof(CTLB::TLB_ENTRY) * 32);
+        zipWriteInFileInZip(file, m_Reg.m_RDRAM_Registers, sizeof(uint32_t) * 10);
+        zipWriteInFileInZip(file, m_Reg.m_SigProcessor_Interface, sizeof(uint32_t) * 10);
+        zipWriteInFileInZip(file, m_Reg.m_Display_ControlReg, sizeof(uint32_t) * 10);
+        zipWriteInFileInZip(file, m_Reg.m_Mips_Interface, sizeof(uint32_t) * 4);
+        zipWriteInFileInZip(file, m_Reg.m_Video_Interface, sizeof(uint32_t) * 14);
+        zipWriteInFileInZip(file, m_Reg.m_Audio_Interface, sizeof(uint32_t) * 6);
+        zipWriteInFileInZip(file, m_Reg.m_Peripheral_Interface, sizeof(uint32_t) * 13);
+        zipWriteInFileInZip(file, m_Reg.m_RDRAM_Interface, sizeof(uint32_t) * 8);
+        zipWriteInFileInZip(file, m_Reg.m_SerialInterface, sizeof(uint32_t) * 4);
+        zipWriteInFileInZip(file, (void* const)&m_TLB.TlbEntry(0), sizeof(CTLB::TLB_ENTRY) * 32);
         zipWriteInFileInZip(file, m_MMU_VM.PifRam(), 0x40);
         zipWriteInFileInZip(file, m_MMU_VM.Rdram(), RdramSize);
         zipWriteInFileInZip(file, m_MMU_VM.Dmem(), 0x1000);
@@ -1618,7 +2262,7 @@ bool CN64System::SaveState()
 
         zipClose(file, "");
 #if defined(ANDROID)
-        utimes((const char *)ZipFile, NULL);
+        utimes((const char*)ZipFile, NULL);
 #endif
     }
     else
@@ -1641,21 +2285,21 @@ bool CN64System::SaveState()
         hSaveFile.Write(g_Rom->GetRomAddress(), 0x40);
         hSaveFile.Write(&NextViTimer, sizeof(uint32_t));
         hSaveFile.Write(&m_Reg.m_PROGRAM_COUNTER, sizeof(m_Reg.m_PROGRAM_COUNTER));
-        hSaveFile.Write(m_Reg.m_GPR, sizeof(int64_t)* 32);
-        hSaveFile.Write(m_Reg.m_FPR, sizeof(int64_t)* 32);
-        hSaveFile.Write(m_Reg.m_CP0, sizeof(uint32_t)* 32);
-        hSaveFile.Write(m_Reg.m_FPCR, sizeof(uint32_t)* 32);
+        hSaveFile.Write(m_Reg.m_GPR, sizeof(int64_t) * 32);
+        hSaveFile.Write(m_Reg.m_FPR, sizeof(int64_t) * 32);
+        hSaveFile.Write(m_Reg.m_CP0, sizeof(uint32_t) * 32);
+        hSaveFile.Write(m_Reg.m_FPCR, sizeof(uint32_t) * 32);
         hSaveFile.Write(&m_Reg.m_HI, sizeof(int64_t));
         hSaveFile.Write(&m_Reg.m_LO, sizeof(int64_t));
-        hSaveFile.Write(m_Reg.m_RDRAM_Registers, sizeof(uint32_t)* 10);
-        hSaveFile.Write(m_Reg.m_SigProcessor_Interface, sizeof(uint32_t)* 10);
-        hSaveFile.Write(m_Reg.m_Display_ControlReg, sizeof(uint32_t)* 10);
-        hSaveFile.Write(m_Reg.m_Mips_Interface, sizeof(uint32_t)* 4);
-        hSaveFile.Write(m_Reg.m_Video_Interface, sizeof(uint32_t)* 14);
-        hSaveFile.Write(m_Reg.m_Audio_Interface, sizeof(uint32_t)* 6);
-        hSaveFile.Write(m_Reg.m_Peripheral_Interface, sizeof(uint32_t)* 13);
-        hSaveFile.Write(m_Reg.m_RDRAM_Interface, sizeof(uint32_t)* 8);
-        hSaveFile.Write(m_Reg.m_SerialInterface, sizeof(uint32_t)* 4);
+        hSaveFile.Write(m_Reg.m_RDRAM_Registers, sizeof(uint32_t) * 10);
+        hSaveFile.Write(m_Reg.m_SigProcessor_Interface, sizeof(uint32_t) * 10);
+        hSaveFile.Write(m_Reg.m_Display_ControlReg, sizeof(uint32_t) * 10);
+        hSaveFile.Write(m_Reg.m_Mips_Interface, sizeof(uint32_t) * 4);
+        hSaveFile.Write(m_Reg.m_Video_Interface, sizeof(uint32_t) * 14);
+        hSaveFile.Write(m_Reg.m_Audio_Interface, sizeof(uint32_t) * 6);
+        hSaveFile.Write(m_Reg.m_Peripheral_Interface, sizeof(uint32_t) * 13);
+        hSaveFile.Write(m_Reg.m_RDRAM_Interface, sizeof(uint32_t) * 8);
+        hSaveFile.Write(m_Reg.m_SerialInterface, sizeof(uint32_t) * 4);
         hSaveFile.Write(&g_TLB->TlbEntry(0), sizeof(CTLB::TLB_ENTRY) * 32);
         hSaveFile.Write(g_MMU->PifRam(), 0x40);
         hSaveFile.Write(g_MMU->Rdram(), RdramSize);
@@ -1679,151 +2323,6 @@ bool CN64System::SaveState()
     }
     g_Notify->DisplayMessage(5, stdstr_f("%s %s", g_Lang->GetString(MSG_SAVED_STATE).c_str(), stdstr(SaveFile.GetNameExtension()).c_str()).c_str());
     WriteTrace(TraceN64System, TraceDebug, "Done");
-    return true;
-}
-
-bool CN64System::SaveStateToFile(const char * FilePath)
-{
-    WriteTrace(TraceN64System, TraceDebug, "Start - SaveStateToFile");
-
-    if ((m_Reg.STATUS_REGISTER & STATUS_EXL) != 0)
-    {
-        WriteTrace(TraceN64System, TraceDebug, "Done - STATUS_EXL set, can not save");
-        return false;
-    }
-
-    if (!FilePath || !FilePath[0])
-    {
-        WriteTrace(TraceN64System, TraceDebug, "Done - Invalid file path");
-        return false;
-    }
-
-    CPath SaveFile(FilePath);
-    CPath ExtraInfo(SaveFile);
-    ExtraInfo.SetExtension(".dat");
-
-    CPath ZipFile(SaveFile);
-    ZipFile.SetNameExtension(stdstr_f("%s.zip", ZipFile.GetNameExtension().c_str()).c_str());
-
-    //Make sure the target dir exists
-    if (!SaveFile.DirectoryExists())
-    {
-        SaveFile.DirectoryCreate();
-    }
-
-    //Open the file
-    if (g_Settings->LoadDword(Game_FuncLookupMode) == FuncFind_ChangeMemory)
-    {
-        if (m_Recomp)
-        {
-            m_Recomp->ResetRecompCode(true);
-        }
-    }
-
-    uint32_t SaveID_0 = 0x23D8A6C8, SaveID_1 = 0x56D2CD23;
-    uint32_t RdramSize = g_Settings->LoadDword(Game_RDRamSize);
-    uint32_t MiInterReg = g_Reg->MI_INTR_REG;
-    uint32_t NextViTimer = m_SystemTimer.GetTimer(CSystemTimer::ViTimer);
-    
-    bool useZip = g_Settings->LoadDword(Setting_AutoZipInstantSave);
-    
-    if (useZip)
-    {
-        ZipFile.Delete();
-        zipFile file = zipOpen(ZipFile, 0);
-        if (!file)
-        {
-            m_Reg.MI_INTR_REG = MiInterReg;
-            WriteTrace(TraceN64System, TraceDebug, "Done - Failed to open zip file");
-            return false;
-        }
-        
-        zipOpenNewFileInZip(file, SaveFile.GetNameExtension().c_str(), NULL, NULL, 0, NULL, 0, NULL, Z_DEFLATED, Z_DEFAULT_COMPRESSION);
-        zipWriteInFileInZip(file, &SaveID_0, sizeof(SaveID_0));
-        zipWriteInFileInZip(file, &RdramSize, sizeof(uint32_t));
-        zipWriteInFileInZip(file, g_Rom->GetRomAddress(), 0x40);
-        zipWriteInFileInZip(file, &NextViTimer, sizeof(uint32_t));
-        zipWriteInFileInZip(file, &m_Reg.m_PROGRAM_COUNTER, sizeof(m_Reg.m_PROGRAM_COUNTER));
-        zipWriteInFileInZip(file, m_Reg.m_GPR, sizeof(int64_t)* 32);
-        zipWriteInFileInZip(file, m_Reg.m_FPR, sizeof(int64_t)* 32);
-        zipWriteInFileInZip(file, m_Reg.m_CP0, sizeof(uint32_t)* 32);
-        zipWriteInFileInZip(file, m_Reg.m_FPCR, sizeof(uint32_t)* 32);
-        zipWriteInFileInZip(file, &m_Reg.m_HI, sizeof(int64_t));
-        zipWriteInFileInZip(file, &m_Reg.m_LO, sizeof(int64_t));
-        zipWriteInFileInZip(file, m_Reg.m_RDRAM_Registers, sizeof(uint32_t)* 10);
-        zipWriteInFileInZip(file, m_Reg.m_SigProcessor_Interface, sizeof(uint32_t)* 10);
-        zipWriteInFileInZip(file, m_Reg.m_Display_ControlReg, sizeof(uint32_t)* 10);
-        zipWriteInFileInZip(file, m_Reg.m_Mips_Interface, sizeof(uint32_t)* 4);
-        zipWriteInFileInZip(file, m_Reg.m_Video_Interface, sizeof(uint32_t)* 14);
-        zipWriteInFileInZip(file, m_Reg.m_Audio_Interface, sizeof(uint32_t)* 6);
-        zipWriteInFileInZip(file, m_Reg.m_Peripheral_Interface, sizeof(uint32_t)* 13);
-        zipWriteInFileInZip(file, m_Reg.m_RDRAM_Interface, sizeof(uint32_t)* 8);
-        zipWriteInFileInZip(file, m_Reg.m_SerialInterface, sizeof(uint32_t)* 4);
-        zipWriteInFileInZip(file, (void *const)&m_TLB.TlbEntry(0), sizeof(CTLB::TLB_ENTRY) * 32);
-        zipWriteInFileInZip(file, m_MMU_VM.PifRam(), 0x40);
-        zipWriteInFileInZip(file, m_MMU_VM.Rdram(), RdramSize);
-        zipWriteInFileInZip(file, m_MMU_VM.Dmem(), 0x1000);
-        zipWriteInFileInZip(file, m_MMU_VM.Imem(), 0x1000);
-        zipCloseFileInZip(file);
-
-        zipOpenNewFileInZip(file, ExtraInfo.GetNameExtension().c_str(), NULL, NULL, 0, NULL, 0, NULL, Z_DEFLATED, Z_DEFAULT_COMPRESSION);
-        zipWriteInFileInZip(file, &SaveID_1, sizeof(SaveID_1));
-        m_SystemTimer.SaveData(file);
-        zipCloseFileInZip(file);
-
-        zipClose(file, "");
-    }
-    else
-    {
-        ExtraInfo.Delete();
-        SaveFile.Delete();
-        CFile hSaveFile(SaveFile, CFileBase::modeWrite | CFileBase::modeCreate);
-        if (!hSaveFile.IsOpen())
-        {
-            m_Reg.MI_INTR_REG = MiInterReg;
-            WriteTrace(TraceN64System, TraceDebug, "Done - Failed to open save file");
-            return false;
-        }
-
-        //Write info to file
-        hSaveFile.SeekToBegin();
-        hSaveFile.Write(&SaveID_0, sizeof(uint32_t));
-        hSaveFile.Write(&RdramSize, sizeof(uint32_t));
-        hSaveFile.Write(g_Rom->GetRomAddress(), 0x40);
-        hSaveFile.Write(&NextViTimer, sizeof(uint32_t));
-        hSaveFile.Write(&m_Reg.m_PROGRAM_COUNTER, sizeof(m_Reg.m_PROGRAM_COUNTER));
-        hSaveFile.Write(m_Reg.m_GPR, sizeof(int64_t)* 32);
-        hSaveFile.Write(m_Reg.m_FPR, sizeof(int64_t)* 32);
-        hSaveFile.Write(m_Reg.m_CP0, sizeof(uint32_t)* 32);
-        hSaveFile.Write(m_Reg.m_FPCR, sizeof(uint32_t)* 32);
-        hSaveFile.Write(&m_Reg.m_HI, sizeof(int64_t));
-        hSaveFile.Write(&m_Reg.m_LO, sizeof(int64_t));
-        hSaveFile.Write(m_Reg.m_RDRAM_Registers, sizeof(uint32_t)* 10);
-        hSaveFile.Write(m_Reg.m_SigProcessor_Interface, sizeof(uint32_t)* 10);
-        hSaveFile.Write(m_Reg.m_Display_ControlReg, sizeof(uint32_t)* 10);
-        hSaveFile.Write(m_Reg.m_Mips_Interface, sizeof(uint32_t)* 4);
-        hSaveFile.Write(m_Reg.m_Video_Interface, sizeof(uint32_t)* 14);
-        hSaveFile.Write(m_Reg.m_Audio_Interface, sizeof(uint32_t)* 6);
-        hSaveFile.Write(m_Reg.m_Peripheral_Interface, sizeof(uint32_t)* 13);
-        hSaveFile.Write(m_Reg.m_RDRAM_Interface, sizeof(uint32_t)* 8);
-        hSaveFile.Write(m_Reg.m_SerialInterface, sizeof(uint32_t)* 4);
-        hSaveFile.Write(&g_TLB->TlbEntry(0), sizeof(CTLB::TLB_ENTRY) * 32);
-        hSaveFile.Write(g_MMU->PifRam(), 0x40);
-        hSaveFile.Write(g_MMU->Rdram(), RdramSize);
-        hSaveFile.Write(g_MMU->Dmem(), 0x1000);
-        hSaveFile.Write(g_MMU->Imem(), 0x1000);
-        hSaveFile.Close();
-
-        CFile hExtraInfo(ExtraInfo, CFileBase::modeWrite | CFileBase::modeCreate);
-        if (hExtraInfo.IsOpen())
-        {
-            m_SystemTimer.SaveData(hExtraInfo);
-            hExtraInfo.Close();
-        }
-    }
-    
-    m_Reg.MI_INTR_REG = MiInterReg;
-    WriteTrace(TraceN64System, TraceDebug, "Done - SaveStateToFile");
     return true;
 }
 
@@ -1854,7 +2353,7 @@ bool CN64System::LoadState()
     }
 
     CPath ZipFileName;
-    ZipFileName = (const std::string &)FileName + ".zip";
+    ZipFileName = (const std::string&)FileName + ".zip";
 
     if (g_Settings->LoadDword(Setting_AutoZipInstantSave))
     {
@@ -1894,7 +2393,7 @@ bool CN64System::LoadState()
     return Result;
 }
 
-bool CN64System::LoadState(const char * FileName)
+bool CN64System::LoadState(const char* FileName)
 {
     WriteTrace(TraceN64System, TraceDebug, "(%s): Start", FileName);
 
@@ -1963,22 +2462,22 @@ bool CN64System::LoadState(const char * FileName)
                 g_Settings->SaveDword(Game_RDRamSize, SaveRDRAMSize);
                 unzReadCurrentFile(file, &NextVITimer, sizeof(NextVITimer));
                 unzReadCurrentFile(file, &m_Reg.m_PROGRAM_COUNTER, sizeof(m_Reg.m_PROGRAM_COUNTER));
-                unzReadCurrentFile(file, m_Reg.m_GPR, sizeof(int64_t)* 32);
-                unzReadCurrentFile(file, m_Reg.m_FPR, sizeof(int64_t)* 32);
-                unzReadCurrentFile(file, m_Reg.m_CP0, sizeof(uint32_t)* 32);
-                unzReadCurrentFile(file, m_Reg.m_FPCR, sizeof(uint32_t)* 32);
+                unzReadCurrentFile(file, m_Reg.m_GPR, sizeof(int64_t) * 32);
+                unzReadCurrentFile(file, m_Reg.m_FPR, sizeof(int64_t) * 32);
+                unzReadCurrentFile(file, m_Reg.m_CP0, sizeof(uint32_t) * 32);
+                unzReadCurrentFile(file, m_Reg.m_FPCR, sizeof(uint32_t) * 32);
                 unzReadCurrentFile(file, &m_Reg.m_HI, sizeof(int64_t));
                 unzReadCurrentFile(file, &m_Reg.m_LO, sizeof(int64_t));
-                unzReadCurrentFile(file, m_Reg.m_RDRAM_Registers, sizeof(uint32_t)* 10);
-                unzReadCurrentFile(file, m_Reg.m_SigProcessor_Interface, sizeof(uint32_t)* 10);
-                unzReadCurrentFile(file, m_Reg.m_Display_ControlReg, sizeof(uint32_t)* 10);
-                unzReadCurrentFile(file, m_Reg.m_Mips_Interface, sizeof(uint32_t)* 4);
-                unzReadCurrentFile(file, m_Reg.m_Video_Interface, sizeof(uint32_t)* 14);
-                unzReadCurrentFile(file, m_Reg.m_Audio_Interface, sizeof(uint32_t)* 6);
-                unzReadCurrentFile(file, m_Reg.m_Peripheral_Interface, sizeof(uint32_t)* 13);
-                unzReadCurrentFile(file, m_Reg.m_RDRAM_Interface, sizeof(uint32_t)* 8);
-                unzReadCurrentFile(file, m_Reg.m_SerialInterface, sizeof(uint32_t)* 4);
-                unzReadCurrentFile(file, (void *const)&g_TLB->TlbEntry(0), sizeof(CTLB::TLB_ENTRY) * 32);
+                unzReadCurrentFile(file, m_Reg.m_RDRAM_Registers, sizeof(uint32_t) * 10);
+                unzReadCurrentFile(file, m_Reg.m_SigProcessor_Interface, sizeof(uint32_t) * 10);
+                unzReadCurrentFile(file, m_Reg.m_Display_ControlReg, sizeof(uint32_t) * 10);
+                unzReadCurrentFile(file, m_Reg.m_Mips_Interface, sizeof(uint32_t) * 4);
+                unzReadCurrentFile(file, m_Reg.m_Video_Interface, sizeof(uint32_t) * 14);
+                unzReadCurrentFile(file, m_Reg.m_Audio_Interface, sizeof(uint32_t) * 6);
+                unzReadCurrentFile(file, m_Reg.m_Peripheral_Interface, sizeof(uint32_t) * 13);
+                unzReadCurrentFile(file, m_Reg.m_RDRAM_Interface, sizeof(uint32_t) * 8);
+                unzReadCurrentFile(file, m_Reg.m_SerialInterface, sizeof(uint32_t) * 4);
+                unzReadCurrentFile(file, (void* const)&g_TLB->TlbEntry(0), sizeof(CTLB::TLB_ENTRY) * 32);
                 unzReadCurrentFile(file, m_MMU_VM.PifRam(), 0x40);
                 unzReadCurrentFile(file, m_MMU_VM.Rdram(), SaveRDRAMSize);
                 unzReadCurrentFile(file, m_MMU_VM.Dmem(), 0x1000);
@@ -2030,22 +2529,22 @@ bool CN64System::LoadState(const char * FileName)
 
         hSaveFile.Read(&NextVITimer, sizeof(NextVITimer));
         hSaveFile.Read(&m_Reg.m_PROGRAM_COUNTER, sizeof(m_Reg.m_PROGRAM_COUNTER));
-        hSaveFile.Read(m_Reg.m_GPR, sizeof(int64_t)* 32);
-        hSaveFile.Read(m_Reg.m_FPR, sizeof(int64_t)* 32);
-        hSaveFile.Read(m_Reg.m_CP0, sizeof(uint32_t)* 32);
-        hSaveFile.Read(m_Reg.m_FPCR, sizeof(uint32_t)* 32);
+        hSaveFile.Read(m_Reg.m_GPR, sizeof(int64_t) * 32);
+        hSaveFile.Read(m_Reg.m_FPR, sizeof(int64_t) * 32);
+        hSaveFile.Read(m_Reg.m_CP0, sizeof(uint32_t) * 32);
+        hSaveFile.Read(m_Reg.m_FPCR, sizeof(uint32_t) * 32);
         hSaveFile.Read(&m_Reg.m_HI, sizeof(int64_t));
         hSaveFile.Read(&m_Reg.m_LO, sizeof(int64_t));
-        hSaveFile.Read(m_Reg.m_RDRAM_Registers, sizeof(uint32_t)* 10);
-        hSaveFile.Read(m_Reg.m_SigProcessor_Interface, sizeof(uint32_t)* 10);
-        hSaveFile.Read(m_Reg.m_Display_ControlReg, sizeof(uint32_t)* 10);
-        hSaveFile.Read(m_Reg.m_Mips_Interface, sizeof(uint32_t)* 4);
-        hSaveFile.Read(m_Reg.m_Video_Interface, sizeof(uint32_t)* 14);
-        hSaveFile.Read(m_Reg.m_Audio_Interface, sizeof(uint32_t)* 6);
-        hSaveFile.Read(m_Reg.m_Peripheral_Interface, sizeof(uint32_t)* 13);
-        hSaveFile.Read(m_Reg.m_RDRAM_Interface, sizeof(uint32_t)* 8);
-        hSaveFile.Read(m_Reg.m_SerialInterface, sizeof(uint32_t)* 4);
-        hSaveFile.Read((void *const)&g_TLB->TlbEntry(0), sizeof(CTLB::TLB_ENTRY) * 32);
+        hSaveFile.Read(m_Reg.m_RDRAM_Registers, sizeof(uint32_t) * 10);
+        hSaveFile.Read(m_Reg.m_SigProcessor_Interface, sizeof(uint32_t) * 10);
+        hSaveFile.Read(m_Reg.m_Display_ControlReg, sizeof(uint32_t) * 10);
+        hSaveFile.Read(m_Reg.m_Mips_Interface, sizeof(uint32_t) * 4);
+        hSaveFile.Read(m_Reg.m_Video_Interface, sizeof(uint32_t) * 14);
+        hSaveFile.Read(m_Reg.m_Audio_Interface, sizeof(uint32_t) * 6);
+        hSaveFile.Read(m_Reg.m_Peripheral_Interface, sizeof(uint32_t) * 13);
+        hSaveFile.Read(m_Reg.m_RDRAM_Interface, sizeof(uint32_t) * 8);
+        hSaveFile.Read(m_Reg.m_SerialInterface, sizeof(uint32_t) * 4);
+        hSaveFile.Read((void* const)&g_TLB->TlbEntry(0), sizeof(CTLB::TLB_ENTRY) * 32);
         hSaveFile.Read(m_MMU_VM.PifRam(), 0x40);
         hSaveFile.Read(m_MMU_VM.Rdram(), SaveRDRAMSize);
         hSaveFile.Read(m_MMU_VM.Dmem(), 0x1000);
@@ -2356,23 +2855,10 @@ void CN64System::RefreshScreen()
         m_CPU_Usage.ShowCPU_Usage();
         m_CPU_Usage.StartTimer(CPU_UsageAddr != Timer_None ? CPU_UsageAddr : Timer_R4300);
     }
-
-    // Handle netplay desync detection (every 1800 frames = 1 minute at 30 FPS)
-    HandleDesyncDetection();
     if ((m_Reg.STATUS_REGISTER & STATUS_IE) != 0)
     {
         if (HasCheatsSlectionChanged())
         {
-            // Check if netplay is active - if so, don't reload cheats from settings
-            // During netplay, cheats are synchronized and should only be loaded from synchronized data
-            bool isNetplayActive = false;
-            if (g_Plugins && g_Plugins->Control())
-            {
-                const char* pluginName = g_Plugins->Control()->PluginName();
-                isNetplayActive = (pluginName != NULL && strstr(pluginName, "NetPlay") != NULL);
-            }
-
-            // Load cheats using the standard method for all gameplay modes
             if (this == g_BaseSystem && g_SyncSystem != NULL)
             {
                 g_SyncSystem->SetCheatsSlectionChanged(true);
@@ -2380,16 +2866,9 @@ void CN64System::RefreshScreen()
             SetCheatsSlectionChanged(false);
             m_Cheats.LoadCheats(false, g_BaseSystem->m_Plugins);
         }
-
-    // Apply cheats using the core hooks
-    m_Cheats.ApplyCheats(g_MMU);
+        m_Cheats.ApplyCheats(g_MMU);
     }
-
-    // Update Discord presence
-    if (g_Discord)
-    {
-        g_Discord->UpdatePresence();
-    }
+    discordUpdate();
     //    if (bProfiling)    { m_Profile.StartTimer(ProfilingAddr != Timer_None ? ProfilingAddr : Timer_R4300); }
 }
 
@@ -2412,182 +2891,5 @@ void CN64System::TLB_Changed()
     if (g_Debugger)
     {
         g_Debugger->TLBChanged();
-    }
-}
-
-std::string CN64System::GenerateDesyncSaveStateHash()
-{
-    // Create a save state and hash stable memory regions to detect desync.
-    // We avoid timing-dependent data and focus on:
-    // - CPU registers (GPR, FPR, COP0)
-    // - RDRAM starting from offset 0x10000 (skipping game-specific state)
-    // - RSP memory (DMEM/IMEM)
-    // - TLB entries
-    //
-    // This provides reliable desync detection without false positives from timing variations.
-
-    // Create a temporary save state file path
-    char tempPath[MAX_PATH];
-    if (!GetTempPathA(MAX_PATH, tempPath))
-    {
-        return "";
-    }
-
-    std::string tempFile = std::string(tempPath) + "pj64_desync_check.pj";
-
-    // Create save state to temporary file
-    if (!SaveStateToFile(tempFile.c_str()))
-    {
-        return "";
-    }
-
-    std::string hashResult;
-    std::ifstream file(tempFile, std::ios::binary);
-    if (!file.is_open())
-    {
-        DeleteFileA(tempFile.c_str()); // Clean up
-        return "";
-    }
-
-    // Hash stable memory regions instead of just the first 1024 bytes
-    CryptoPP::SHA256 hash;
-    std::vector<char> buffer;
-
-    try {
-        // Skip the save state header (SaveID + RdramSize + ROM header = 72 bytes)
-        file.seekg(72, std::ios::beg);
-
-        // Skip NextViTimer (4 bytes) - timing dependent!
-        file.seekg(4, std::ios::cur);
-
-        // Hash Program Counter (8 bytes) - should be stable
-        buffer.resize(8);
-        file.read(buffer.data(), buffer.size());
-        if (file.gcount() > 0) {
-            hash.Update((const byte*)buffer.data(), file.gcount());
-        }
-
-        // Hash CPU registers (GPR, FPR, COP0) - should be very stable
-        buffer.resize(256 + 256 + 128); // GPR + FPR + COP0
-        file.read(buffer.data(), buffer.size());
-        if (file.gcount() > 0) {
-            hash.Update((const byte*)buffer.data(), file.gcount());
-        }
-
-        // Hash HI and LO registers (16 bytes)
-        buffer.resize(16);
-        file.read(buffer.data(), buffer.size());
-        if (file.gcount() > 0) {
-            hash.Update((const byte*)buffer.data(), file.gcount());
-        }
-
-        // Skip peripheral registers (RDRAM, SI, DISPLAY, MIPS, VIDEO, AUDIO, PERIPHERAL, RDRAM interfaces)
-        // These can contain timing-dependent data
-        file.seekg(10*4 + 10*4 + 10*4 + 4*4 + 14*4 + 6*4 + 13*4 + 8*4, std::ios::cur);
-
-        // Skip SerialInterface registers (4*4 = 16 bytes)
-        file.seekg(16, std::ios::cur);
-
-        // Hash TLB entries - should be stable (32 entries * sizeof(TLB_ENTRY))
-        // Note: We can't directly access g_TLB here, but the save state format includes TLB data
-        // The TLB data comes after the SerialInterface registers in the save state
-        buffer.resize(32 * sizeof(CTLB::TLB_ENTRY));
-        file.read(buffer.data(), buffer.size());
-        if (file.gcount() > 0) {
-            hash.Update((const byte*)buffer.data(), file.gcount());
-        }
-
-        // Skip PIF RAM (64 bytes)
-        file.seekg(64, std::ios::cur);
-
-        // Hash RDRAM starting from offset 0x10000 (64KB) to avoid game-specific state at the beginning
-        // This skips things like frame counters, RNG seeds, etc. that might legitimately vary
-        const uint32_t RDRAM_OFFSET = 0x10000;
-        const uint32_t RDRAM_HASH_SIZE = 2 * 1024 * 1024; // Hash 2MB of RDRAM (half of typical 4MB)
-
-        file.seekg(RDRAM_OFFSET, std::ios::cur);
-        buffer.resize(64 * 1024); // Read in 64KB chunks
-
-        size_t totalRDRAMHashed = 0;
-        while (totalRDRAMHashed < RDRAM_HASH_SIZE && file.good()) {
-            size_t toRead = (buffer.size() < (RDRAM_HASH_SIZE - totalRDRAMHashed)) ? buffer.size() : (RDRAM_HASH_SIZE - totalRDRAMHashed);
-            file.read(buffer.data(), toRead);
-            size_t bytesRead = file.gcount();
-            if (bytesRead > 0) {
-                hash.Update((const byte*)buffer.data(), bytesRead);
-                totalRDRAMHashed += bytesRead;
-            } else {
-                break;
-            }
-        }
-
-        // Hash DMEM and IMEM (RSP memory) - should be stable
-        buffer.resize(0x2000); // 8KB total for DMEM+IMEM
-        file.read(buffer.data(), buffer.size());
-        if (file.gcount() > 0) {
-            hash.Update((const byte*)buffer.data(), file.gcount());
-        }
-
-        // Finalize hash
-        byte digest[CryptoPP::SHA256::DIGESTSIZE];
-        hash.Final(digest);
-
-        // Convert to hex string
-        CryptoPP::HexEncoder encoder;
-        std::string hexDigest;
-        encoder.Attach(new CryptoPP::StringSink(hexDigest));
-        encoder.Put(digest, sizeof(digest));
-        encoder.MessageEnd();
-
-        hashResult = hexDigest;
-    }
-    catch (...) {
-        // If anything goes wrong, return empty string
-        hashResult = "";
-    }
-
-    file.close();
-
-    // Clean up temporary file
-    DeleteFileA(tempFile.c_str());
-
-    return hashResult;
-}
-
-void CN64System::HandleDesyncDetection()
-{
-    // Increment frame counter
-    m_DesyncFrameCounter++;
-
-    // Check if 1800 frames have passed (30 FPS * 60 seconds = 1 minute)
-    const uint32_t DESYNC_CHECK_INTERVAL = 1800;
-    if (m_DesyncFrameCounter >= DESYNC_CHECK_INTERVAL)
-    {
-        // Reset counter
-        m_DesyncFrameCounter = 0;
-
-        // Check if netplay is active
-        bool isNetplayActive = false;
-        if (m_Plugins && m_Plugins->Control())
-        {
-            const char* pluginName = m_Plugins->Control()->PluginName();
-            isNetplayActive = (pluginName != NULL && strstr(pluginName, "NetPlay") != NULL);
-        }
-
-        if (isNetplayActive)
-        {
-            // Create temporary save state and get hash for desync detection
-            std::string desyncHash = GenerateDesyncSaveStateHash();
-            if (!desyncHash.empty())
-            {
-                // Call netplay function to handle desync detection
-                typedef void(__cdecl* HandleDesyncDetectionFunc)(const char* hash);
-                HandleDesyncDetectionFunc handleDesync = (HandleDesyncDetectionFunc)GetProcAddress(GetModuleHandle(NULL), "HandleNetplayDesyncDetection");
-                if (handleDesync)
-                {
-                    handleDesync(desyncHash.c_str());
-                }
-            }
-        }
     }
 }

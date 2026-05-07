@@ -263,6 +263,124 @@ void CMainMenu::OnOpenUserFolder(HWND hWnd)
     sei.nShow = SW_SHOWNORMAL;
 }
 
+void CMainMenu::OnReplaceSaves(HWND hWnd, bool interactive)
+{
+    std::string base = g_Settings->LoadStringVal(Cmd_BaseDirectory).c_str();
+    if (!base.empty() && base.back() != '\\' && base.back() != '/')
+    {
+        base.push_back('\\');
+    }
+
+    std::string backupDir = base + "User\\Save\\Backup\\";
+    std::string saveDir = base + "User\\Save\\";
+    std::string search = backupDir + "*.*";
+
+    WIN32_FIND_DATAA fd;
+    HANDLE hFind = FindFirstFileA(search.c_str(), &fd);
+    if (hFind == INVALID_HANDLE_VALUE)
+    {
+        MessageBoxA(hWnd, "No backup files found. Please reinstall the emulator.", "Replace Saves", MB_OK | MB_ICONINFORMATION);
+        return;
+    }
+
+    int differentTotal = 0;
+    int replacedCount = 0;
+    do
+    {
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            continue;
+
+        std::string filename = fd.cFileName;
+        std::string backupFile = backupDir + filename;
+        std::string saveFile = saveDir + filename;
+
+        // Open backup file
+        HANDLE hBackup = CreateFileA(backupFile.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
+            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+        if (hBackup == INVALID_HANDLE_VALUE)
+            continue;
+
+        // Try opening save file
+        HANDLE hSave = CreateFileA(saveFile.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
+            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+
+        bool different = false;
+        if (hSave == INVALID_HANDLE_VALUE)
+        {
+            different = true; // missing save file means different
+        }
+        else
+        {
+            DWORD sizeBackup = GetFileSize(hBackup, NULL);
+            DWORD sizeSave = GetFileSize(hSave, NULL);
+            if (sizeBackup != sizeSave)
+            {
+                different = true;
+            }
+            else
+            {
+                const DWORD BUF = 4096;
+                BYTE buf1[BUF];
+                BYTE buf2[BUF];
+                DWORD r1 = 0, r2 = 0;
+                SetFilePointer(hBackup, 0, NULL, FILE_BEGIN);
+                SetFilePointer(hSave, 0, NULL, FILE_BEGIN);
+                while (ReadFile(hBackup, buf1, BUF, &r1, NULL) && ReadFile(hSave, buf2, BUF, &r2, NULL) && r1 > 0)
+                {
+                    if (r1 != r2 || memcmp(buf1, buf2, r1) != 0)
+                    {
+                        different = true;
+                        break;
+                    }
+                }
+            }
+            CloseHandle(hSave);
+        }
+
+        CloseHandle(hBackup);
+
+        if (different)
+        {
+            differentTotal++;
+            std::string msg = "Your " + filename + " has been changed. Replace?";
+            int res = MessageBoxA(hWnd, msg.c_str(), "Replace Save", MB_YESNO | MB_ICONQUESTION);
+            if (res == IDYES)
+            {
+                // Ensure save directory exists (best-effort)
+                // CopyFile will fail if path doesn't exist; let it fail and inform user
+                if (CopyFileA(backupFile.c_str(), saveFile.c_str(), FALSE))
+                {
+                    replacedCount++;
+                    MessageBoxA(hWnd, (filename + " replaced successfully.").c_str(), "Replace Save", MB_OK | MB_ICONINFORMATION);
+                }
+                else
+                {
+                    MessageBoxA(hWnd, ("There was an error replacing " + filename + ".").c_str(), "Replace Save", MB_OK | MB_ICONERROR);
+                }
+            }
+        }
+
+    } while (FindNextFileA(hFind, &fd));
+
+    FindClose(hFind);
+    if (interactive)
+    {
+        if (differentTotal == 0)
+        {
+            MessageBoxA(hWnd, "No saves to replace.", "Replace Saves", MB_OK | MB_ICONINFORMATION);
+        }
+        else if (replacedCount == 0)
+        {
+            MessageBoxA(hWnd, "No files were replaced.", "Replace Saves", MB_OK | MB_ICONINFORMATION);
+        }
+        else
+        {
+            std::string doneMsg = std::to_string(replacedCount) + " file(s) replaced.";
+            MessageBoxA(hWnd, doneMsg.c_str(), "Replace Saves", MB_OK | MB_ICONINFORMATION);
+        }
+    }
+}
+
 bool CMainMenu::ProcessMessage(HWND hWnd, DWORD /*FromAccelerator*/, DWORD MenuID)
 {
     switch (MenuID)
@@ -542,7 +660,7 @@ bool CMainMenu::ProcessMessage(HWND hWnd, DWORD /*FromAccelerator*/, DWORD MenuI
     case ID_HELP_ABOUTSETTINGFILES: m_Gui->AboutIniBox(); break;
 	case ID_NETPLAY_MPN: ShellExecute(NULL, "open", "https://discord.com/invite/marioparty", NULL, NULL, SW_SHOWMAXIMIZED); break;
 	case ID_NETPLAY_UPDATE_EMULATOR: ShellExecute(NULL, "open", "Plugin\\Updater\\Updater.exe", NULL, NULL, SW_SHOWDEFAULT); break;
-    case ID_NETPLAY_REPLACESAVES: ShellExecute(NULL, "open", "Replace.bat", NULL, NULL, NULL); break;
+    case ID_NETPLAY_REPLACESAVES: OnReplaceSaves(hWnd, true); break;
 
     default:
         if (MenuID >= ID_RECENT_ROM_START && MenuID < ID_RECENT_ROM_END)

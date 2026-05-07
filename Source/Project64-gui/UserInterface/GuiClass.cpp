@@ -10,6 +10,7 @@
 ****************************************************************************/
 #include "stdafx.h"
 #include "RomInformationClass.h"
+#include "resource.h"
 
 #include <commctrl.h>
 #include <Project64-core/Settings/SettingType/SettingsType-Application.h>
@@ -1048,6 +1049,27 @@ LRESULT CALLBACK CMainGui::MainGui_Proc(HWND hWnd, DWORD uMsg, DWORD wParam, DWO
                 {
                     RomInformation Info(_this->CurrentedSelectedRom());
                     Info.DisplayInformation(hWnd);
+                }
+                break;
+            case ID_POPUPMENU_REPLACEGAMESAVE:
+                {
+                    CN64Rom Rom;
+                    if (!Rom.LoadN64Image(_this->CurrentedSelectedRom(), true))
+                    {
+                        break;
+                    }
+
+                    Rom.SaveRomSettingID(true);
+                    CN64System::ReplaceSaves(true, true);
+
+                    if (g_Rom)
+                    {
+                        g_Rom->SaveRomSettingID(false);
+                    }
+                    else
+                    {
+                        Rom.ClearRomSettingID();
+                    }
                 }
                 break;
             case ID_POPUPMENU_EDITSETTINGS:

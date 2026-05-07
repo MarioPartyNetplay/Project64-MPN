@@ -1,5 +1,8 @@
 # Public server list for Project64 Netplay
-# Format: host:port|description
-us-east.marioparty.online:9065|Buffalo (New York)
-germany.marioparty.online:9051|Frankfurt (Germany)
-brazil.marioparty.online:9000|São Paulo (Brazil)
+# Format: code|host:port|description
+ams|ams.play64.com|Amsterdam (Netherlands)
+nyc|nyc.play64.com|New York City (USA)
+sfo|sfo.play64.com|San Francisco (USA)
+sao|169.155.126.48:9000|Sao Paulo (Brazil)
+hkg|103.70.0.124:9070|Hong Kong (China)
+syd|169.155.124.36:9005|Sydney (Australia)

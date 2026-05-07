@@ -9,6 +9,7 @@
 *                                                                           *
 ****************************************************************************/
 #include "stdafx.h"
+#include "resource.h"
 #include <Project64-gui/Settings/UISettings.h>
 
 #include <commctrl.h>
@@ -901,6 +902,8 @@ void CRomBrowser::RomList_PopupMenu(uint32_t /*pnmh*/)
                 SetMenuItemInfo(hPopupMenu, (uint32_t)GfxMenu, MF_BYCOMMAND, &lpmii);
             }
         }
+
+        InsertMenuW(hPopupMenu, ID_POPUPMENU_EDITSETTINGS, MF_BYCOMMAND | MF_STRING, ID_POPUPMENU_REPLACEGAMESAVE, L"Replace This Game's Save");
     }
 
     //Get the current Mouse location

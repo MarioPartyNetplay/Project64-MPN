@@ -44,9 +44,6 @@
     <Filter Include="3rd Party\Zlib">
       <UniqueIdentifier>{1478740a-b66b-41bd-833c-917c0cb85047}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Mario Party Netplay">
-      <UniqueIdentifier>{de0fa7e2-f674-4dd0-9776-59275bf4587e}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Settings\SettingType\SettingsType-Application.cpp">
@@ -293,9 +290,7 @@
     <ClCompile Include="Logging.cpp" />
     <ClCompile Include="MemoryExceptionFilter.cpp" />
     <ClCompile Include="stdafx.cpp" />
-    <ClCompile Include="MarioPartyNetplay\Discord.cpp">
-      <Filter>Mario Party Netplay</Filter>
-    </ClCompile>
+    <ClCompile Include="Discord.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\3rdParty\zlib\zconf.h">
@@ -589,14 +584,8 @@
     <ClInclude Include="RomList\RomList.h">
       <Filter>Rom List</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\project64-mpn\Source\Project64-core\3rdParty\mario_party_netplay.h">
+    <ClInclude Include="3rdParty\mario_party_netplay.h">
       <Filter>3rd Party</Filter>
-    </ClInclude>
-    <ClInclude Include="MarioPartyNetplay\Discord.h">
-      <Filter>Mario Party Netplay</Filter>
-    </ClInclude>
-    <ClInclude Include="MarioPartyNetplay\MarioPartyOverlays.h">
-      <Filter>Mario Party Netplay</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

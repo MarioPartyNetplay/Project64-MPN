@@ -49,7 +49,7 @@ class CN64System :
     protected CDebugSettings
 {
 public:
-    CN64System(CPlugins * Plugins, bool SavesReadOnly, bool SyncSystem);
+    CN64System(CPlugins* Plugins, bool SavesReadOnly, bool SyncSystem);
     virtual ~CN64System(void);
 
     CCheats    m_Cheats;
@@ -57,11 +57,12 @@ public:
     SAVE_CHIP_TYPE m_SaveUsing;
 
     //Methods
-    static bool LoadFileImage(const char * FileLoc);
-    static bool RunFileImage(const char * FileLoc);
-    static bool RunFileImageIPL(const char * FileLoc);
-    static bool RunDiskImage(const char * FileLoc);
+    static bool LoadFileImage(const char* FileLoc);
+    static bool RunFileImage(const char* FileLoc);
+    static bool RunFileImageIPL(const char* FileLoc);
+    static bool RunDiskImage(const char* FileLoc);
     static void RunLoadedImage(void);
+    static void ReplaceSaves(bool interactive = false, bool showSummary = true);
     static void CloseSystem(void);
 
     void   CloseCpu();
@@ -70,7 +71,7 @@ public:
     void   EndEmulation();
     void   SyncToAudio();
     void   AlterSpeed(const CSpeedLimiter::ESpeedChange SpeedChange) { m_Limiter.AlterSpeed(SpeedChange); }
-    void   SetSpeed(int Speed) { m_Limiter.SetSpeed(Speed);  }
+    void   SetSpeed(int Speed) { m_Limiter.SetSpeed(Speed); }
     int    GetSpeed(void) const { return m_Limiter.GetSpeed(); }
     int    GetBaseSpeed(void) const { return m_Limiter.GetBaseSpeed(); }
     void   Reset(bool bInitReg, bool ClearMenory);
@@ -80,7 +81,6 @@ public:
     void   Pause();
     void   RunRSP();
     bool   SaveState();
-    bool   SaveStateToFile(const char * FilePath);
     bool   LoadState(const char * FileName);
     bool   LoadState();
 
@@ -97,9 +97,9 @@ public:
     uint32_t m_CurrentSP;
 #endif
     //For Sync CPU
-    void   UpdateSyncCPU(CN64System * const SecondCPU, uint32_t const Cycles);
-    void   SyncCPU(CN64System * const SecondCPU);
-    void   SyncCPUPC(CN64System * const SecondCPU);
+    void   UpdateSyncCPU(CN64System* const SecondCPU, uint32_t const Cycles);
+    void   SyncCPU(CN64System* const SecondCPU);
+    void   SyncCPUPC(CN64System* const SecondCPU);
     void   SyncSystem();
     void   SyncSystemPC();
 private:
@@ -115,18 +115,16 @@ private:
     friend class CMipsMemoryVM;
 
     //Used for loading and potentially executing the CPU in its own thread.
-    static void StartEmulationThread(CThread * thread);
-    static bool EmulationStarting(CThread * thread);
+    static void StartEmulationThread(CThread* thread);
+    static bool EmulationStarting(CThread* thread);
     static void StartEmulationThead();
 
     void   ExecuteCPU();
     void   RefreshScreen();
-    void   DumpSyncErrors(CN64System * SecondCPU);
+    void   DumpSyncErrors(CN64System* SecondCPU);
     void   StartEmulation2(bool NewThread);
-    void   HandleDesyncDetection();
-    std::string GenerateDesyncSaveStateHash();
     bool   SetActiveSystem(bool bActive = true);
-    void   InitRegisters(bool bPostPif, CMipsMemoryVM & MMU);
+    void   InitRegisters(bool bPostPif, CMipsMemoryVM& MMU);
     void   DisplayRSPListCount();
 
     //CPU Methods
@@ -142,16 +140,16 @@ private:
     void TLB_Unmaped(uint32_t VAddr, uint32_t Len);
     void TLB_Changed();
 
-    CPlugins      * const m_Plugins;  //The plugin container
-    CPlugins      * m_SyncPlugins;
-    CN64System    * m_SyncCPU;
+    CPlugins* const m_Plugins;  //The plugin container
+    CPlugins* m_SyncPlugins;
+    CN64System* m_SyncCPU;
     CMipsMemoryVM   m_MMU_VM;   //Memory of the n64
     CTLB            m_TLB;
     CRegisters      m_Reg;
     CMempak         m_Mempak;
     CFramePerSecond m_FPS;
     CProfiling      m_CPU_Usage; //used to track the cpu usage
-    CRecompiler   * m_Recomp;
+    CRecompiler* m_Recomp;
     CAudio          m_Audio;
     CSpeedLimiter   m_Limiter;
     bool            m_InReset;
@@ -176,7 +174,7 @@ private:
     int32_t  m_CyclesToSkip;
 
     //Handle to the cpu thread
-    CThread * m_thread;
+    CThread* m_thread;
 
     //Handle to pause mutex
     SyncEvent m_hPauseEvent;
@@ -186,9 +184,20 @@ private:
 
     //list of function that have been called .. used in profiling
     FUNC_CALLS m_FunctionCalls;
-       
+
     bool m_HasAutosaved;
 
-    // Netplay desync detection
-    uint32_t m_DesyncFrameCounter;
+    char* m_DiscordApplicationId;
+    uint8_t m_DiscordCurrentPlayers;
+    int64_t m_DiscordNextPost;
+    bool    m_DiscordSendPresence;
+    int64_t m_DiscordStartTime;
+
+    void    discordInit();
+    void    discordUpdate();
+    void    getMk64Rps(uint8_t* Rdram, DiscordRichPresence& discordPresence);
+    void    getMp1Rps(uint8_t* Rdram, DiscordRichPresence& discordPresence);
+    void    getMp2Rps(uint8_t* Rdram, DiscordRichPresence& discordPresence);
+    void    getMp3Rps(uint8_t* Rdram, DiscordRichPresence& discordPresence);
+    void    getSsbRps(uint8_t* Rdram, DiscordRichPresence& discordPresence);
 };

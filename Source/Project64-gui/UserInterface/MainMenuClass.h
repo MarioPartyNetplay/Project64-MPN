@@ -85,6 +85,7 @@ private:
     void OnCheats(HWND hWnd);
     void OnSettings(HWND hWnd);
     void OnOpenUserFolder(HWND hWnd);
+    void OnReplaceSaves(HWND hWnd, bool interactive = false);
 
     void FillOutMenu(HMENU hMenu);
     std::wstring GetSaveSlotString(int Slot);
