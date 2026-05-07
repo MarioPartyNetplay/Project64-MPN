@@ -15,6 +15,7 @@ bool connection::is_open() {
 
 void connection::close(const error_code& error) {
     if (tcp_socket && tcp_socket->is_open()) {
+        ::log(string("Closing TCP connection: ") + (error ? error.message() : "(no error)"));
         error_code ec;
         tcp_socket->shutdown(ip::tcp::socket::shutdown_both, ec);
         tcp_socket->close(ec);
@@ -23,6 +24,7 @@ void connection::close(const error_code& error) {
     tcp_output_buffer.clear();
 
     close_udp();
+    ::log(string("Connection closed: ") + (error ? error.message() : "(no error)"));
     on_error(error);
 }
 

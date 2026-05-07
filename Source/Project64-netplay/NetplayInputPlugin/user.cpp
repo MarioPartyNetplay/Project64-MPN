@@ -17,7 +17,14 @@ void user::set_room(room* room) {
 }
 
 void user::on_error(const error_code& error) {
+    std::string reason = (error ? error.message() : std::string("(no error)"));
+    ::log("[" + (my_room ? my_room->get_id() : std::string("server")) + "] " + name + " disconnected: " + reason);
     if (my_room) {
+        try {
+            my_room->send_info(name + std::string(" disconnected: ") + reason);
+        } catch (...) {
+            // ignore any send failures
+        }
         my_room->on_user_quit(this);
         my_room = nullptr;
     }
@@ -386,3 +393,4 @@ void user::send_request_authority(uint32_t user_id, uint32_t authority_id) {
 void user::send_delegate_authority(uint32_t user_id, uint32_t authority_id) {
     send(packet() << DELEGATE_AUTHORITY << user_id << authority_id);
 }
+

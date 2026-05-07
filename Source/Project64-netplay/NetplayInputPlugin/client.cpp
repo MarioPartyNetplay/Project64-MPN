@@ -5,11 +5,74 @@
 #include "connection.h"
 #include "util.h"
 #include "uri.h"
+#include <set>
+#include <tuple>
 
 using namespace std;
 using namespace asio;
 
 namespace {
+    constexpr const char* DESYNC_REQ_PREFIX = "__PJ64_DS_REQ__:";
+    constexpr const char* DESYNC_RES_PREFIX = "__PJ64_DS_RES__:";
+    constexpr const char* DESYNC_ALERT_PREFIX = "__PJ64_DS_ALERT__:";
+
+    static std::set<uint32_t> g_desync_target_frames;
+    static std::set<uint32_t> g_ready_result_frames;
+    static std::map<uint32_t, std::string> g_local_frame_hashes;
+    static std::vector<std::tuple<uint32_t, uint32_t, std::string>> g_pending_remote_results;
+    static std::vector<std::pair<uint32_t, uint32_t>> g_alerted_user_frame;
+    static uint32_t g_last_desync_request_input_id = 0;
+
+    bool get_local_desync_hash(string& out_hash) {
+#ifdef _WIN32
+        typedef bool(__cdecl *GetEmulatorStateHashFn)(char*, size_t);
+        HMODULE exe = GetModuleHandle(NULL);
+        if (!exe) return false;
+        auto fn = (GetEmulatorStateHashFn)GetProcAddress(exe, "GetEmulatorStateHashForNetplay");
+        if (!fn) return false;
+        char buf[65] = {0};
+        if (!fn(buf, sizeof(buf))) return false;
+        out_hash = buf;
+        return out_hash.size() == 64;
+#else
+        out_hash.clear();
+        return false;
+#endif
+    }
+
+    bool parse_desync_request_message(const string& message, uint32_t& frame) {
+        if (message.rfind(DESYNC_REQ_PREFIX, 0) != 0) {
+            return false;
+        }
+        string value = message.substr(strlen(DESYNC_REQ_PREFIX));
+        if (value.empty()) return false;
+        for (char ch : value) {
+            if (!isdigit(static_cast<unsigned char>(ch))) return false;
+        }
+        frame = static_cast<uint32_t>(strtoul(value.c_str(), nullptr, 10));
+        return true;
+    }
+
+    bool parse_desync_result_message(const string& message, uint32_t& frame, string& hash) {
+        if (message.rfind(DESYNC_RES_PREFIX, 0) != 0) {
+            return false;
+        }
+        string value = message.substr(strlen(DESYNC_RES_PREFIX));
+        auto sep = value.find(':');
+        if (sep == string::npos) return false;
+        string frame_text = value.substr(0, sep);
+        hash = value.substr(sep + 1);
+        if (frame_text.empty() || hash.size() != 64) return false;
+        for (char ch : frame_text) {
+            if (!isdigit(static_cast<unsigned char>(ch))) return false;
+        }
+        for (char ch : hash) {
+            if (!isxdigit(static_cast<unsigned char>(ch))) return false;
+        }
+        frame = static_cast<uint32_t>(strtoul(frame_text.c_str(), nullptr, 10));
+        return true;
+    }
+
     struct public_server_entry {
         string code;
         string address;
@@ -482,6 +545,16 @@ void client::on_input() {
 
     input_id++;
 
+    // Capture hash exactly when the requested frame is reached.
+    if (g_desync_target_frames.find(input_id) != g_desync_target_frames.end()) {
+        string local_hash;
+        if (get_local_desync_hash(local_hash)) {
+            g_local_frame_hashes[input_id] = local_hash;
+            g_ready_result_frames.insert(input_id);
+        }
+        g_desync_target_frames.erase(input_id);
+    }
+
     input_times.push_back(timestamp());
     while (input_times.front() < input_times.back() - 2.0) {
         input_times.pop_front();
@@ -903,10 +976,61 @@ void client::on_receive(packet& p, bool udp) {
         case MESSAGE: {
             auto user_id = p.read<uint32_t>();
             auto message = p.read<string>();
+            uint32_t req_frame = 0;
+            if (parse_desync_request_message(message, req_frame)) {
+                // Schedule response only if request is for a near-future frame.
+                if (user_id != me->id && req_frame > input_id && req_frame - input_id <= 600) {
+                    g_desync_target_frames.insert(req_frame);
+                }
+                break;
+            }
+
+            uint32_t res_frame = 0;
+            string remote_hash;
+            if (parse_desync_result_message(message, res_frame, remote_hash)) {
+                auto local_it = g_local_frame_hashes.find(res_frame);
+                if (local_it == g_local_frame_hashes.end()) {
+                    // Wait until we reach that exact frame and compute our own hash.
+                    g_pending_remote_results.emplace_back(user_id, res_frame, remote_hash);
+                    break;
+                }
+
+                const string& my_hash = local_it->second;
+                auto alerted_it = find(g_alerted_user_frame.begin(), g_alerted_user_frame.end(), make_pair(user_id, res_frame));
+                if (my_hash != remote_hash && alerted_it == g_alerted_user_frame.end()) {
+                    string name = (user_id < user_map.size() && user_map[user_id]) ? user_map[user_id]->name : to_string(user_id);
+                    my_dialog->error("Desync detected with " + name + " at frame " + to_string(res_frame) + "!");
+                    g_alerted_user_frame.push_back(make_pair(user_id, res_frame));
+                    try {
+                        send_message(string(DESYNC_ALERT_PREFIX) + to_string(res_frame) + ":" + name);
+                    } catch (...) {}
+                } else if (my_hash == remote_hash && alerted_it != g_alerted_user_frame.end()) {
+                    g_alerted_user_frame.erase(alerted_it);
+                }
+                break;
+            }
+
+            // Incoming broadcasted desync alerts from other clients: show as error
+            if (message.rfind(DESYNC_ALERT_PREFIX, 0) == 0) {
+                string value = message.substr(strlen(DESYNC_ALERT_PREFIX));
+                auto sep = value.find(':');
+                if (sep != string::npos) {
+                    string frame_text = value.substr(0, sep);
+                    string who = value.substr(sep + 1);
+                    trim(who);
+                    bool digits = !frame_text.empty();
+                    for (char ch : frame_text) if (!isdigit((unsigned char)ch)) digits = false;
+                    if (digits) {
+                        uint32_t f = static_cast<uint32_t>(strtoul(frame_text.c_str(), nullptr, 10));
+                        my_dialog->error("Desync detected with " + who + " at frame " + to_string(f) + "!");
+                    }
+                }
+                break;
+            }
+
             message_received(user_id, message);
             break;
         }
-
         case LAG: {
             auto lag = p.read<uint8_t>();
             auto source_id = p.read<uint32_t>();
@@ -1099,6 +1223,67 @@ void client::on_tick() {
 
     if (!udp_established) {
         send_udp_ping();
+    }
+
+    // Client-only frame-locked desync checks over regular MESSAGE packets.
+    if (started && is_open()) {
+        // Player 1 periodically schedules a future frame check for everyone.
+        if (me && me->id == 0 && input_id >= g_last_desync_request_input_id + 600) {
+            uint32_t target_frame = input_id + 120;
+            g_last_desync_request_input_id = input_id;
+            g_desync_target_frames.insert(target_frame);
+            send(packet() << MESSAGE << (string(DESYNC_REQ_PREFIX) + to_string(target_frame)));
+        }
+
+        // Publish only frame hashes that were captured exactly at frame boundary in on_input().
+        std::vector<uint32_t> ready_frames(g_ready_result_frames.begin(), g_ready_result_frames.end());
+        for (auto frame : ready_frames) {
+            auto it = g_local_frame_hashes.find(frame);
+            if (it != g_local_frame_hashes.end() && me && me->id == 0) {
+                send(packet() << MESSAGE << (string(DESYNC_RES_PREFIX) + to_string(frame) + ":" + it->second));
+            }
+            g_ready_result_frames.erase(frame);
+        }
+
+        // Resolve remote results that were waiting for our local frame hash.
+        std::vector<std::tuple<uint32_t, uint32_t, std::string>> still_pending;
+        for (const auto& item : g_pending_remote_results) {
+            auto user_id = std::get<0>(item);
+            auto frame = std::get<1>(item);
+            const auto& remote_hash = std::get<2>(item);
+
+            auto local_it = g_local_frame_hashes.find(frame);
+            if (local_it == g_local_frame_hashes.end()) {
+                if (frame + 600 >= input_id) {
+                    still_pending.push_back(item);
+                }
+                continue;
+            }
+
+            const string& my_hash = local_it->second;
+            auto alerted_it = find(g_alerted_user_frame.begin(), g_alerted_user_frame.end(), make_pair(user_id, frame));
+            if (my_hash != remote_hash && alerted_it == g_alerted_user_frame.end()) {
+                string name = (user_id < user_map.size() && user_map[user_id]) ? user_map[user_id]->name : to_string(user_id);
+                my_dialog->error("Desync detected with " + name + " at frame " + to_string(frame) + "!");
+                g_alerted_user_frame.push_back(make_pair(user_id, frame));
+                // Broadcast alert to inform room
+                try {
+                    send_message(string(DESYNC_ALERT_PREFIX) + to_string(frame) + ":" + name);
+                } catch (...) {}
+            } else if (my_hash == remote_hash && alerted_it != g_alerted_user_frame.end()) {
+                g_alerted_user_frame.erase(alerted_it);
+            }
+        }
+        g_pending_remote_results.swap(still_pending);
+
+        // Trim old hashes to keep memory bounded.
+        for (auto it = g_local_frame_hashes.begin(); it != g_local_frame_hashes.end();) {
+            if (it->first + 1200 < input_id) {
+                it = g_local_frame_hashes.erase(it);
+            } else {
+                ++it;
+            }
+        }
     }
 
     timer.expires_after(500ms);
