@@ -75,12 +75,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "play64.com"
             VALUE "FileDescription", "N64 Input Plugin for Online Netplay"
-            VALUE "FileVersion", APP_VERSION
+            VALUE "FileVersion", "MPN"
             VALUE "InternalName", "netplay_input_plugin"
             VALUE "LegalCopyright", "play64.com © 2019"
             VALUE "OriginalFilename", "netplay_input_plugin.dll"
             VALUE "ProductName", APP_NAME
-            VALUE "ProductVersion", APP_VERSION
+        VALUE "ProductVersion", "MPN"
         END
     END
     BLOCK "VarFileInfo"

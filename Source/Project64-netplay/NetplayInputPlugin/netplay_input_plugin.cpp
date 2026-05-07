@@ -100,7 +100,7 @@ EXPORT void CALL ControllerCommand( int Control, BYTE * Command) {
 EXPORT void CALL DllAbout ( HWND hParent ) {
     load();
 
-    string message = string(APP_NAME) + "\n\nVersion: " + string(APP_VERSION) + "\n\nAuthor: @CoderTimZ (aka AQZ)\n\nWebsite: www.play64.com";
+    string message = string(APP_NAME) + "\n\nVersion: MPN" + "\n\nAuthor: @CoderTimZ (aka AQZ)\n\nWebsite: www.play64.com";
 
     MessageBox(hParent, utf8_to_wstring(message).c_str(), L"About", MB_OK | MB_ICONINFORMATION);
 }

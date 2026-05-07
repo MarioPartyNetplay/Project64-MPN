@@ -141,6 +141,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <TargetName>netplay_input_plugin</TargetName>
+    <OutDir>$(SolutionDir)bin\Release\Plugin\Input\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release (Server)|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -307,8 +308,8 @@ git status --short | find " " &gt;nul
 if errorlevel 1 (del %TEMP%\dirty.txt 2&gt; nul) else (echo -dirty&gt; %TEMP%\dirty.txt)
 set /p DIRTY= &lt; %TEMP%\dirty.txt 2&gt; nul
 echo #define APP_NAME "AQZ NetPlay" &gt; version.h
-echo #define APP_VERSION "%COUNT% (%COMMIT%%DIRTY%)" &gt;&gt; version.h
-echo #define APP_NAME_AND_VERSION "AQZ NetPlay v%COUNT% (%COMMIT%%DIRTY%)" &gt;&gt; version.h
+echo #define APP_VERSION (%COMMIT%)" &gt;&gt; version.h
+echo #define APP_NAME_AND_VERSION "AQZ NetPlay (%COMMIT%)" &gt;&gt; version.h
 </Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>

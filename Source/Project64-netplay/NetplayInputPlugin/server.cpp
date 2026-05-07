@@ -191,12 +191,12 @@ void server::on_tick() {
 }
 
 string server::get_random_room_id() {
-    static constexpr char ALPHABET[] = "123456789abcdefghjkmnpqrstuvwxyz";
+    static constexpr char ALPHABET[] = "123456789";
     static uniform_int_distribution<size_t> dist(0, strlen(ALPHABET) - 1);
     static random_device rd;
 
     string result;
-    result.resize(4);
+    result.resize(3);
     do {
         for (char& c : result) {
             c = ALPHABET[dist(rd)];

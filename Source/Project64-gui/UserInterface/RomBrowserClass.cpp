@@ -903,7 +903,8 @@ void CRomBrowser::RomList_PopupMenu(uint32_t /*pnmh*/)
             }
         }
 
-        InsertMenuW(hPopupMenu, ID_POPUPMENU_EDITSETTINGS, MF_BYCOMMAND | MF_STRING, ID_POPUPMENU_REPLACEGAMESAVE, L"Replace This Game's Save");
+        InsertMenuW(hPopupMenu, 2, MF_BYPOSITION | MF_STRING, ID_POPUPMENU_REPLACEGAMESAVE, L"Replace Save");
+
     }
 
     //Get the current Mouse location

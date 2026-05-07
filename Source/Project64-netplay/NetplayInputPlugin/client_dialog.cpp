@@ -199,16 +199,50 @@ void client_dialog::update_server_list(const map<string, double>& servers) {
         int i = 0;
         server_list.clear();
         for (auto& e : servers) {
-            size_t index = e.first.find('|');
-            string address = e.first.substr(0, index);
-            server_list.push_back(address);
-            StringCbCopy(text, sizeof(text), utf8_to_wstring(address).c_str());
-            ListView_SetItemText(list, i, 0, text);
-            if (index != string::npos) {
-                index++;
-                StringCbCopy(text, sizeof(text), utf8_to_wstring(e.first.substr(index, e.first.find('|', index))).c_str());
-                ListView_SetItemText(list, i, 1, text);
+            auto strip = [](string value) {
+                auto start = find_if_not(value.begin(), value.end(), [](unsigned char ch) {
+                    return isspace(ch) != 0;
+                });
+                auto finish = find_if_not(value.rbegin(), value.rend(), [](unsigned char ch) {
+                    return isspace(ch) != 0;
+                }).base();
+                return start < finish ? string(start, finish) : string();
+            };
+
+            vector<string> parts;
+            size_t start = 0;
+            while (true) {
+                size_t sep = e.first.find('|', start);
+                parts.push_back(e.first.substr(start, sep == string::npos ? string::npos : sep - start));
+                if (sep == string::npos) break;
+                start = sep + 1;
             }
+
+            for (auto& part : parts) {
+                part = strip(part);
+            }
+
+            string server_value;
+            string join_value;
+            string location;
+            if (parts.size() >= 3) {
+                server_value = parts[0];
+                join_value = parts[0];
+                location = parts[2];
+            } else if (parts.size() == 2) {
+                server_value = parts[0];
+                join_value = parts[0];
+                location = parts[1];
+            } else {
+                server_value = e.first;
+                join_value = e.first;
+            }
+
+            server_list.push_back(join_value);
+            // Show Location in column 0
+            StringCbCopy(text, sizeof(text), utf8_to_wstring(location).c_str());
+            ListView_SetItemText(list, i, 0, text);
+            // Show Ping/status in column 1
             switch ((int)e.second) {
                 case SERVER_STATUS_PENDING: StringCbCopy(text, sizeof(text), L""); break;
                 case SERVER_STATUS_ERROR: StringCbCopy(text, sizeof(text), L"(Failure)"); break;
@@ -217,7 +251,7 @@ void client_dialog::update_server_list(const map<string, double>& servers) {
                 case SERVER_STATUS_OUTDATED_SERVER: StringCbCopy(text, sizeof(text), L"(Outdated Server)"); break;
                 default: StringCbCopy(text, sizeof(text), utf8_to_wstring(to_string(static_cast<int>(e.second * 1000)) + " ms").c_str()); break;
             }
-            ListView_SetItemText(list, i, 2, text);
+            ListView_SetItemText(list, i, 1, text);
             i++;
         }
 
@@ -448,13 +482,11 @@ INT_PTR CALLBACK client_dialog::DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wPara
 
             HWND server_view = GetDlgItem(hwndDlg, IDC_SERVER_LIST);
             ListView_SetExtendedListViewStyle(server_view, LVS_EX_DOUBLEBUFFER | LVS_EX_FULLROWSELECT);
-            column.pszText = (LPWSTR)L"Server";
-            ListView_InsertColumn(server_view, 0, &column);
             column.pszText = (LPWSTR)L"Location";
-            ListView_InsertColumn(server_view, 1, &column);
+            ListView_InsertColumn(server_view, 0, &column);
             column.pszText = (LPWSTR)L"Ping";
-            ListView_InsertColumn(server_view, 2, &column);
-            dialog->set_column_scale(server_view, { 120, 96, 72 });
+            ListView_InsertColumn(server_view, 1, &column);
+            dialog->set_column_scale(server_view, { 160, 96 });
 
             dialog->scale_columns();
 

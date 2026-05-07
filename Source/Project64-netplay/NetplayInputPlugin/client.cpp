@@ -9,6 +9,50 @@
 using namespace std;
 using namespace asio;
 
+namespace {
+    struct public_server_entry {
+        string code;
+        string address;
+        string description;
+    };
+
+    string to_lower_copy(string value) {
+        transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+            return static_cast<char>(tolower(ch));
+        });
+        return value;
+    }
+
+    public_server_entry parse_public_server_entry(const string& raw) {
+        public_server_entry entry;
+        vector<string> parts;
+        size_t start = 0;
+        while (true) {
+            size_t sep = raw.find('|', start);
+            parts.push_back(raw.substr(start, sep == string::npos ? string::npos : sep - start));
+            if (sep == string::npos) break;
+            start = sep + 1;
+        }
+
+        for (auto& part : parts) {
+            trim(part);
+        }
+
+        if (parts.size() >= 3) {
+            entry.code = parts[0];
+            entry.address = parts[1];
+            entry.description = parts[2];
+        } else if (parts.size() == 2) {
+            entry.address = parts[0];
+            entry.description = parts[1];
+        } else if (!parts.empty()) {
+            entry.address = parts[0];
+        }
+
+        return entry;
+    }
+}
+
 int get_input_rate(char code) {
     switch (code) {
         case BRAZILIAN:
@@ -100,54 +144,30 @@ bool client::input_detected(const input_data& input, uint32_t mask) {
 }
 
 void client::load_public_server_list() {
-    constexpr static char API_HOST[] = "api.play64.com";
+    public_servers["AMS|ams.play64.com|Amsterdam (Netherlands)"] = SERVER_STATUS_PENDING;
+    public_servers["NYC|nyc.play64.com|New York City (USA)"] = SERVER_STATUS_PENDING;
+    public_servers["SFO|sfo.play64.com|San Francisco (USA)"] = SERVER_STATUS_PENDING;
+    public_servers["SAO|169.155.126.48:9000|Sao Paulo (Brazil)"] = SERVER_STATUS_PENDING;
+    public_servers["HKG|103.70.0.124:9070|Hong Kong (China)"] = SERVER_STATUS_PENDING;
+    public_servers["SYD|169.155.124.36:9005|Sydney (Australia)"] = SERVER_STATUS_PENDING;
 
-    service.post([&] {
-        ip::tcp::resolver tcp_resolver(service);
-        error_code error;
-        auto iterator = tcp_resolver.resolve(API_HOST, "80", error);
-        if (error) return my_dialog->error("Failed to load server list");
-        auto s = make_shared<ip::tcp::socket>(service);
-        s->async_connect(*iterator, [=](const error_code& error) {
-            if (error) return my_dialog->error("Failed to load server list");
-            shared_ptr<string> buf = make_shared<string>(
-                "GET /servers.txt HTTP/1.1\r\n"
-                "Host: " + string(API_HOST) + "\r\n"
-                "Connection: close\r\n\r\n");
-            async_write(*s, buffer(*buf), [=](const error_code& error, size_t transferred) {
-                if (error) {
-                    s->close();
-                    my_dialog->error("Failed to load server list");
-                } else {
-                    buf->resize(4096);
-                    async_read(*s, buffer(*buf), [=](const error_code& error, size_t transferred) {
-                        s->close();
-                        if (error != error::eof) return my_dialog->error("Failed to load server list");
-                        buf->resize(transferred);
-                        public_servers.clear();
-#ifdef DEBUG
-                        public_servers["localhost"] = SERVER_STATUS_PENDING;
-#endif
-                        bool content = false;
-                        for (size_t start = 0, end = 0; end != string::npos; start = end + 1) {
-                            end = buf->find('\n', start);
-                            string line = buf->substr(start, end == string::npos ? string::npos : end - start);
-                            if (!line.empty() && line.back() == '\r') {
-                                line.resize(line.length() - 1);
-                            }
-                            if (line.empty()) {
-                                content = true;
-                            } else if (content) {
-                                public_servers[line] = SERVER_STATUS_PENDING;
-                            }
-                        }
-                        my_dialog->update_server_list(public_servers);
-                        ping_public_server_list();
-                    });
-                }
-            });
-        });
-    });
+    // Populate code/address maps so 3-letter codes resolve to their endpoints
+    for (const auto& e : public_servers) {
+        auto entry = parse_public_server_entry(e.first);
+        if (!entry.code.empty() && !entry.address.empty()) {
+            string code_key = to_lower_copy(entry.code);
+            public_server_code_map[code_key] = entry.address;
+
+            uri endpoint(entry.address);
+            if (!endpoint.host.empty()) {
+                string endpoint_key = to_lower_copy(endpoint.host) + ":" + to_string(endpoint.port ? endpoint.port : 6400);
+                public_server_endpoint_code_map[endpoint_key] = entry.code;
+            }
+        }
+    }
+
+    my_dialog->update_server_list(public_servers);
+    ping_public_server_list();
 }
 
 void client::ping_public_server_list() {
@@ -160,7 +180,13 @@ void client::ping_public_server_list() {
     };
     auto s(weak_from_this());
     for (auto& e : public_servers) {
-        uri u(e.first.substr(0, e.first.find('|')));
+        auto entry = parse_public_server_entry(e.first);
+        if (entry.address.empty()) {
+            done(e.first, SERVER_STATUS_ERROR);
+            continue;
+        }
+
+        uri u(entry.address);
         udp_resolver.async_resolve(u.host, to_string(u.port ? u.port : 6400), [=](const auto& error, auto iterator) {
             if (s.expired()) return;
             if (error) return done(e.first, SERVER_STATUS_ERROR);
@@ -208,6 +234,48 @@ void client::ping_public_server_list() {
             });
         });
     }
+}
+
+bool client::try_resolve_server_code_alias(uri& u) const {
+    string host_lower = to_lower_copy(u.host);
+    for (const auto& entry : public_server_code_map) {
+        const string& code = entry.first;
+        const string& endpoint = entry.second;
+
+        if (host_lower == code || (u.path == "/" && host_lower.rfind(code, 0) == 0 && host_lower.size() > code.size())) {
+            string suffix;
+            if (host_lower.size() > code.size()) {
+                suffix = u.host.substr(code.size());
+                if (suffix.find_first_of(".:[]") != string::npos) {
+                    continue;
+                }
+            }
+
+            uri endpoint_uri(endpoint);
+            if (endpoint_uri.host.empty()) {
+                continue;
+            }
+
+            u.host = endpoint_uri.host;
+            if (!u.port && endpoint_uri.port) {
+                u.port = endpoint_uri.port;
+            }
+
+            if (!suffix.empty()) {
+                u.path = "/" + suffix;
+            }
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+string client::get_server_code_for_endpoint(const string& host, uint16_t port) const {
+    string endpoint_key = to_lower_copy(host) + ":" + to_string(port);
+    auto it = public_server_endpoint_code_map.find(endpoint_key);
+    return it == public_server_endpoint_code_map.end() ? string() : it->second;
 }
 
 void client::get_external_address() {
@@ -473,6 +541,7 @@ void client::on_message(string message) {
                 if (!u.scheme.empty() && u.scheme != "play64") {
                     throw runtime_error("Unsupported protocol: " + u.scheme);
                 }
+                try_resolve_server_code_alias(u);
                 host = u.host;
                 port = params.size() >= 3 ? stoi(params[2]) : (u.port ? u.port : 6400);
                 path = u.path;
@@ -763,9 +832,26 @@ void client::on_receive(packet& p, bool udp) {
 
         case PATH: {
             path = p.read<string>();
-            my_dialog->info(
+
+            string legacy_join_target =
+                (host == "127.0.0.1" ? (external_address.is_unspecified() ? "<Your IP>" : external_address.to_string()) : host)
+                + (port == 6400 ? "" : ":" + to_string(port))
+                + (path == "/" ? "" : path);
+
+            string join_target = legacy_join_target;
+            if (host != "127.0.0.1") {
+                string code = get_server_code_for_endpoint(host, port);
+                if (!code.empty()) {
+                    join_target = code + (path == "/" ? "" : path.substr(1));
+                }
+            }
+
+            string invite_text =
                 "Others may join with the following command:\r\n\r\n"
-                "/join " + (host == "127.0.0.1" ? (external_address.is_unspecified() ? "<Your IP>" : external_address.to_string()) : host) + (port == 6400 ? "" : ":" + to_string(port)) + (path == "/" ? "" : path) + "\r\n"
+                "/join " + join_target + "\r\n";
+
+            my_dialog->info(
+                invite_text
             );
             break;
         }

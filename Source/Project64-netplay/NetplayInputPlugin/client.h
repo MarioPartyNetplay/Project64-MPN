@@ -9,6 +9,8 @@
 #include "client_dialog.h"
 #include "server.h"
 
+struct uri;
+
 int get_input_rate(country_code code);
 
 class client: public service_wrapper, public connection {
@@ -48,6 +50,8 @@ class client: public service_wrapper, public connection {
         std::vector<std::shared_ptr<user_info>> user_map = { me };
         std::vector<std::shared_ptr<user_info>> user_list = { me };
         std::map<std::string, double> public_servers;
+        std::map<std::string, std::string> public_server_code_map;
+        std::map<std::string, std::string> public_server_endpoint_code_map;
         CONTROL* controllers;
         std::shared_ptr<client_dialog> my_dialog;
         std::shared_ptr<server> my_server;
@@ -63,6 +67,8 @@ class client: public service_wrapper, public connection {
 
         virtual void close(const std::error_code& error = std::error_code());
         void ping_public_server_list();
+        bool try_resolve_server_code_alias(uri& u) const;
+        std::string get_server_code_for_endpoint(const std::string& host, uint16_t port) const;
         void start_game();
         void on_message(std::string message);
         void set_lag(uint8_t lag);
