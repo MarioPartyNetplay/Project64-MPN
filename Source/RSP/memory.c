@@ -120,22 +120,36 @@ void SetJumpTable (DWORD End) {
 }
 
 void RSP_LB_DMEM ( uint32_t Addr, uint8_t * Value ) {
-	*Value = *(uint8_t *)(RSPInfo.DMEM + ((Addr ^ 3) & 0xFFF));
+	uint32_t offset = ((Addr ^ 3) & 0xFFF);
+	if (offset < 0x1000) {
+		*Value = *(uint8_t *)(RSPInfo.DMEM + offset);
+	} else {
+		*Value = 0;
+	}
 }
 
 void RSP_LBV_DMEM ( uint32_t Addr, int vect, int element ) {
-	RSP_Vect[vect].B[15 - element] = *(RSPInfo.DMEM + ((Addr ^ 3) & 0xFFF));
+	uint32_t offset = ((Addr ^ 3) & 0xFFF);
+	if (offset < 0x1000) {
+		RSP_Vect[vect].B[15 - element] = *(RSPInfo.DMEM + offset);
+	} else {
+		RSP_Vect[vect].B[15 - element] = 0;
+	}
 }
 
 void RSP_LDV_DMEM ( uint32_t Addr, int vect, int element ) {
 	int length, Count;
-	
 	length = 8;
 	if (length > 16 - element) {
 		length = 16 - element;
 	}
 	for (Count = element; Count < (length + element); Count ++ ){
-		RSP_Vect[vect].B[15 - Count] = *(RSPInfo.DMEM + ((Addr ^ 3) & 0xFFF));
+		uint32_t offset = ((Addr ^ 3) & 0xFFF);
+		if (offset < 0x1000) {
+			RSP_Vect[vect].B[15 - Count] = *(RSPInfo.DMEM + offset);
+		} else {
+			RSP_Vect[vect].B[15 - Count] = 0;
+		}
 		Addr += 1;
 	}
 
@@ -165,18 +179,19 @@ void RSP_LFV_DMEM ( uint32_t Addr, int vect, int element ) {
 }
 
 void RSP_LH_DMEM ( uint32_t Addr, uint16_t * Value ) {
-	if ((Addr & 0x1) != 0) {
-		if (Addr > 0xFFE) {
-			DisplayError("hmmmm.... Problem with:\nRSP_LH_DMEM");
-			return;
-		}
-		Addr &= 0xFFF;
-		*Value  = *(uint8_t *)(RSPInfo.DMEM + ((Addr + 0) ^ 3)) << 8;
-		*Value += *(uint8_t *)(RSPInfo.DMEM + ((Addr + 1) ^ 3)) << 0;
-		return;
-	}
-	*Value = *(uint16_t *)(RSPInfo.DMEM + ((Addr ^ 2) & 0xFFF));
+    Addr &= 0xFFF; // Force address into valid 4KB range
+    if ((Addr & 0x1) != 0) {
+        // If we are at the very last byte, the second byte of the halfword 
+        // wraps back to the start of DMEM (index 0)
+        uint32_t addr2 = (Addr + 1) & 0xFFF; 
+        
+        *Value  = *(uint8_t *)(RSPInfo.DMEM + (Addr ^ 3)) << 8;
+        *Value += *(uint8_t *)(RSPInfo.DMEM + (addr2 ^ 3));
+        return;
+    }
+    *Value = *(uint16_t *)(RSPInfo.DMEM + ((Addr ^ 2) & 0xFFF));
 }
+
 
 void RSP_LHV_DMEM ( uint32_t Addr, int vect, int element ) {
 	RSP_Vect[vect].HW[7] = *(RSPInfo.DMEM + ((Addr + ((0x10 - element) & 0xF) ^3) & 0xFFF)) << 7;
@@ -315,9 +330,11 @@ void RSP_SBV_DMEM ( uint32_t Addr, int vect, int element ) {
 
 void RSP_SDV_DMEM ( uint32_t Addr, int vect, int element ) {
 	int Count;
-
 	for (Count = element; Count < (8 + element); Count ++ ){
-		*(RSPInfo.DMEM + ((Addr ^ 3) & 0xFFF)) = RSP_Vect[vect].B[15 - (Count & 0xF)];
+		uint32_t offset = ((Addr ^ 3) & 0xFFF);
+		if (offset < 0x1000) {
+			*(RSPInfo.DMEM + offset) = RSP_Vect[vect].B[15 - (Count & 0xF)];
+		}
 		Addr += 1;
 	}
 }
@@ -488,21 +505,25 @@ void RSP_SQV_DMEM ( uint32_t Addr, int vect, int element ) {
 
 void RSP_SRV_DMEM ( uint32_t Addr, int vect, int element ) {
 	int length, Count, offset;
-
 	length = (Addr & 0xF);
 	offset = (0x10 - length) & 0xF;
 	Addr &= 0xFF0;
 	for (Count = element; Count < (length + element); Count ++ ){
-		*(RSPInfo.DMEM + ((Addr ^ 3) & 0xFFF)) = RSP_Vect[vect].B[15 - ((Count + offset) & 0xF)];
+		uint32_t offsetDMEM = ((Addr ^ 3) & 0xFFF);
+		if (offsetDMEM < 0x1000) {
+			*(RSPInfo.DMEM + offsetDMEM) = RSP_Vect[vect].B[15 - ((Count + offset) & 0xF)];
+		}
 		Addr += 1;
 	}
 }
 
 void RSP_SSV_DMEM ( uint32_t Addr, int vect, int element ) {
 	int Count;
-
 	for (Count = element; Count < (2 + element); Count ++ ){
-		*(RSPInfo.DMEM + ((Addr ^ 3) & 0xFFF)) = RSP_Vect[vect].B[15 - (Count & 0xF)];
+		uint32_t offset = ((Addr ^ 3) & 0xFFF);
+		if (offset < 0x1000) {
+			*(RSPInfo.DMEM + offset) = RSP_Vect[vect].B[15 - (Count & 0xF)];
+		}
 		Addr += 1;
 	}
 }

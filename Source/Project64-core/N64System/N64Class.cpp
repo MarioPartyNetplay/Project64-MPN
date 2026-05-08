@@ -1231,10 +1231,12 @@ void CN64System::StartEmulation(bool NewThread)
     __except_catch()
     {
         char message[400];
-        sprintf(message, "Exception caught\nFile: %s\nLine: %d", __FILE__, __LINE__);
+        unsigned int ExceptionCode = _exception_code();
+        sprintf(message, "Exception 0x%X caught\nFile: %s\nLine: %d\nPC: 0x%X", ExceptionCode, __FILE__, __LINE__, m_Reg.m_PROGRAM_COUNTER);
         g_Notify->DisplayError(message);
+        WriteTrace(TraceN64System, TraceError, "Exception 0x%X at PC 0x%X", ExceptionCode, m_Reg.m_PROGRAM_COUNTER);
     }
-    WriteTrace(TraceN64System, TraceDebug, "Done (NewThread: %s)", NewThread ? "true" : "false")
+    WriteTrace(TraceN64System, TraceDebug, "Done (NewThread: %s)", NewThread ? "true" : "false");
 }
 
 void CN64System::EndEmulation(void)
@@ -2697,13 +2699,24 @@ void CN64System::RunRSP()
             __except_try()
             {
                 WriteTrace(TraceRSP, TraceDebug, "do cycles - starting");
-                g_Plugins->RSP()->DoRspCycles(100);
-                WriteTrace(TraceRSP, TraceDebug, "do cycles - Done");
+                if (g_Plugins != NULL && g_Plugins->RSP() != NULL)
+                {
+                    g_Plugins->RSP()->DoRspCycles(100);
+                    WriteTrace(TraceRSP, TraceDebug, "do cycles - Done");
+                }
+                else
+                {
+                    WriteTrace(TraceRSP, TraceError, "RSP plugin not initialized");
+                    g_Notify->FatalError("RSP plugin not initialized - this should not happen");
+                }
             }
             __except_catch()
             {
-                WriteTrace(TraceRSP, TraceError, "exception generated");
-                g_Notify->FatalError("CN64System::RunRSP()\nUnknown memory action\n\nEmulation stop");
+                unsigned int ExceptionCode = _exception_code();
+                WriteTrace(TraceRSP, TraceError, "exception 0x%X generated during RSP execution at PC 0x%X", ExceptionCode, m_Reg.m_PROGRAM_COUNTER);
+                char message[256];
+                sprintf(message, "CN64System::RunRSP()\nRSP Exception 0x%X at PC 0x%X\nEmulation stop", ExceptionCode, m_Reg.m_PROGRAM_COUNTER);
+                g_Notify->FatalError(message);
             }
 
             if (Task == 1 && bDelayDP() && ((m_Reg.m_GfxIntrReg & MI_INTR_DP) != 0))
@@ -2907,26 +2920,39 @@ extern "C" __declspec(dllexport) bool GetEmulatorStateHashForNetplay(char * hash
         
         CryptoPP::SHA256 sha;
         
-        // Hash only the most stable CPU register state 
-        // We use individual fixed-size members, not arrays, to avoid pointer issues
+        // Hash only the most stable CPU register state.
+        // Use named fixed-size members instead of raw register arrays to avoid layout/padding issues.
         sha.Update((const CryptoPP::byte*)&reg->m_PROGRAM_COUNTER, sizeof(reg->m_PROGRAM_COUNTER));
         sha.Update((const CryptoPP::byte*)&reg->m_HI, sizeof(reg->m_HI));
         sha.Update((const CryptoPP::byte*)&reg->m_LO, sizeof(reg->m_LO));
         sha.Update((const CryptoPP::byte*)&reg->m_LLBit, sizeof(reg->m_LLBit));
+
+        sha.Update((const CryptoPP::byte*)&reg->INDEX_REGISTER, sizeof(reg->INDEX_REGISTER));
+        sha.Update((const CryptoPP::byte*)&reg->ENTRYLO0_REGISTER, sizeof(reg->ENTRYLO0_REGISTER));
+        sha.Update((const CryptoPP::byte*)&reg->ENTRYLO1_REGISTER, sizeof(reg->ENTRYLO1_REGISTER));
+        sha.Update((const CryptoPP::byte*)&reg->CONTEXT_REGISTER, sizeof(reg->CONTEXT_REGISTER));
+        sha.Update((const CryptoPP::byte*)&reg->PAGE_MASK_REGISTER, sizeof(reg->PAGE_MASK_REGISTER));
+        sha.Update((const CryptoPP::byte*)&reg->WIRED_REGISTER, sizeof(reg->WIRED_REGISTER));
+        sha.Update((const CryptoPP::byte*)&reg->BAD_VADDR_REGISTER, sizeof(reg->BAD_VADDR_REGISTER));
+        sha.Update((const CryptoPP::byte*)&reg->ENTRYHI_REGISTER, sizeof(reg->ENTRYHI_REGISTER));
+        sha.Update((const CryptoPP::byte*)&reg->COMPARE_REGISTER, sizeof(reg->COMPARE_REGISTER));
+        sha.Update((const CryptoPP::byte*)&reg->STATUS_REGISTER, sizeof(reg->STATUS_REGISTER));
+        sha.Update((const CryptoPP::byte*)&reg->CAUSE_REGISTER, sizeof(reg->CAUSE_REGISTER));
+        sha.Update((const CryptoPP::byte*)&reg->EPC_REGISTER, sizeof(reg->EPC_REGISTER));
+        sha.Update((const CryptoPP::byte*)&reg->CONFIG_REGISTER, sizeof(reg->CONFIG_REGISTER));
+        sha.Update((const CryptoPP::byte*)&reg->TAGLO_REGISTER, sizeof(reg->TAGLO_REGISTER));
+        sha.Update((const CryptoPP::byte*)&reg->TAGHI_REGISTER, sizeof(reg->TAGHI_REGISTER));
+        sha.Update((const CryptoPP::byte*)&reg->ERROREPC_REGISTER, sizeof(reg->ERROREPC_REGISTER));
+        sha.Update((const CryptoPP::byte*)&reg->FAKE_CAUSE_REGISTER, sizeof(reg->FAKE_CAUSE_REGISTER));
         
-        // Hash CP0 registers explicitly with size check
-        if (sizeof(reg->m_CP0) > 0) {
-            sha.Update((const CryptoPP::byte*)reg->m_CP0, sizeof(reg->m_CP0));
+        // Hash each GPR individually to be extra safe.
+        for (int i = 0; i < 32; i++) {
+            sha.Update((const CryptoPP::byte*)&reg->m_GPR[i].DW, sizeof(reg->m_GPR[i].DW));
         }
         
-        // Hash each GPR individually to be extra safe
+        // Hash each FPR individually to be extra safe.
         for (int i = 0; i < 32; i++) {
-            sha.Update((const CryptoPP::byte*)&reg->m_GPR[i], sizeof(reg->m_GPR[i]));
-        }
-        
-        // Hash each FPR individually to be extra safe
-        for (int i = 0; i < 32; i++) {
-            sha.Update((const CryptoPP::byte*)&reg->m_FPR[i], sizeof(reg->m_FPR[i]));
+            sha.Update((const CryptoPP::byte*)&reg->m_FPR[i].DW, sizeof(reg->m_FPR[i].DW));
         }
         
         // Finalize and generate hex string

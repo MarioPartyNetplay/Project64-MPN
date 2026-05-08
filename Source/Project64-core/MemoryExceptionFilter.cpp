@@ -868,7 +868,21 @@ int32_t CMipsMemoryVM::MemoryFilter(uint32_t dwExptCode, void * lpExceptionPoint
 
     //convert the pointer since we are not having win32 structures in headers
     LPEXCEPTION_POINTERS lpEP = (LPEXCEPTION_POINTERS)lpExceptionPointer;
-    uint32_t MemAddress = (char *)lpEP->ExceptionRecord->ExceptionInformation[1] - (char *)g_MMU->Rdram();
+    size_t FaultAddress = (size_t)lpEP->ExceptionRecord->ExceptionInformation[1];
+    size_t RdramBase = (size_t)g_MMU->Rdram();
+    size_t RdramLimit = RdramBase + 0x20000000;
+
+    if (FaultAddress < RdramBase || FaultAddress >= RdramLimit)
+    {
+        WriteTrace(TraceExceptionHandler, TraceError, "Invalid memory address: %p (PC: %08X)", (void *)FaultAddress, lpEP->ContextRecord->Eip);
+        if (bHaveDebugger())
+        {
+            g_Notify->BreakPoint(__FILE__, __LINE__);
+        }
+        return EXCEPTION_EXECUTE_HANDLER;
+    }
+
+    uint32_t MemAddress = (uint32_t)(FaultAddress - RdramBase);
 
     X86_CONTEXT context;
     context.Edi = (uint32_t*)&lpEP->ContextRecord->Edi;

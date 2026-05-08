@@ -1,0 +1,196 @@
+name: CI Server
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      
+      - name: Checkout Submodules
+        run: git submodule update --init --recursive
+
+      - name: Update Git Hash
+        run: |
+          $gitHash = git rev-parse --short=7 HEAD
+          $versionFile = "Source/Project64-core/Version.h"
+          (Get-Content $versionFile) -replace 'GIT_HASH_PLACEHOLDER', $gitHash | Set-Content $versionFile
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build Project64-MPN
+        run: msbuild "Project64-MPN.sln" /p:Configuration=Release /p:Platform=Win32 /verbosity:minimal
+
+      - name: Upload Binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: Project64MPN-windows-x86_64
+          path: Bin/Release/
+
+  build-flatpak:
+    needs: build-windows
+    runs-on: ubuntu-latest
+    container:
+      image: bilelmoussaoui/flatpak-github-actions:freedesktop-24.08
+      options: --privileged
+    
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download Windows Binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: Project64MPN-windows-x86_64
+          path: ./app-bin
+
+      - name: Download Linux Wine Engine
+        run: |
+          curl -L https://github.com/Kron4ek/Wine-Builds/releases/download/11.0/wine-11.0-amd64.tar.xz -o wine-linux.tar.xz
+          mkdir -p wine-linux-engine
+          tar -xf wine-linux.tar.xz -C wine-linux-engine --strip-components=1
+
+      - name: Prepare Desktop Files
+        run: |
+          mkdir -p app-bin  # Ensure the directory exists
+          cat <<EOF > app-bin/org.mariopartynetplay.Project64MPN.desktop
+          [Desktop Entry]
+          Version=1.0
+          Type=Application
+          Name=Project64 MPN
+          Comment=Nintendo 64 Emulator (Wine)
+          Exec=project64mpn-launcher
+          Icon=org.mariopartynetplay.Project64MPN
+          Categories=Game;Emulator;
+          Terminal=false
+          EOF
+          cp Package/Linux/Project64-MPN.png app-bin/
+
+      - name: Generate Manifest
+        run: |
+          cat <<EOF > org.mariopartynetplay.Project64MPN.yml
+          app-id: org.mariopartynetplay.Project64MPN
+          runtime: org.freedesktop.Platform
+          runtime-version: '24.08'
+          sdk: org.freedesktop.Sdk
+          command: project64mpn-launcher
+          finish-args:
+            - --device=all
+            - --socket=x11
+            - --socket=wayland
+            - --socket=pulseaudio
+            - --share=ipc
+            - --share=network
+            - --filesystem=home
+            - --env=WINEDEBUG=-all
+          modules:
+            - name: wine-engine
+              buildsystem: simple
+              build-commands:
+                - mkdir -p /app/wine-runtime/  # Add this line
+                - cp -R * /app/wine-runtime/
+              sources:
+                - type: dir
+                  path: ./wine-linux-engine
+
+            - name: project64mpn-bin
+              buildsystem: simple
+              build-commands:
+                - install -d /app/bin
+                - install -d /app/share/project64
+                - install -d /app/share/applications
+                - install -d /app/share/icons/hicolor/128x128/apps
+                
+                - cp -r * /app/share/project64/
+                
+                - |
+                  echo '#!/bin/sh' > /app/bin/project64mpn-launcher
+                  echo 'export PATH=\$PATH:/app/wine-runtime/bin' >> /app/bin/project64mpn-launcher
+                  echo 'export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/app/wine-runtime/lib:/app/wine-runtime/lib64' >> /app/bin/project64mpn-launcher
+                  echo 'wine /app/share/project64/Project64.exe "\$@"' >> /app/bin/project64mpn-launcher
+                - chmod +x /app/bin/project64mpn-launcher
+                
+                - install -m644 org.mariopartynetplay.Project64MPN.desktop /app/share/applications/org.mariopartynetplay.Project64MPN.desktop
+                - install -m644 Project64-MPN.png /app/share/icons/hicolor/128x128/apps/org.mariopartynetplay.Project64MPN.png
+              sources:
+                - type: dir
+                  path: ./app-bin
+          EOF
+
+      - name: Build Flatpak Bundle
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: Project64MPN-flatpak-linux-x86_64.flatpak
+          manifest-path: org.mariopartynetplay.Project64MPN.yml
+          cache: false
+
+  build-macos:
+    needs: build-windows
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download Windows Binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: Project64MPN-windows-x86_64
+          path: ./pj64-bin
+
+      - name: Download Gcenx Wine Engine
+        run: |
+          curl -L https://github.com/Gcenx/macOS_Wine_builds/releases/download/11.8/wine-devel-11.8-osx64.tar.xz -o wine.tar.xz
+          mkdir -p wine-engine
+          tar -xf wine.tar.xz -C wine-engine
+
+      - name: Structure App Bundle
+        run: |
+          APP_BUNDLE="Project64-MPN.app"
+          CONTENTS="$APP_BUNDLE/Contents"
+          # This is the standard path your launcher script uses
+          DEST_BIN="$CONTENTS/Resources/wine-home/usr/bin"
+          
+          mkdir -p "$CONTENTS/MacOS"
+          mkdir -p "$CONTENTS/Resources/wine-prefix/drive_c/pj64mpn"
+
+          # 1. Copy Metadata
+          cp "Package/macOS/Info.plist" "$CONTENTS/"
+          cp "Package/macOS/Project64-MPN.icns" "$CONTENTS/Resources/"
+          cp "Package/macOS/Project64-MPN" "$CONTENTS/MacOS/"
+          
+          # 2. Identify and Sync Wine
+          # Find where the actual 'bin' directory is inside the extracted engine
+          REAL_BIN_PATH=$(find wine-engine -name "bin" -type d | head -n 1)
+          WINE_ROOT_SRC=$(dirname "$REAL_BIN_PATH")
+          
+          echo "Found Wine Root Source at: $WINE_ROOT_SRC"
+          
+          # Ensure the target directory exists
+          mkdir -p "$CONTENTS/Resources/wine-home/usr"
+          
+          # Sync the content into wine-home/usr
+          rsync -av "$WINE_ROOT_SRC/" "$CONTENTS/Resources/wine-home/usr/"
+
+          # 3. Copy Project64 Windows Binaries
+          cp -R ./pj64-bin/* "$CONTENTS/Resources/wine-prefix/drive_c/pj64mpn/"
+
+          # 4. Fix Permissions
+          chmod +x "$CONTENTS/MacOS/Project64-MPN"
+          # Use the variable to ensure we are pointing at the right place
+          find "$CONTENTS/Resources/wine-home/usr/bin" -type f -exec chmod +x {}
+
+      - name: Create DMG
+        run: |
+          hdiutil create \
+            -volname "Project64-MPN" \
+            -srcfolder "Project64-MPN.app" \
+            -ov -format UDZO \
+            Project64MPN-macOS-x86_64.dmg
+
+      - name: Upload MacOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Project64MPN-macos-x86_64
+          path: Project64MPN-macOS-x86_64.dmg

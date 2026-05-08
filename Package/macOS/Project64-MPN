@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# --- 1. Setup Paths (Must come first) ---
+# ROOT is /YourApp.app/Contents/MacOS
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+RESOURCES="$(cd "$ROOT/../Resources" && pwd)"
+
+# --- 2. Define Environment Variables ---
+export WINEPREFIX="$RESOURCES/wine-prefix"
+export WINEARCH="win64"
+export LC_ALL="en_US.UTF-8"
+export PATH="$RESOURCES/wine-home/usr/bin:$PATH"
+export WINELOADER="$RESOURCES/wine-home/usr/bin/wine64"
+
+# Critical for macOS Wine: DYLD path must include both the Wine lib and the internal wine folder
+export DYLD_FALLBACK_LIBRARY_PATH="$RESOURCES/wine-home/usr/lib:/usr/lib:/usr/local/lib"
+
+# --- 3. Symlink Logic (Application Support) ---
+SOURCE_DIR="$RESOURCES/wine-prefix/drive_c/pj64mpn/User"
+TARGET_LINK="$HOME/Library/Application Support/Project64-MPN"
+
+# Ensure the parent directory exists in the user's Library
+mkdir -p "$HOME/Library/Application Support"
+
+CURRENT_DEST=$(readlink "$TARGET_LINK")
+
+if [ "$CURRENT_DEST" != "$SOURCE_DIR" ]; then
+    echo "Updating link..."
+    
+    # Try to link without sudo first by using the user's Library folder
+    # Note: Linking to /Library/ (System) requires sudo, but ~/Library/ (User) does not.
+    # Using ~/Library is much better for app portability.
+    rm -rf "$TARGET_LINK"
+    ln -sfn "$SOURCE_DIR" "$TARGET_LINK"
+    
+    # Force icon refresh via Finder
+    killall Finder
+    
+    # Restart the app
+    APP_BUNDLE=$(cd "$ROOT/../../" && pwd)
+    open "$APP_BUNDLE"
+    exit 0
+fi
+
+# --- 4. Wine Launch Logic ---
+WINE_BIN="$RESOURCES/wine-home/usr/bin/wine64"
+SERVER_BIN="$RESOURCES/wine-home/usr/bin/wineserver"
+APP_EXE='C:\pj64mpn\Project64-MPN.exe'
+
+# Kill any hung servers from previous crashes
+"$SERVER_BIN" -k || true
+
+# Launching
+echo "Launching Project64-MPN via Wine..."
+exec "$WINE_BIN" "$APP_EXE"

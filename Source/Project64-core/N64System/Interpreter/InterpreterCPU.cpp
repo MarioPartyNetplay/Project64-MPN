@@ -349,7 +349,11 @@ void CInterpreterCPU::ExecuteCPU()
     }
     __except_catch()
     {
-        g_Notify->FatalError(GS(MSG_UNKNOWN_MEM_ACTION));
+        unsigned int ExceptionCode = _exception_code();
+        WriteTrace(TraceN64System, TraceError, "Interpreter exception 0x%X at PC 0x%X", ExceptionCode, *_PROGRAM_COUNTER);
+        char msg[256];
+        sprintf(msg, "Interpreter Exception 0x%X at PC 0x%X\n\nThis usually indicates a TLB miss or invalid memory access.", ExceptionCode, *_PROGRAM_COUNTER);
+        g_Notify->FatalError(msg);
     }
     WriteTrace(TraceN64System, TraceDebug, "Done");
 }

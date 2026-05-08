@@ -12,6 +12,7 @@
 #include <Project64-core/N64System/Recompiler/RecompilerClass.h>
 #include <Project64-core/N64System/SystemGlobals.h>
 #include <Project64-core/N64System/Recompiler/RecompilerCodeLog.h>
+#include <Project64-core/N64System/Mips/OpcodeName.h>
 #include <Project64-core/N64System/N64Class.h>
 #include <Project64-core/N64System/Interpreter/InterpreterCPU.h>
 #include <Project64-core/ExceptionHandler.h>
@@ -57,6 +58,13 @@ void CRecompiler::Run()
 #ifdef legacycode
     *g_MemoryStack = (uint32_t)(RDRAM + (_GPR[29].W[0] & 0x1FFFFFFF));
 #endif
+    RunRecompilerLoop();
+
+    WriteTrace(TraceRecompiler, TraceDebug, "Done");
+}
+
+void CRecompiler::RunRecompilerLoop()
+{
     __except_try()
     {
         if (g_System->LookUpMode() == FuncFind_VirtualLookup)
@@ -102,10 +110,31 @@ void CRecompiler::Run()
     }
     __except_catch()
     {
-        g_Notify->DisplayError(MSG_UNKNOWN_MEM_ACTION);
-    }
+        unsigned int ExceptionCode = _exception_code();
+        uint32_t pc = g_Reg->m_PROGRAM_COUNTER;
+        WriteTrace(TraceRecompiler, TraceError, "exception 0x%X during recompiled code execution at PC 0x%X", ExceptionCode, pc);
 
-    WriteTrace(TraceRecompiler, TraceDebug, "Done");
+        uint32_t opcode = 0;
+        if (g_MMU != NULL && g_MMU->LW_VAddr(pc, opcode))
+        {
+            WriteTrace(TraceRecompiler, TraceError, "opcode at PC 0x%X: %08X (%s)", pc, opcode, R4300iOpcodeName(opcode, pc));
+            for (int offset = -2; offset <= 2; offset++)
+            {
+                uint32_t address = pc + (offset * 4);
+                uint32_t nearbyOpcode = 0;
+                if (g_MMU->LW_VAddr(address, nearbyOpcode))
+                {
+                    WriteTrace(TraceRecompiler, TraceError, "pc%+d 0x%X: %08X (%s)", offset * 4, address, nearbyOpcode, R4300iOpcodeName(nearbyOpcode, address));
+                }
+            }
+        }
+
+        WriteTrace(TraceRecompiler, TraceError, "GPR29/SP=0x%08X  HI=0x%08X%08X  LO=0x%08X%08X", g_Reg->m_GPR[29].W[0], g_Reg->m_HI.W[1], g_Reg->m_HI.W[0], g_Reg->m_LO.W[1], g_Reg->m_LO.W[0]);
+        m_EndEmulation = true;
+        char message[256];
+        sprintf(message, "Recompiler exception 0x%X at PC 0x%X - see log for opcode details", ExceptionCode, pc);
+        g_Notify->DisplayMessage(5, message);
+    }
 }
 
 void CRecompiler::RecompilerMain_VirtualTable()

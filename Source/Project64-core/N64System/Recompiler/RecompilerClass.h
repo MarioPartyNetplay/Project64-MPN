@@ -62,6 +62,7 @@ private:
     CRecompiler(const CRecompiler&);            // Disable copy constructor
     CRecompiler& operator=(const CRecompiler&); // Disable assignment
 
+    void RunRecompilerLoop();
     CCompiledFunc * CompileCode();
 
     typedef struct

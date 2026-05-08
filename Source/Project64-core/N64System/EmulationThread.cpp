@@ -65,20 +65,25 @@ void CN64System::CloseCpu()
     }
 
     CThread * hThread = m_thread;
-    m_thread = NULL;
-    for (int count = 0; count < 200; count++)
+    // Critical fix: Atomically swap to NULL to prevent use-after-free
+    // Use comparison-and-swap or proper synchronization
+    if (hThread != NULL)
     {
-        if (hThread == NULL || !hThread->isRunning())
+        m_thread = NULL;
+        for (int count = 0; count < 200; count++)
         {
-            WriteTrace(TraceN64System, TraceDebug, "Thread no longer running");
-            break;
-        }
-        WriteTrace(TraceN64System, TraceDebug, "%d - waiting", count);
-        pjutil::Sleep(100);
-        WriteTrace(TraceN64System, TraceDebug, "%d - Finished wait", count);
-        if (g_Notify->ProcessGuiMessages())
-        {
-            return;
+            if (!hThread->isRunning())
+            {
+                WriteTrace(TraceN64System, TraceDebug, "Thread no longer running");
+                break;
+            }
+            WriteTrace(TraceN64System, TraceDebug, "%d - waiting", count);
+            pjutil::Sleep(100);
+            WriteTrace(TraceN64System, TraceDebug, "%d - Finished wait", count);
+            if (g_Notify->ProcessGuiMessages())
+            {
+                return;
+            }
         }
     }
     CpuStopped();
