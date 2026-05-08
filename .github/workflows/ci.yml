@@ -86,9 +86,3 @@ jobs:
           bundle: Project64MPN-flatpak-linux-x86_64.flatpak
           manifest-path: org.project64.Project64.yml
           cache: false
-
-      - name: Upload Final Flatpak
-        uses: actions/upload-artifact@v4
-        with:
-          name: Project64MPN-flatpak-linux-x86_64
-          path: Project64MPN-flatpak-linux-x86_64.flatpak
