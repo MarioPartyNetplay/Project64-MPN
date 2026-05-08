@@ -480,51 +480,10 @@ bool CMainMenu::ProcessMessage(HWND hWnd, DWORD /*FromAccelerator*/, DWORD MenuI
         g_BaseSystem->AlterSpeed(CSpeedLimiter::DECREASE_SPEED);
         break;
     case ID_OPTIONS_FULLSCREEN:
-        g_BaseSystem->ExternalEvent(SysEvent_ChangingFullScreen);
+        WriteTrace(TraceUserInterface, TraceDebug, "Fullscreen disabled (menu)");
         break;
     case ID_OPTIONS_FULLSCREEN2:
-        if (UISettingsLoadBool(UserInterface_InFullScreen))
-        {
-            WriteTrace(TraceUserInterface, TraceDebug, "ID_OPTIONS_FULLSCREEN a");
-            m_Gui->MakeWindowOnTop(false);
-            Notify().SetGfxPlugin(NULL);
-            WriteTrace(TraceGFXPlugin, TraceDebug, "ChangeWindow: Starting");
-            g_Plugins->Gfx()->ChangeWindow();
-            WriteTrace(TraceGFXPlugin, TraceDebug, "ChangeWindow: Done");
-            ShowCursor(true);
-            m_Gui->ShowStatusBar(true);
-            m_Gui->MakeWindowOnTop(UISettingsLoadBool(UserInterface_AlwaysOnTop));
-            UISettingsSaveBool(UserInterface_InFullScreen, (DWORD)false);
-        }
-        else
-        {
-            WriteTrace(TraceUserInterface, TraceDebug, "ID_OPTIONS_FULLSCREEN b");
-            ShowCursor(false);
-            WriteTrace(TraceUserInterface, TraceDebug, "ID_OPTIONS_FULLSCREEN b 1");
-            m_Gui->ShowStatusBar(false);
-            WriteTrace(TraceUserInterface, TraceDebug, "ID_OPTIONS_FULLSCREEN b 2");
-            try
-            {
-                WriteTrace(TraceGFXPlugin, TraceDebug, "ChangeWindow: Starting");
-                g_Plugins->Gfx()->ChangeWindow();
-                WriteTrace(TraceGFXPlugin, TraceDebug, "ChangeWindow: Done");
-            }
-            catch (...)
-            {
-                WriteTrace(TraceError, TraceDebug, "Exception when going to full screen");
-                char Message[600];
-                sprintf(Message, "Exception caught\nFile: %s\nLine: %d", __FILE__, __LINE__);
-                MessageBox(NULL, Message, "Exception", MB_OK);
-            }
-            WriteTrace(TraceUserInterface, TraceDebug, "ID_OPTIONS_FULLSCREEN b 4");
-            m_Gui->MakeWindowOnTop(false);
-            WriteTrace(TraceUserInterface, TraceDebug, "ID_OPTIONS_FULLSCREEN b 5");
-            Notify().SetGfxPlugin(g_Plugins->Gfx());
-            WriteTrace(TraceUserInterface, TraceDebug, "ID_OPTIONS_FULLSCREEN b 3");
-            UISettingsSaveBool(UserInterface_InFullScreen, true);
-            WriteTrace(TraceUserInterface, TraceDebug, "ID_OPTIONS_FULLSCREEN b 6");
-        }
-        WriteTrace(TraceUserInterface, TraceDebug, "ID_OPTIONS_FULLSCREEN 1");
+        WriteTrace(TraceUserInterface, TraceDebug, "Fullscreen disabled (menu toggle)");
         break;
     case ID_OPTIONS_ALWAYSONTOP:
         if (UISettingsLoadBool(UserInterface_AlwaysOnTop))
