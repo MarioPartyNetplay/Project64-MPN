@@ -1,0 +1,94 @@
+name: CI Server
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      
+      - name: Checkout Submodules
+        run: git submodule update --init --recursive
+
+      - name: Update Git Hash
+        run: |
+          $gitHash = git rev-parse --short=7 HEAD
+          $versionFile = "Source/Project64-core/Version.h"
+          (Get-Content $versionFile) -replace 'GIT_HASH_PLACEHOLDER', $gitHash | Set-Content $versionFile
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build Project64-MPN
+        run: msbuild "Project64-MPN.sln" /p:Configuration=Release /p:Platform=Win32 /verbosity:minimal
+
+      - name: Upload Binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: Project64MPN-windows-x86_64
+          path: Bin/Release/
+
+  build-flatpak:
+    needs: build-windows
+    runs-on: ubuntu-latest
+    container:
+      image: bilelmoussaoui/flatpak-github-actions:freedesktop-23.08
+      options: --privileged
+    
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download Windows Binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: Project64MPN-windows-x86_64
+          path: ./app-bin
+
+      - name: Generate Manifest and Build
+        run: |
+          cat <<EOF > org.project64.Project64.yml
+          app-id: org.project64.Project64
+          runtime: org.freedesktop.Platform
+          runtime-version: '23.08'
+          sdk: org.freedesktop.Sdk
+          base: org.winehq.Wine
+          base-version: stable-23.08
+          command: project64-launcher
+          finish-args:
+            - --device=all
+            - --socket=x11
+            - --socket=pulseaudio
+            - --share=ipc
+            - --filesystem=home
+          modules:
+            - name: project64-bin
+              buildsystem: simple
+              build-commands:
+                - install -d /app/bin
+                - install -d /app/share/project64
+                # This copies everything from ./app-bin into the Flatpak share folder
+                - cp -r * /app/share/project64/
+                - echo '#!/bin/sh' > /app/bin/project64-launcher
+                # Ensure the .exe name matches your actual output filename!
+                - echo 'wine /app/share/project64/Project64.exe "\$@"' >> /app/bin/project64-launcher
+                - chmod +x /app/bin/project64-launcher
+              sources:
+                - type: dir
+                  path: ./app-bin
+          EOF
+
+      - name: Build Flatpak Bundle
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: Project64MPN-flatpak-linux-x86_64.flatpak
+          manifest-path: org.project64.Project64.yml
+          cache: false
+
+      - name: Upload Final Flatpak
+        uses: actions/upload-artifact@v4
+        with:
+          name: Project64MPN-flatpak-linux-x86_64
+          path: Project64MPN-flatpak-linux-x86_64.flatpak
