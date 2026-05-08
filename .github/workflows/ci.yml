@@ -31,7 +31,7 @@ jobs:
           name: Project64MPN-windows-x86_64
           path: Bin/Release/
 
-  build-flatpak:
+build-flatpak:
     needs: build-windows
     runs-on: ubuntu-latest
     container:
@@ -47,34 +47,58 @@ jobs:
           name: Project64MPN-windows-x86_64
           path: ./app-bin
 
-      - name: Generate Manifest and Build
+      - name: Prepare Desktop Files
         run: |
-          cat <<EOF > org.project64.Project64.yml
-          app-id: org.project64.Project64
+          mkdir -p exports
+          cat <<EOF > exports/org.mariopartynetplay.Project64MPN.desktop
+          [Desktop Entry]
+          Version=1.0
+          Type=Application
+          Name=Project64 MPN
+          Comment=Nintendo 64 Emulator (Wine)
+          Exec=project64mpn-launcher
+          Icon=org.mariopartynetplay.Project64MPN
+          Categories=Game;Emulator;
+          Terminal=false
+          EOF
+
+      - name: Generate Manifest
+        run: |
+          cat <<EOF > org.mariopartynetplay.Project64MPN.yml
+          app-id: org.mariopartynetplay.Project64MPN
           runtime: org.freedesktop.Platform
           runtime-version: '23.08'
           sdk: org.freedesktop.Sdk
-          base: org.winehq.Wine
-          base-version: stable-23.08
-          command: project64-launcher
+          # Added Wine Extension
+          sdk-extensions:
+            - org.freedesktop.Sdk.Extension.wine
+          command: project64mpn-launcher
           finish-args:
             - --device=all
             - --socket=x11
+            - --socket=wayland
             - --socket=pulseaudio
             - --share=ipc
+            - --share=network
             - --filesystem=home
+            - --env=WINEDEBUG=-all
           modules:
-            - name: project64-bin
+            - name: project64mpn-bin
               buildsystem: simple
               build-commands:
                 - install -d /app/bin
                 - install -d /app/share/project64
-                # This copies everything from ./app-bin into the Flatpak share folder
+                - install -d /app/share/applications
+                # Copy binaries
                 - cp -r * /app/share/project64/
-                - echo '#!/bin/sh' > /app/bin/project64-launcher
-                # Ensure the .exe name matches your actual output filename!
-                - echo 'wine /app/share/project64/Project64.exe "\$@"' >> /app/bin/project64-launcher
-                - chmod +x /app/bin/project64-launcher
+                # Setup Launcher script with Wine path
+                - |
+                  echo '#!/bin/sh' > /app/bin/project64mpn-launcher
+                  echo 'export PATH=\$PATH:/usr/lib/sdk/wine/bin' >> /app/bin/project64mpn-launcher
+                  echo 'wine /app/share/project64/Project64.exe "\$@"' >> /app/bin/project64mpn-launcher
+                - chmod +x /app/bin/project64mpn-launcher
+                # Install the desktop file
+                - install -m644 ../exports/org.mariopartynetplay.Project64MPN.desktop /app/share/applications/org.mariopartynetplay.Project64MPN.desktop
               sources:
                 - type: dir
                   path: ./app-bin
@@ -84,5 +108,5 @@ jobs:
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           bundle: Project64MPN-flatpak-linux-x86_64.flatpak
-          manifest-path: org.project64.Project64.yml
+          manifest-path: org.mariopartynetplay.Project64MPN.yml # Fixed filename mismatch
           cache: false
