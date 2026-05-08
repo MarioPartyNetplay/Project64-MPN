@@ -2902,8 +2902,7 @@ extern "C" __declspec(dllexport) bool GetEmulatorStateHashForNetplay(char * hash
         CryptoPP::SHA256 sha;
         const uint32_t RdramSize = g_Settings->LoadDword(Game_RDRamSize);
 
-        // Feed core registers
-        sha.Update((const CryptoPP::byte*)&g_Reg->m_PROGRAM_COUNTER, sizeof(g_Reg->m_PROGRAM_COUNTER));
+        // Hash CPU registers (but not PC which changes every instruction - timing-volatile)
         sha.Update((const CryptoPP::byte*)g_Reg->m_GPR, sizeof(int64_t) * 32);
         sha.Update((const CryptoPP::byte*)g_Reg->m_FPR, sizeof(int64_t) * 32);
         sha.Update((const CryptoPP::byte*)&g_Reg->m_HI, sizeof(g_Reg->m_HI));
@@ -2919,11 +2918,8 @@ extern "C" __declspec(dllexport) bool GetEmulatorStateHashForNetplay(char * hash
         sha.Update((const CryptoPP::byte*)g_Reg->m_Peripheral_Interface, sizeof(uint32_t) * 13);
         sha.Update((const CryptoPP::byte*)g_Reg->m_RDRAM_Interface, sizeof(uint32_t) * 8);
 
-        // TLB entries
-        sha.Update((const CryptoPP::byte*)&g_TLB->TlbEntry(0), sizeof(CTLB::TLB_ENTRY) * 32);
-
-        // RSP / memory
-        if (g_MMU && g_MMU->PifRam()) sha.Update((const CryptoPP::byte*)g_MMU->PifRam(), 0x40);
+        // Hash stable emulator memory state
+        if (g_MMU && g_MMU->PifRam()) sha.Update((const CryptoPP::byte*)(const void*)g_MMU->PifRam(), 0x40);
         if (g_MMU && g_MMU->Rdram() && RdramSize) sha.Update((const CryptoPP::byte*)g_MMU->Rdram(), RdramSize);
         if (g_MMU && g_MMU->Dmem()) sha.Update((const CryptoPP::byte*)g_MMU->Dmem(), 0x1000);
         if (g_MMU && g_MMU->Imem()) sha.Update((const CryptoPP::byte*)g_MMU->Imem(), 0x1000);
