@@ -1,0 +1,49 @@
+#!/bin/sh
+
+# 1. Setup paths
+# ROOT is /YourApp.app/Contents/MacOS
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+RESOURCES="$ROOT/../Resources"
+WINE_BIN_DIR="$RESOURCES/wine-home/usr/bin"
+
+# The REAL folder inside the app
+SOURCE_DIR="$RESOURCES/wine-prefix/drive_c/pj64mpn/User"
+
+# The Shortcut in the System Library
+TARGET_LINK="/Library/Application Support/Project64-MPN"
+
+# 2. Check and Fix Logic
+CURRENT_DEST=$(readlink "$TARGET_LINK")
+
+if [ "$CURRENT_DEST" != "$SOURCE_DIR" ]; then
+    echo "Updating link and refreshing icon..."
+    
+    # Update link with admin privileges
+    osascript -e "do shell script \"rm -rf '$TARGET_LINK' && ln -sfn '$SOURCE_DIR' '$TARGET_LINK' && touch -h '$TARGET_LINK' && chmod -R 777 '$TARGET_LINK'\" with administrator privileges"
+    
+    # Refresh Finder to force the icon update
+    killall Finder
+    
+    # Get the path to the actual .app bundle (three levels up from the binary)
+    APP_BUNDLE=$(cd "$ROOT/../../" && pwd)
+    
+    # Reopen the app and exit the current script
+    echo "Restarting app..."
+    open "$APP_BUNDLE"
+    exit 0
+else
+    echo "Link is correct. Proceeding to launch..."
+fi
+
+# 3. Wine Launch Logic
+# We use 'exec' here so Wine becomes the main process
+"$WINE_BIN_DIR/wineserver" -k 
+
+export WINEPREFIX="$RESOURCES/wine-prefix"
+export WINEARCH="win64"
+export LC_ALL="en_US.UTF-8"
+
+WINE="$WINE_BIN_DIR/wine64"
+APP_PATH='C:/pj64mpn/Project64-MPN.exe'
+
+exec "$WINE" "$APP_PATH"
