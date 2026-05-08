@@ -31,7 +31,7 @@ jobs:
           name: Project64MPN-windows-x86_64
           path: Bin/Release/
 
-build-flatpak:
+  build-flatpak:
     needs: build-windows
     runs-on: ubuntu-latest
     container:
@@ -69,7 +69,6 @@ build-flatpak:
           runtime: org.freedesktop.Platform
           runtime-version: '23.08'
           sdk: org.freedesktop.Sdk
-          # Added Wine Extension
           sdk-extensions:
             - org.freedesktop.Sdk.Extension.wine
           command: project64mpn-launcher
@@ -89,15 +88,12 @@ build-flatpak:
                 - install -d /app/bin
                 - install -d /app/share/project64
                 - install -d /app/share/applications
-                # Copy binaries
                 - cp -r * /app/share/project64/
-                # Setup Launcher script with Wine path
                 - |
                   echo '#!/bin/sh' > /app/bin/project64mpn-launcher
                   echo 'export PATH=\$PATH:/usr/lib/sdk/wine/bin' >> /app/bin/project64mpn-launcher
                   echo 'wine /app/share/project64/Project64.exe "\$@"' >> /app/bin/project64mpn-launcher
                 - chmod +x /app/bin/project64mpn-launcher
-                # Install the desktop file
                 - install -m644 ../exports/org.mariopartynetplay.Project64MPN.desktop /app/share/applications/org.mariopartynetplay.Project64MPN.desktop
               sources:
                 - type: dir
@@ -108,5 +104,61 @@ build-flatpak:
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           bundle: Project64MPN-flatpak-linux-x86_64.flatpak
-          manifest-path: org.mariopartynetplay.Project64MPN.yml # Fixed filename mismatch
+          manifest-path: org.mariopartynetplay.Project64MPN.yml
           cache: false
+
+  build-macos:
+    needs: build-windows
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download Windows Binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: Project64MPN-windows-x86_64
+          path: ./pj64-bin
+
+      - name: Download Gcenx Wine Engine
+        run: |
+          curl -L https://github.com/Gcenx/winecx/releases/download/23.7.1/wine-crossover-23.7.1-osx64.tar.xz -o wine.tar.xz
+          mkdir -p wine-engine
+          tar -xf wine.tar.xz -C wine-engine
+
+      - name: Structure App Bundle
+        run: |
+          APP_BUNDLE="Project64-MPN.app"
+          CONTENTS="$APP_BUNDLE/Contents"
+          
+          mkdir -p "$CONTENTS/MacOS"
+          mkdir -p "$CONTENTS/Resources/wine-home/usr"
+          mkdir -p "$CONTENTS/Resources/wine-prefix/drive_c/pj64mpn"
+
+          # Copy repo files
+          cp "Package/macOS/Info.plist" "$CONTENTS/"
+          cp "Package/macOS/Project64-MPN.icns" "$CONTENTS/Resources/"
+          cp "Package/macOS/Project64-MPN" "$CONTENTS/MacOS/"
+          
+          # Copy Wine Engine
+          cp -R wine-engine/* "$CONTENTS/Resources/wine-home/usr/"
+
+          # Copy Project64 Binaries
+          cp -r ./pj64-bin/* "$CONTENTS/Resources/wine-prefix/drive_c/pj64mpn/"
+
+          # Permissions
+          chmod +x "$CONTENTS/MacOS/Project64-MPN"
+          chmod +x "$CONTENTS/Resources/wine-home/usr/bin/"*
+
+      - name: Create DMG
+        run: |
+          hdiutil create \
+            -volname "Project64-MPN" \
+            -srcfolder "Project64-MPN.app" \
+            -ov -format UDZO \
+            Project64MPN-macOS-x86_64.dmg
+
+      - name: Upload MacOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Project64MPN-macos-dmg
+          path: Project64MPN-macOS-x86_64.dmg
