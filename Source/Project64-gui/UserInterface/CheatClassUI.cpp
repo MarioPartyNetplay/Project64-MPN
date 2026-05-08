@@ -1358,8 +1358,8 @@ stdstr CCheatsUI::ReadCodeString(HWND hDlg, bool& validcodes, bool& validoptions
     codeformat = -1;
     int numcodes = 0;
 
-    char codestring[524288];
-    memset(codestring, '\0', sizeof(codestring));
+    stdstr codestring;
+    codestring.reserve(524288);
 
     numlines = SendDlgItemMessage(hDlg, IDC_CHEAT_CODES, EM_GETLINECOUNT, 0, 0);
     if (numlines == 0) { validcodes = false; }
@@ -1389,8 +1389,8 @@ stdstr CCheatsUI::ReadCodeString(HWND hDlg, bool& validcodes, bool& validoptions
         }
         if (strcmp(tempformat, formatnormal) == 0)
         {
-            strcat(codestring, ",");
-            strcat(codestring, str);
+            codestring += ",";
+            codestring += str;
             numcodes++;
             if (codeformat < 0) codeformat = 0;
         }
@@ -1398,8 +1398,8 @@ stdstr CCheatsUI::ReadCodeString(HWND hDlg, bool& validcodes, bool& validoptions
         {
             if (codeformat != 2)
             {
-                strcat(codestring, ",");
-                strcat(codestring, str);
+                codestring += ",";
+                codestring += str;
                 numcodes++;
                 codeformat = 1;
                 nooptions = false;
@@ -1414,8 +1414,8 @@ stdstr CCheatsUI::ReadCodeString(HWND hDlg, bool& validcodes, bool& validoptions
         {
             if (codeformat != 1)
             {
-                strcat(codestring, ",");
-                strcat(codestring, str);
+                codestring += ",";
+                codestring += str;
                 numcodes++;
                 codeformat = 2;
                 nooptions = false;
@@ -1431,7 +1431,7 @@ stdstr CCheatsUI::ReadCodeString(HWND hDlg, bool& validcodes, bool& validoptions
             validcodes = false;
         }
     }
-    if (strlen(codestring) == 0)
+    if (codestring.length() == 0)
     {
         validcodes = false;
     }
@@ -1447,8 +1447,8 @@ stdstr CCheatsUI::ReadOptionsString(HWND hDlg, bool&/*validcodes*/, bool& valido
     validoptions = true;
     int numoptions = 0;
 
-    char optionsstring[2048];
-    memset(optionsstring, '\0', sizeof(optionsstring));
+    stdstr optionsstring;
+    optionsstring.reserve(2048);
 
     numlines = SendDlgItemMessage(hDlg, IDC_CHEAT_OPTIONS, EM_GETLINECOUNT, 0, 0);
 
@@ -1486,15 +1486,15 @@ stdstr CCheatsUI::ReadOptionsString(HWND hDlg, bool&/*validcodes*/, bool& valido
                         str[j] = (char)toupper(str[j]);
                     }
 
-                    if (optionsstring[0] == 0)
+                    if (optionsstring.length() == 0)
                     {
-                        strcat(optionsstring, "$");
+                        optionsstring += "$";
                     }
                     else
                     {
-                        strcat(optionsstring, ",$");
+                        optionsstring += ",$";
                     }
-                    strcat(optionsstring, str);
+                    optionsstring += str;
                     numoptions++;
                 }
                 else
@@ -1527,8 +1527,8 @@ stdstr CCheatsUI::ReadOptionsString(HWND hDlg, bool&/*validcodes*/, bool& valido
                         str[j] = (char)toupper(str[j]);
                     }
 
-                    strcat(optionsstring, ",$");
-                    strcat(optionsstring, str);
+                    optionsstring += ",$";
+                    optionsstring += str;
                     numoptions++;
                 }
                 else

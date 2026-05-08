@@ -554,7 +554,7 @@ bool CRomBrowser::RomListDrawItem(int32_t idCtrl, uint32_t lParam)
     std::wstring text = String;
 	if (wcscmp(L"#301#", text.c_str()) == 0)
 	{
-		text = stdstr(pRomInfo->InternalName).ToUTF16();
+        text = stdstr(pRomInfo->InternalName).ToUTF16(stdstr::CODEPAGE_932);
 	}
     if (wcscmp(L"#340#", text.c_str()) == 0)
     {
@@ -579,7 +579,7 @@ bool CRomBrowser::RomListDrawItem(int32_t idCtrl, uint32_t lParam)
         text = String;
 		if (wcscmp(L"#301#", text.c_str()) == 0)
 		{
-			text = stdstr(pRomInfo->InternalName).ToUTF16();
+            text = stdstr(pRomInfo->InternalName).ToUTF16(stdstr::CODEPAGE_932);
 		}
         if (wcscmp(L"#340#", text.c_str()) == 0)
         {
