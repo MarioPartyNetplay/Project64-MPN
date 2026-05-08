@@ -52,46 +52,6 @@ input_plugin::input_plugin(string path) {
     RomOpen                  = (void(*)(void))                                   GetProcAddress(dll, "RomOpen");
     WM_KeyDown               = (void(*)(WPARAM wParam, LPARAM lParam))           GetProcAddress(dll, "WM_KeyDown");
     WM_KeyUp                 = (void(*)(WPARAM wParam, LPARAM lParam))           GetProcAddress(dll, "WM_KeyUp");
-
-    if (!InitiateControllers0100 && !InitiateControllers0101) {
-        FreeLibrary(dll);
-        throw runtime_error("Required function 'InitiateControllers' is missing from dll");
-    }
-
-    if (!CloseDLL) {
-        FreeLibrary(dll);
-        throw runtime_error("Required function 'CloseDLL' is missing from dll");
-    }
-
-    if (!DllConfig) {
-        FreeLibrary(dll);
-        throw runtime_error("Required function 'DllConfig' is missing from dll");
-    }
-
-    if (!GetKeys) {
-        FreeLibrary(dll);
-        throw runtime_error("Required function 'GetKeys' is missing from dll");
-    }
-
-    if (!RomClosed) {
-        FreeLibrary(dll);
-        throw runtime_error("Required function 'RomClosed' is missing from dll");
-    }
-
-    if (!RomOpen) {
-        FreeLibrary(dll);
-        throw runtime_error("Required function 'RomOpen' is missing from dll");
-    }
-
-    if (!WM_KeyDown) {
-        FreeLibrary(dll);
-        throw runtime_error("Required function 'WM_KeyDown' is missing from dll");
-    }
-
-    if (!WM_KeyUp) {
-        FreeLibrary(dll);
-        throw runtime_error("Required function 'WM_KeyUp' is missing from dll");
-    }
 }
 
 input_plugin::~input_plugin() {
