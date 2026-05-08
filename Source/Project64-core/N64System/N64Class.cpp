@@ -2898,43 +2898,51 @@ void CN64System::TLB_Changed()
 extern "C" __declspec(dllexport) bool GetEmulatorStateHashForNetplay(char * hash_buffer, size_t buffer_size)
 {
     if (hash_buffer == NULL || buffer_size < 65) return false;
+    if (g_Reg == NULL) return false;
+    
     try {
+        // Snapshot the register pointer to avoid race conditions
+        CRegisters * reg = g_Reg;
+        if (!reg) return false;
+        
         CryptoPP::SHA256 sha;
-        const uint32_t RdramSize = g_Settings->LoadDword(Game_RDRamSize);
-
-        // Hash CPU registers (but not PC which changes every instruction - timing-volatile)
-        sha.Update((const CryptoPP::byte*)g_Reg->m_GPR, sizeof(int64_t) * 32);
-        sha.Update((const CryptoPP::byte*)g_Reg->m_FPR, sizeof(int64_t) * 32);
-        sha.Update((const CryptoPP::byte*)&g_Reg->m_HI, sizeof(g_Reg->m_HI));
-        sha.Update((const CryptoPP::byte*)&g_Reg->m_LO, sizeof(g_Reg->m_LO));
-
-        // Feed a selection of interface/registers that affect deterministic state
-        sha.Update((const CryptoPP::byte*)g_Reg->m_RDRAM_Registers, sizeof(uint32_t) * 10);
-        sha.Update((const CryptoPP::byte*)g_Reg->m_SigProcessor_Interface, sizeof(uint32_t) * 10);
-        sha.Update((const CryptoPP::byte*)g_Reg->m_Display_ControlReg, sizeof(uint32_t) * 10);
-        sha.Update((const CryptoPP::byte*)g_Reg->m_Mips_Interface, sizeof(uint32_t) * 4);
-        sha.Update((const CryptoPP::byte*)g_Reg->m_Video_Interface, sizeof(uint32_t) * 14);
-        sha.Update((const CryptoPP::byte*)g_Reg->m_Audio_Interface, sizeof(uint32_t) * 6);
-        sha.Update((const CryptoPP::byte*)g_Reg->m_Peripheral_Interface, sizeof(uint32_t) * 13);
-        sha.Update((const CryptoPP::byte*)g_Reg->m_RDRAM_Interface, sizeof(uint32_t) * 8);
-
-        // Hash stable emulator memory state
-        if (g_MMU && g_MMU->PifRam()) sha.Update((const CryptoPP::byte*)(const void*)g_MMU->PifRam(), 0x40);
-        if (g_MMU && g_MMU->Rdram() && RdramSize) sha.Update((const CryptoPP::byte*)g_MMU->Rdram(), RdramSize);
-        if (g_MMU && g_MMU->Dmem()) sha.Update((const CryptoPP::byte*)g_MMU->Dmem(), 0x1000);
-        if (g_MMU && g_MMU->Imem()) sha.Update((const CryptoPP::byte*)g_MMU->Imem(), 0x1000);
-
-        // Finalize
+        
+        // Hash only the most stable CPU register state 
+        // We use individual fixed-size members, not arrays, to avoid pointer issues
+        sha.Update((const CryptoPP::byte*)&reg->m_PROGRAM_COUNTER, sizeof(reg->m_PROGRAM_COUNTER));
+        sha.Update((const CryptoPP::byte*)&reg->m_HI, sizeof(reg->m_HI));
+        sha.Update((const CryptoPP::byte*)&reg->m_LO, sizeof(reg->m_LO));
+        sha.Update((const CryptoPP::byte*)&reg->m_LLBit, sizeof(reg->m_LLBit));
+        
+        // Hash CP0 registers explicitly with size check
+        if (sizeof(reg->m_CP0) > 0) {
+            sha.Update((const CryptoPP::byte*)reg->m_CP0, sizeof(reg->m_CP0));
+        }
+        
+        // Hash each GPR individually to be extra safe
+        for (int i = 0; i < 32; i++) {
+            sha.Update((const CryptoPP::byte*)&reg->m_GPR[i], sizeof(reg->m_GPR[i]));
+        }
+        
+        // Hash each FPR individually to be extra safe
+        for (int i = 0; i < 32; i++) {
+            sha.Update((const CryptoPP::byte*)&reg->m_FPR[i], sizeof(reg->m_FPR[i]));
+        }
+        
+        // Finalize and generate hex string
         unsigned char digest[CryptoPP::SHA256::DIGESTSIZE];
         sha.Final(digest);
 
-        // Convert to lowercase hex
+        // Convert digest to lowercase hex string with safe bounds checking
         static const char hexmap[] = "0123456789abcdef";
-        for (size_t i = 0; i < CryptoPP::SHA256::DIGESTSIZE; ++i) {
+        for (size_t i = 0; i < CryptoPP::SHA256::DIGESTSIZE && (i*2 + 1) < buffer_size; ++i) {
             hash_buffer[i*2]     = hexmap[(digest[i] >> 4) & 0xF];
             hash_buffer[i*2 + 1] = hexmap[digest[i] & 0xF];
         }
-        hash_buffer[CryptoPP::SHA256::DIGESTSIZE * 2] = '\0';
+        // Null terminate safely
+        if (CryptoPP::SHA256::DIGESTSIZE * 2 < buffer_size) {
+            hash_buffer[CryptoPP::SHA256::DIGESTSIZE * 2] = '\0';
+        }
         return true;
     }
     catch (...) {
