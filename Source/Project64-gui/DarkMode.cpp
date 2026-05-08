@@ -215,13 +215,13 @@ LRESULT CALLBACK CBTProc(int nCode,
     case HCBT_ACTIVATE:
     {
         HWND hWnd = (HWND)wParam;
-        DBG_HWND(hWnd, HCBT_ACTIVATE);
+        //DBG_HWND(hWnd, HCBT_ACTIVATE);
         break;
     }
     case HCBT_CREATEWND:
     {
         HWND hWnd = (HWND)wParam;
-        DBG_HWND(hWnd, HCBT_CREATEWND);
+        //DBG_HWND(hWnd, HCBT_CREATEWND);
 
         // need to be careful with subclassing (avoiding conflict with SWS plugin)
         if (needsToBePatched(hWnd)) {
@@ -235,7 +235,7 @@ LRESULT CALLBACK CBTProc(int nCode,
     case HCBT_DESTROYWND:
     {
         HWND hWnd = (HWND)wParam;
-        DBG_HWND(hWnd, HCBT_DESTROYWND);
+        //DBG_HWND(hWnd, HCBT_DESTROYWND);
 
         DWORD style = GetWindowLong(hWnd, GWL_STYLE);
         auto wndName = getClass(hWnd);

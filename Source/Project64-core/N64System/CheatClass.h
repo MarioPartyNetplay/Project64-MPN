@@ -23,7 +23,7 @@ public:
     enum
     {
         MaxCheats = 50000,
-        MaxGSEntries = 2048,
+        MaxGSEntries = 8192,
     };
 
     void ApplyCheats(CMipsMemoryVM * MMU);
@@ -31,9 +31,6 @@ public:
     void LoadCheats(bool DisableSelected, CPlugins * Plugins);
     void LoadCheatsFromData(const char * cheat_file_content, const char * enabled_file_content, const char * game_identifier, CPlugins * Plugins);
 
-    // Thread-safe netplay cheat functions
-    void ApplyCheatsForNetplay(CMipsMemoryVM * MMU);
-    void LoadCheatsFromDataForNetplay(const char * cheat_file_content, const char * enabled_file_content, const char * game_identifier, CPlugins * Plugins);
 
     static bool IsValid16BitCode(const char * CheatString);
 

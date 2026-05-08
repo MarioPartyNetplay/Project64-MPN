@@ -16,13 +16,13 @@
 #include <Project64-core/Plugins/AudioPlugin.h>
 #include <Project64-core/Plugins/RSPPlugin.h>
 #include <Project64-core/Plugins/ControllerPlugin.h>
+#include <Project64-core/N64System/Recompiler/RecompilerClass.h>
+#include <Project64-core/N64System/SystemGlobals.h>
 #include <stdlib.h>
 
 CCheats::CCheats()
 {
-    // Initialize both cheat arrays as empty
     m_Codes.clear();
-    m_NetplayCodes.clear();
 }
 
 CCheats::~CCheats()
@@ -84,7 +84,7 @@ bool CCheats::LoadCode(int CheatNo, const char * CheatString)
         }
         ReadPos++;
     }
-    if (Code.size() == 0)
+    if (Code.size() == 0 || Code.size() > MaxGSEntries)
     {
         return false;
     }
@@ -149,6 +149,7 @@ void CCheats::LoadPermCheats(CPlugins * Plugins)
 
 void CCheats::LoadCheats(bool DisableSelected, CPlugins * Plugins)
 {
+    CGuard Guard(m_CriticalSection);
     m_Codes.clear();
     LoadPermCheats(Plugins);
 
@@ -214,8 +215,18 @@ uint16_t ConvertXP64Value(uint16_t Value)
     return tmpValue;
 }
 
+static void InvalidateRecompilerCache(uint32_t VAddr)
+{
+    if (g_Recompiler)
+    {
+        g_Recompiler->ClearRecompCode_Virt(VAddr & ~0xFFF, 0x1000, CRecompiler::Remove_ProtectedMem);
+    }
+}
+
 void CCheats::ApplyCheats(CMipsMemoryVM * MMU)
 {
+    static CriticalSection s_CheatLock;
+    CGuard Guard(s_CheatLock);
     for (size_t CurrentCheat = 0; CurrentCheat < m_Codes.size(); CurrentCheat++)
     {
         const CODES & CodeEntry = m_Codes[CurrentCheat];
@@ -228,6 +239,8 @@ void CCheats::ApplyCheats(CMipsMemoryVM * MMU)
 
 void CCheats::ApplyGSButton(CMipsMemoryVM * MMU)
 {
+    static CriticalSection s_CheatLock;
+    CGuard Guard(s_CheatLock);
     uint32_t Address;
     for (size_t CurrentCheat = 0; CurrentCheat < m_Codes.size(); CurrentCheat++)
     {
@@ -239,19 +252,23 @@ void CCheats::ApplyGSButton(CMipsMemoryVM * MMU)
             case 0x88000000:
                 Address = 0x80000000 | (Code.Command & 0xFFFFFF);
                 MMU->SB_VAddr(Address, (uint8_t)Code.Value);
+                InvalidateRecompilerCache(Address);
                 break;
             case 0x89000000:
                 Address = 0x80000000 | (Code.Command & 0xFFFFFF);
                 MMU->SH_VAddr(Address, Code.Value);
+                InvalidateRecompilerCache(Address);
                 break;
                 // Xplorer64
             case 0xA8000000:
                 Address = 0x80000000 | (ConvertXP64Address(Code.Command) & 0xFFFFFF);
                 MMU->SB_VAddr(Address, (uint8_t)ConvertXP64Value(Code.Value));
+                InvalidateRecompilerCache(Address);
                 break;
             case 0xA9000000:
                 Address = 0x80000000 | (ConvertXP64Address(Code.Command) & 0xFFFFFF);
                 MMU->SH_VAddr(Address, ConvertXP64Value(Code.Value));
+                InvalidateRecompilerCache(Address);
                 break;
             }
         }
@@ -393,19 +410,35 @@ int CCheats::ApplyCheatEntry(CMipsMemoryVM * MMU, const CODES & CodeEntry, int C
     break;
     case 0x80000000:
         Address = 0x80000000 | (Code.Command & 0xFFFFFF);
-        if (Execute) { MMU->SB_VAddr(Address, (uint8_t)Code.Value); }
+        if (Execute)
+        {
+            MMU->SB_VAddr(Address, (uint8_t)Code.Value);
+            InvalidateRecompilerCache(Address);
+        }
         break;
     case 0x81000000:
         Address = 0x80000000 | (Code.Command & 0xFFFFFF);
-        if (Execute) { MMU->SH_VAddr(Address, Code.Value); }
+        if (Execute)
+        {
+            MMU->SH_VAddr(Address, Code.Value);
+            InvalidateRecompilerCache(Address);
+        }
         break;
     case 0xA0000000:
         Address = 0xA0000000 | (Code.Command & 0xFFFFFF);
-        if (Execute) { MMU->SB_VAddr(Address, (uint8_t)Code.Value); }
+        if (Execute)
+        {
+            MMU->SB_VAddr(Address, (uint8_t)Code.Value);
+            InvalidateRecompilerCache(Address);
+        }
         break;
     case 0xA1000000:
         Address = 0xA0000000 | (Code.Command & 0xFFFFFF);
-        if (Execute) { MMU->SH_VAddr(Address, Code.Value); }
+        if (Execute)
+        {
+            MMU->SH_VAddr(Address, Code.Value);
+            InvalidateRecompilerCache(Address);
+        }
         break;
     case 0xD0000000:
         Address = 0x80000000 | (Code.Command & 0xFFFFFF);
@@ -433,29 +466,53 @@ int CCheats::ApplyCheatEntry(CMipsMemoryVM * MMU, const CODES & CodeEntry, int C
     case 0x82000000:
     case 0x84000000:
         Address = 0x80000000 | (Code.Command & 0xFFFFFF);
-        if (Execute) { MMU->SB_VAddr(Address, (uint8_t)Code.Value); }
+        if (Execute)
+        {
+            MMU->SB_VAddr(Address, (uint8_t)Code.Value);
+            InvalidateRecompilerCache(Address);
+        }
         break;
     case 0x31000000:
     case 0x83000000:
     case 0x85000000:
         Address = 0x80000000 | (Code.Command & 0xFFFFFF);
-        if (Execute) { MMU->SH_VAddr(Address, Code.Value); }
+        if (Execute)
+        {
+            MMU->SH_VAddr(Address, Code.Value);
+            InvalidateRecompilerCache(Address);
+        }
         break;
     case 0xE8000000:
         Address = 0x80000000 | (ConvertXP64Address(Code.Command) & 0xFFFFFF);
-        if (Execute) { MMU->SB_VAddr(Address, (uint8_t)ConvertXP64Value(Code.Value)); }
+        if (Execute)
+        {
+            MMU->SB_VAddr(Address, (uint8_t)ConvertXP64Value(Code.Value));
+            InvalidateRecompilerCache(Address);
+        }
         break;
     case 0xE9000000:
         Address = 0x80000000 | (ConvertXP64Address(Code.Command) & 0xFFFFFF);
-        if (Execute) { MMU->SH_VAddr(Address, ConvertXP64Value(Code.Value)); }
+        if (Execute)
+        {
+            MMU->SH_VAddr(Address, ConvertXP64Value(Code.Value));
+            InvalidateRecompilerCache(Address);
+        }
         break;
     case 0xC8000000:
         Address = 0xA0000000 | (ConvertXP64Address(Code.Command) & 0xFFFFFF);
-        if (Execute) { MMU->SB_VAddr(Address, (uint8_t)Code.Value); }
+        if (Execute)
+        {
+            MMU->SB_VAddr(Address, (uint8_t)Code.Value);
+            InvalidateRecompilerCache(Address);
+        }
         break;
     case 0xC9000000:
         Address = 0xA0000000 | (ConvertXP64Address(Code.Command) & 0xFFFFFF);
-        if (Execute) { MMU->SH_VAddr(Address, ConvertXP64Value(Code.Value)); }
+        if (Execute)
+        {
+            MMU->SH_VAddr(Address, ConvertXP64Value(Code.Value));
+            InvalidateRecompilerCache(Address);
+        }
         break;
     case 0xB8000000:
         Address = 0x80000000 | (ConvertXP64Address(Code.Command) & 0xFFFFFF);
