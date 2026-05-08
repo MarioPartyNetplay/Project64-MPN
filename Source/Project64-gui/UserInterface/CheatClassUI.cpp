@@ -1358,7 +1358,7 @@ stdstr CCheatsUI::ReadCodeString(HWND hDlg, bool& validcodes, bool& validoptions
     codeformat = -1;
     int numcodes = 0;
 
-    char codestring[65536];
+    char codestring[524288];
     memset(codestring, '\0', sizeof(codestring));
 
     numlines = SendDlgItemMessage(hDlg, IDC_CHEAT_CODES, EM_GETLINECOUNT, 0, 0);
