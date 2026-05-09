@@ -31,7 +31,7 @@ jobs:
           name: Project64MPN-windows-x86_64
           path: Bin/Release/
 
-  build-flatpak:
+build-flatpak:
     needs: build-windows
     runs-on: ubuntu-latest
     container:
@@ -46,6 +46,13 @@ jobs:
         with:
           name: Project64MPN-windows-x86_64
           path: ./app-bin
+
+      # We download a portable Wine build for Linux, just like we did for macOS
+      - name: Download Linux Wine Engine
+        run: |
+          curl -L https://github.com/Kron4ek/Wine-Builds/releases/download/11.0/wine-11.0-amd64.tar.xz -o wine-linux.tar.xz
+          mkdir -p wine-linux-engine
+          tar -xf wine-linux.tar.xz -C wine-linux-engine --strip-components=1
 
       - name: Prepare Desktop Files
         run: |
@@ -69,14 +76,6 @@ jobs:
           runtime: org.freedesktop.Platform
           runtime-version: '24.08'
           sdk: org.freedesktop.Sdk
-          sdk-extensions:
-            - org.freedesktop.Sdk.Extension.wine64//stable
-          add-extensions:
-            org.freedesktop.Sdk.Extension.wine64:
-              directory: lib/sdk/wine64
-              add-ld-path: lib
-              no-autodownload: false
-              version: 'stable'
           command: project64mpn-launcher
           finish-args:
             - --device=all
@@ -88,6 +87,14 @@ jobs:
             - --filesystem=home
             - --env=WINEDEBUG=-all
           modules:
+            - name: wine-engine
+              buildsystem: simple
+              build-commands:
+                - cp -R * /app/wine-runtime/
+              sources:
+                - type: dir
+                  path: ./wine-linux-engine
+
             - name: project64mpn-bin
               buildsystem: simple
               build-commands:
@@ -95,12 +102,17 @@ jobs:
                 - install -d /app/share/project64
                 - install -d /app/share/applications
                 - install -d /app/share/icons/hicolor/128x128/apps
+                
                 - cp -r * /app/share/project64/
+                
                 - |
                   echo '#!/bin/sh' > /app/bin/project64mpn-launcher
-                  echo 'export PATH=\$PATH:/usr/lib/sdk/wine64/bin' >> /app/bin/project64mpn-launcher
+                  # We point PATH to our internal bundled Wine
+                  echo 'export PATH=\$PATH:/app/wine-runtime/bin' >> /app/bin/project64mpn-launcher
+                  echo 'export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/app/wine-runtime/lib:/app/wine-runtime/lib64' >> /app/bin/project64mpn-launcher
                   echo 'wine /app/share/project64/Project64.exe "\$@"' >> /app/bin/project64mpn-launcher
                 - chmod +x /app/bin/project64mpn-launcher
+                
                 - install -m644 ../exports/org.mariopartynetplay.Project64MPN.desktop /app/share/applications/org.mariopartynetplay.Project64MPN.desktop
                 - install -m644 ../Package/Linux/Project64-MPN.png /app/share/icons/hicolor/128x128/apps/org.mariopartynetplay.Project64MPN.png
               sources:
