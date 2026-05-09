@@ -130,7 +130,7 @@ jobs:
         run: |
           curl -L https://github.com/Gcenx/macOS_Wine_builds/releases/download/11.8/wine-devel-11.8-osx64.tar.xz -o wine.tar.xz
           mkdir -p wine-engine
-          tar -xf wine.tar.xz -C wine-engine
+          tar -xf wine.tar.xz -C wine-engine --strip-components=1
 
       - name: Structure App Bundle
         run: |
