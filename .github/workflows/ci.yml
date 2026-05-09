@@ -70,12 +70,13 @@ jobs:
           runtime-version: '24.08'
           sdk: org.freedesktop.Sdk
           sdk-extensions:
-            - org.freedesktop.Sdk.Extension.wine64
+            - org.freedesktop.Sdk.Extension.wine64//stable
           add-extensions:
             org.freedesktop.Sdk.Extension.wine64:
               directory: lib/sdk/wine64
               add-ld-path: lib
               no-autodownload: false
+              version: 'stable'
           command: project64mpn-launcher
           finish-args:
             - --device=all
@@ -94,15 +95,12 @@ jobs:
                 - install -d /app/share/project64
                 - install -d /app/share/applications
                 - install -d /app/share/icons/hicolor/128x128/apps
-                
                 - cp -r * /app/share/project64/
-                
                 - |
                   echo '#!/bin/sh' > /app/bin/project64mpn-launcher
                   echo 'export PATH=\$PATH:/usr/lib/sdk/wine64/bin' >> /app/bin/project64mpn-launcher
                   echo 'wine /app/share/project64/Project64.exe "\$@"' >> /app/bin/project64mpn-launcher
                 - chmod +x /app/bin/project64mpn-launcher
-                
                 - install -m644 ../exports/org.mariopartynetplay.Project64MPN.desktop /app/share/applications/org.mariopartynetplay.Project64MPN.desktop
                 - install -m644 ../Package/Linux/Project64-MPN.png /app/share/icons/hicolor/128x128/apps/org.mariopartynetplay.Project64MPN.png
               sources:
@@ -133,8 +131,9 @@ jobs:
         run: |
           curl -L https://github.com/Gcenx/macOS_Wine_builds/releases/download/11.8/wine-devel-11.8-osx64.tar.xz -o wine.tar.xz
           mkdir -p wine-engine
-          tar -xf wine.tar.xz -C wine-engine --strip-components=1
-
+          # Using --strip-components=1 to try and find the root Wine folders
+          tar -xf wine.tar.xz -C wine-engine --strip-components=1 || tar -xf wine.tar.xz -C wine-engine
+          
       - name: Structure App Bundle
         run: |
           APP_BUNDLE="Project64-MPN.app"
@@ -149,15 +148,21 @@ jobs:
           cp "Package/macOS/Project64-MPN.icns" "$CONTENTS/Resources/"
           cp "Package/macOS/Project64-MPN" "$CONTENTS/MacOS/"
           
-          # Copy Wine Engine
-          cp -R wine-engine/* "$CONTENTS/Resources/wine-home/usr/"
+          # Copy Wine Engine (Robust Copy)
+          # We check if 'bin' exists in the root of wine-engine; if not, we find where it is.
+          if [ -d "wine-engine/bin" ]; then
+            cp -R wine-engine/* "$CONTENTS/Resources/wine-home/usr/"
+          else
+            WINE_ROOT=$(find wine-engine -name "bin" -type d | head -n 1 | sed 's/\/bin//')
+            cp -R "$WINE_ROOT"/* "$CONTENTS/Resources/wine-home/usr/"
+          fi
 
           # Copy Project64 Binaries
           cp -r ./pj64-bin/* "$CONTENTS/Resources/wine-prefix/drive_c/pj64mpn/"
 
           # Permissions
           chmod +x "$CONTENTS/MacOS/Project64-MPN"
-          # Ensure Wine binaries are executable
+          # Find and fix permissions for all binaries
           find "$CONTENTS/Resources/wine-home/usr/bin/" -type f -exec chmod +x {} +
 
       - name: Create DMG
