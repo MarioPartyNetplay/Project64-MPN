@@ -139,10 +139,12 @@ jobs:
 
       - name: Download Gcenx Wine Engine
         run: |
+          # Use a stable download and ensure the directory is clean
           curl -L https://github.com/Gcenx/macOS_Wine_builds/releases/download/11.8/wine-devel-11.8-osx64.tar.xz -o wine.tar.xz
           mkdir -p wine-engine
-          tar -xf wine.tar.xz -C wine-engine --strip-components=1 || tar -xf wine.tar.xz -C wine-engine
-          
+          # Extracting without stripping first to avoid errors if the archive structure changes
+          tar -xf wine.tar.xz -C wine-engine
+
       - name: Structure App Bundle
         run: |
           APP_BUNDLE="Project64-MPN.app"
@@ -152,21 +154,28 @@ jobs:
           mkdir -p "$CONTENTS/Resources/wine-home/usr"
           mkdir -p "$CONTENTS/Resources/wine-prefix/drive_c/pj64mpn"
 
+          # Copy app skeleton files
           cp "Package/macOS/Info.plist" "$CONTENTS/"
           cp "Package/macOS/Project64-MPN.icns" "$CONTENTS/Resources/"
           cp "Package/macOS/Project64-MPN" "$CONTENTS/MacOS/"
           
-          if [ -d "wine-engine/bin" ]; then
-            cp -R wine-engine/* "$CONTENTS/Resources/wine-home/usr/"
-          else
-            WINE_ROOT=$(find wine-engine -name "bin" -type d | head -n 1 | sed 's/\/bin//')
-            cp -R "$WINE_ROOT"/* "$CONTENTS/Resources/wine-home/usr/"
-          fi
+          # Find the actual root of the wine files (handling nested folders)
+          WINE_ROOT=$(find wine-engine -name "bin" -type d | head -n 1 | sed 's/\/bin//')
+          echo "Found Wine Root at: $WINE_ROOT"
 
+          # CRITICAL: Use -RP to preserve symbolic links for dependencies
+          # Using '.' ensures we copy the contents of the directory, including hidden files
+          cp -RP "$WINE_ROOT/." "$CONTENTS/Resources/wine-home/usr/"
+
+          # Copy Project64 Windows Binaries
           cp -r ./pj64-bin/* "$CONTENTS/Resources/wine-prefix/drive_c/pj64mpn/"
 
+          # Ensure execution permissions
           chmod +x "$CONTENTS/MacOS/Project64-MPN"
           find "$CONTENTS/Resources/wine-home/usr/bin/" -type f -exec chmod +x {} +
+          
+          # Verify the copy (for the logs)
+          ls -F "$CONTENTS/Resources/wine-home/usr/lib/" | head -n 10
 
       - name: Create DMG
         run: |
@@ -179,5 +188,5 @@ jobs:
       - name: Upload MacOS Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Project64MPN-macos-dmg
+          name: Project64MPN-macos-x86_64
           path: Project64MPN-macOS-x86_64.dmg
