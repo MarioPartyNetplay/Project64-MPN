@@ -88,13 +88,22 @@ jobs:
                 - install -d /app/bin
                 - install -d /app/share/project64
                 - install -d /app/share/applications
+                # Create the icon directory (standard size 128x128, adjust path if different)
+                - install -d /app/share/icons/hicolor/128x128/apps
+                
                 - cp -r * /app/share/project64/
+                
                 - |
                   echo '#!/bin/sh' > /app/bin/project64mpn-launcher
                   echo 'export PATH=\$PATH:/usr/lib/sdk/wine/bin' >> /app/bin/project64mpn-launcher
                   echo 'wine /app/share/project64/Project64.exe "\$@"' >> /app/bin/project64mpn-launcher
                 - chmod +x /app/bin/project64mpn-launcher
+                
+                # Install the Desktop file
                 - install -m644 ../exports/org.mariopartynetplay.Project64MPN.desktop /app/share/applications/org.mariopartynetplay.Project64MPN.desktop
+                
+                # Install the Icon (renamed to match the app-id/Icon field in desktop file)
+                - install -m644 ../Package/Linux/Project64-MPN.png /app/share/icons/hicolor/128x128/apps/org.mariopartynetplay.Project64MPN.png
               sources:
                 - type: dir
                   path: ./app-bin
