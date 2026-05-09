@@ -71,7 +71,7 @@ jobs:
           runtime-version: '24.08'
           sdk: org.freedesktop.Sdk
           sdk-extensions:
-            - org.freedesktop.Sdk.Extension.wine
+            - org.winehq.Wine
           command: project64mpn-launcher
           finish-args:
             - --device=all
