@@ -67,11 +67,15 @@ jobs:
           cat <<EOF > org.mariopartynetplay.Project64MPN.yml
           app-id: org.mariopartynetplay.Project64MPN
           runtime: org.freedesktop.Platform
-          # 2. Update runtime version here
           runtime-version: '24.08'
           sdk: org.freedesktop.Sdk
           sdk-extensions:
-            - org.winehq.Wine
+            - org.freedesktop.Sdk.Extension.wine64
+          add-extensions:
+            org.freedesktop.Sdk.Extension.wine64:
+              directory: lib/sdk/wine64
+              add-ld-path: lib
+              no-autodownload: false
           command: project64mpn-launcher
           finish-args:
             - --device=all
@@ -95,8 +99,7 @@ jobs:
                 
                 - |
                   echo '#!/bin/sh' > /app/bin/project64mpn-launcher
-                  # The path to the wine extension stays consistent in 24.08
-                  echo 'export PATH=\$PATH:/usr/lib/sdk/wine/bin' >> /app/bin/project64mpn-launcher
+                  echo 'export PATH=\$PATH:/usr/lib/sdk/wine64/bin' >> /app/bin/project64mpn-launcher
                   echo 'wine /app/share/project64/Project64.exe "\$@"' >> /app/bin/project64mpn-launcher
                 - chmod +x /app/bin/project64mpn-launcher
                 
@@ -154,7 +157,8 @@ jobs:
 
           # Permissions
           chmod +x "$CONTENTS/MacOS/Project64-MPN"
-          chmod +x "$CONTENTS/Resources/wine-home/usr/bin/"*
+          # Ensure Wine binaries are executable
+          find "$CONTENTS/Resources/wine-home/usr/bin/" -type f -exec chmod +x {} +
 
       - name: Create DMG
         run: |
