@@ -31,7 +31,7 @@ jobs:
           name: Project64MPN-windows-x86_64
           path: Bin/Release/
 
-build-flatpak:
+  build-flatpak:
     needs: build-windows
     runs-on: ubuntu-latest
     container:
@@ -47,7 +47,6 @@ build-flatpak:
           name: Project64MPN-windows-x86_64
           path: ./app-bin
 
-      # We download a portable Wine build for Linux, just like we did for macOS
       - name: Download Linux Wine Engine
         run: |
           curl -L https://github.com/Kron4ek/Wine-Builds/releases/download/11.0/wine-11.0-amd64.tar.xz -o wine-linux.tar.xz
@@ -107,7 +106,6 @@ build-flatpak:
                 
                 - |
                   echo '#!/bin/sh' > /app/bin/project64mpn-launcher
-                  # We point PATH to our internal bundled Wine
                   echo 'export PATH=\$PATH:/app/wine-runtime/bin' >> /app/bin/project64mpn-launcher
                   echo 'export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/app/wine-runtime/lib:/app/wine-runtime/lib64' >> /app/bin/project64mpn-launcher
                   echo 'wine /app/share/project64/Project64.exe "\$@"' >> /app/bin/project64mpn-launcher
@@ -154,7 +152,6 @@ build-flatpak:
           mkdir -p "$CONTENTS/Resources/wine-home/usr"
           mkdir -p "$CONTENTS/Resources/wine-prefix/drive_c/pj64mpn"
 
-          # Copy repo files
           cp "Package/macOS/Info.plist" "$CONTENTS/"
           cp "Package/macOS/Project64-MPN.icns" "$CONTENTS/Resources/"
           cp "Package/macOS/Project64-MPN" "$CONTENTS/MacOS/"
@@ -166,12 +163,9 @@ build-flatpak:
             cp -R "$WINE_ROOT"/* "$CONTENTS/Resources/wine-home/usr/"
           fi
 
-          # Copy Project64 Binaries
           cp -r ./pj64-bin/* "$CONTENTS/Resources/wine-prefix/drive_c/pj64mpn/"
 
-          # Permissions
           chmod +x "$CONTENTS/MacOS/Project64-MPN"
-          # Find and fix permissions for all binaries
           find "$CONTENTS/Resources/wine-home/usr/bin/" -type f -exec chmod +x {} +
 
       - name: Create DMG
