@@ -131,7 +131,6 @@ jobs:
         run: |
           curl -L https://github.com/Gcenx/macOS_Wine_builds/releases/download/11.8/wine-devel-11.8-osx64.tar.xz -o wine.tar.xz
           mkdir -p wine-engine
-          # Using --strip-components=1 to try and find the root Wine folders
           tar -xf wine.tar.xz -C wine-engine --strip-components=1 || tar -xf wine.tar.xz -C wine-engine
           
       - name: Structure App Bundle
@@ -148,8 +147,6 @@ jobs:
           cp "Package/macOS/Project64-MPN.icns" "$CONTENTS/Resources/"
           cp "Package/macOS/Project64-MPN" "$CONTENTS/MacOS/"
           
-          # Copy Wine Engine (Robust Copy)
-          # We check if 'bin' exists in the root of wine-engine; if not, we find where it is.
           if [ -d "wine-engine/bin" ]; then
             cp -R wine-engine/* "$CONTENTS/Resources/wine-home/usr/"
           else
