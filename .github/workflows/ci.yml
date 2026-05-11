@@ -86,6 +86,8 @@ jobs:
             - --share=network
             - --filesystem=home
             - --env=WINEDEBUG=-all
+            - --allow=multiarch
+            - --allow=devel
           modules:
             - name: wine-engine
               buildsystem: simple
