@@ -179,7 +179,7 @@ jobs:
           # 4. Fix Permissions
           chmod +x "$CONTENTS/MacOS/Project64-MPN"
           # Use the variable to ensure we are pointing at the right place
-          find "$CONTENTS/Resources/wine-home/usr/bin" -type f -exec chmod +x {}
+          find "$CONTENTS/Resources/wine-home/usr/bin" -type f -exec chmod +x {} +
 
       - name: Create DMG
         run: |
