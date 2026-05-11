@@ -110,7 +110,7 @@ jobs:
                   echo '#!/bin/sh' > /app/bin/project64mpn-launcher
                   echo 'export PATH=\$PATH:/app/wine-runtime/bin' >> /app/bin/project64mpn-launcher
                   echo 'export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/app/wine-runtime/lib:/app/wine-runtime/lib64' >> /app/bin/project64mpn-launcher
-                  echo 'wine /app/share/project64/Project64.exe "\$@"' >> /app/bin/project64mpn-launcher
+                  echo 'wine /app/share/project64/Project64-MPN.exe "\$@"' >> /app/bin/project64mpn-launcher
                 - chmod +x /app/bin/project64mpn-launcher
                 
                 - install -m644 org.mariopartynetplay.Project64MPN.desktop /app/share/applications/org.mariopartynetplay.Project64MPN.desktop
