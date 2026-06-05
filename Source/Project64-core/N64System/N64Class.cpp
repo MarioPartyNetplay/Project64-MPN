@@ -2919,43 +2919,35 @@ extern "C" __declspec(dllexport) bool GetEmulatorStateHashForNetplay(char * hash
         if (!reg) return false;
         
         CryptoPP::SHA256 sha;
-        
-        // Hash only the most stable CPU register state.
-        // Use named fixed-size members instead of raw register arrays to avoid layout/padding issues.
-        sha.Update((const CryptoPP::byte*)&reg->m_PROGRAM_COUNTER, sizeof(reg->m_PROGRAM_COUNTER));
-        sha.Update((const CryptoPP::byte*)&reg->m_HI, sizeof(reg->m_HI));
-        sha.Update((const CryptoPP::byte*)&reg->m_LO, sizeof(reg->m_LO));
-        sha.Update((const CryptoPP::byte*)&reg->m_LLBit, sizeof(reg->m_LLBit));
+        const uint32_t RdramSize = g_Settings->LoadDword(Game_RDRamSize);
 
-        sha.Update((const CryptoPP::byte*)&reg->INDEX_REGISTER, sizeof(reg->INDEX_REGISTER));
-        sha.Update((const CryptoPP::byte*)&reg->ENTRYLO0_REGISTER, sizeof(reg->ENTRYLO0_REGISTER));
-        sha.Update((const CryptoPP::byte*)&reg->ENTRYLO1_REGISTER, sizeof(reg->ENTRYLO1_REGISTER));
-        sha.Update((const CryptoPP::byte*)&reg->CONTEXT_REGISTER, sizeof(reg->CONTEXT_REGISTER));
-        sha.Update((const CryptoPP::byte*)&reg->PAGE_MASK_REGISTER, sizeof(reg->PAGE_MASK_REGISTER));
-        sha.Update((const CryptoPP::byte*)&reg->WIRED_REGISTER, sizeof(reg->WIRED_REGISTER));
-        sha.Update((const CryptoPP::byte*)&reg->BAD_VADDR_REGISTER, sizeof(reg->BAD_VADDR_REGISTER));
-        sha.Update((const CryptoPP::byte*)&reg->ENTRYHI_REGISTER, sizeof(reg->ENTRYHI_REGISTER));
-        sha.Update((const CryptoPP::byte*)&reg->COMPARE_REGISTER, sizeof(reg->COMPARE_REGISTER));
-        sha.Update((const CryptoPP::byte*)&reg->STATUS_REGISTER, sizeof(reg->STATUS_REGISTER));
-        sha.Update((const CryptoPP::byte*)&reg->CAUSE_REGISTER, sizeof(reg->CAUSE_REGISTER));
-        sha.Update((const CryptoPP::byte*)&reg->EPC_REGISTER, sizeof(reg->EPC_REGISTER));
-        sha.Update((const CryptoPP::byte*)&reg->CONFIG_REGISTER, sizeof(reg->CONFIG_REGISTER));
-        sha.Update((const CryptoPP::byte*)&reg->TAGLO_REGISTER, sizeof(reg->TAGLO_REGISTER));
-        sha.Update((const CryptoPP::byte*)&reg->TAGHI_REGISTER, sizeof(reg->TAGHI_REGISTER));
-        sha.Update((const CryptoPP::byte*)&reg->ERROREPC_REGISTER, sizeof(reg->ERROREPC_REGISTER));
-        sha.Update((const CryptoPP::byte*)&reg->FAKE_CAUSE_REGISTER, sizeof(reg->FAKE_CAUSE_REGISTER));
-        
-        // Hash each GPR individually to be extra safe.
-        for (int i = 0; i < 32; i++) {
-            sha.Update((const CryptoPP::byte*)&reg->m_GPR[i].DW, sizeof(reg->m_GPR[i].DW));
-        }
-        
-        // Hash each FPR individually to be extra safe.
-        for (int i = 0; i < 32; i++) {
-            sha.Update((const CryptoPP::byte*)&reg->m_FPR[i].DW, sizeof(reg->m_FPR[i].DW));
-        }
-        
-        // Finalize and generate hex string
+        // Feed core registers
+        sha.Update((const CryptoPP::byte*)&g_Reg->m_PROGRAM_COUNTER, sizeof(g_Reg->m_PROGRAM_COUNTER));
+        sha.Update((const CryptoPP::byte*)g_Reg->m_GPR, sizeof(int64_t) * 32);
+        sha.Update((const CryptoPP::byte*)g_Reg->m_FPR, sizeof(int64_t) * 32);
+        sha.Update((const CryptoPP::byte*)&g_Reg->m_HI, sizeof(g_Reg->m_HI));
+        sha.Update((const CryptoPP::byte*)&g_Reg->m_LO, sizeof(g_Reg->m_LO));
+
+        // Feed a selection of interface/registers that affect deterministic state
+        sha.Update((const CryptoPP::byte*)g_Reg->m_RDRAM_Registers, sizeof(uint32_t) * 10);
+        sha.Update((const CryptoPP::byte*)g_Reg->m_SigProcessor_Interface, sizeof(uint32_t) * 10);
+        sha.Update((const CryptoPP::byte*)g_Reg->m_Display_ControlReg, sizeof(uint32_t) * 10);
+        sha.Update((const CryptoPP::byte*)g_Reg->m_Mips_Interface, sizeof(uint32_t) * 4);
+        sha.Update((const CryptoPP::byte*)g_Reg->m_Video_Interface, sizeof(uint32_t) * 14);
+        sha.Update((const CryptoPP::byte*)g_Reg->m_Audio_Interface, sizeof(uint32_t) * 6);
+        sha.Update((const CryptoPP::byte*)g_Reg->m_Peripheral_Interface, sizeof(uint32_t) * 13);
+        sha.Update((const CryptoPP::byte*)g_Reg->m_RDRAM_Interface, sizeof(uint32_t) * 8);
+
+        // TLB entries
+        sha.Update((const CryptoPP::byte*)&g_TLB->TlbEntry(0), sizeof(CTLB::TLB_ENTRY) * 32);
+
+        // RSP / memory
+        if (g_MMU && g_MMU->PifRam()) sha.Update((const CryptoPP::byte*)g_MMU->PifRam(), 0x40);
+        if (g_MMU && g_MMU->Rdram() && RdramSize) sha.Update((const CryptoPP::byte*)g_MMU->Rdram(), RdramSize);
+        if (g_MMU && g_MMU->Dmem()) sha.Update((const CryptoPP::byte*)g_MMU->Dmem(), 0x1000);
+        if (g_MMU && g_MMU->Imem()) sha.Update((const CryptoPP::byte*)g_MMU->Imem(), 0x1000);
+
+        // Finalize
         unsigned char digest[CryptoPP::SHA256::DIGESTSIZE];
         sha.Final(digest);
 

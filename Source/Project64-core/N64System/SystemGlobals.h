@@ -91,8 +91,7 @@ extern "C" __declspec(dllexport) void ApplyCheatsDirectlyForNetplay(const char *
 
 // Function to get emulator state hash for desync detection (for netplay)
 // Export from main executable so plugin can use GetProcAddress
-// Returns SHA256 hash of CPU state (GPR, FPR, HI/LO) and stable memory (PIF RAM, RDRAM, DMEM, IMEM)
-// Excludes PC (Program Counter) and interface registers which are timing-volatile
+// Returns SHA256 hash of critical emulator state (RDRAM, CPU registers, RSP memory)
 // Caller must provide a buffer of at least 65 bytes (64 hex chars + null terminator)
 extern "C" __declspec(dllexport) bool GetEmulatorStateHashForNetplay(char * hash_buffer, size_t buffer_size);
 

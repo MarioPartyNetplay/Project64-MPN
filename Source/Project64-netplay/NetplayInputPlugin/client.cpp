@@ -22,17 +22,6 @@ namespace {
     static std::vector<std::tuple<uint32_t, uint32_t, std::string>> g_pending_remote_results;
     static std::vector<std::pair<uint32_t, uint32_t>> g_alerted_user_frame;
     static uint32_t g_last_desync_request_input_id = 0;
-    static bool g_desync_alert_shown = false;
-
-    bool show_desync_alert(client_dialog* dialog, const string& name, uint32_t frame) {
-        if (g_desync_alert_shown) {
-            return false;
-        }
-
-        g_desync_alert_shown = true;
-        dialog->error("Desync detected with " + name + " at frame " + to_string(frame) + "!");
-        return true;
-    }
 
     bool get_local_desync_hash(string& out_hash) {
 #ifdef _WIN32
@@ -1010,12 +999,11 @@ void client::on_receive(packet& p, bool udp) {
                 auto alerted_it = find(g_alerted_user_frame.begin(), g_alerted_user_frame.end(), make_pair(user_id, res_frame));
                 if (my_hash != remote_hash && alerted_it == g_alerted_user_frame.end()) {
                     string name = (user_id < user_map.size() && user_map[user_id]) ? user_map[user_id]->name : to_string(user_id);
+                    my_dialog->error("Desync detected with " + name + " at frame " + to_string(res_frame) + "!");
                     g_alerted_user_frame.push_back(make_pair(user_id, res_frame));
-                    if (show_desync_alert(my_dialog.get(), name, res_frame)) {
-                        try {
-                            send_message(string(DESYNC_ALERT_PREFIX) + to_string(res_frame) + ":" + name);
-                        } catch (...) {}
-                    }
+                    try {
+                        send_message(string(DESYNC_ALERT_PREFIX) + to_string(res_frame) + ":" + name);
+                    } catch (...) {}
                 } else if (my_hash == remote_hash && alerted_it != g_alerted_user_frame.end()) {
                     g_alerted_user_frame.erase(alerted_it);
                 }
@@ -1034,7 +1022,7 @@ void client::on_receive(packet& p, bool udp) {
                     for (char ch : frame_text) if (!isdigit((unsigned char)ch)) digits = false;
                     if (digits) {
                         uint32_t f = static_cast<uint32_t>(strtoul(frame_text.c_str(), nullptr, 10));
-                        show_desync_alert(my_dialog.get(), who, f);
+                        my_dialog->error("Desync detected with " + who + " at frame " + to_string(f) + "!");
                     }
                 }
                 break;
@@ -1276,7 +1264,12 @@ void client::on_tick() {
             auto alerted_it = find(g_alerted_user_frame.begin(), g_alerted_user_frame.end(), make_pair(user_id, frame));
             if (my_hash != remote_hash && alerted_it == g_alerted_user_frame.end()) {
                 string name = (user_id < user_map.size() && user_map[user_id]) ? user_map[user_id]->name : to_string(user_id);
+                my_dialog->error("Desync detected with " + name + " at frame " + to_string(frame) + "!");
                 g_alerted_user_frame.push_back(make_pair(user_id, frame));
+                // Broadcast alert to inform room
+                try {
+                    send_message(string(DESYNC_ALERT_PREFIX) + to_string(frame) + ":" + name);
+                } catch (...) {}
             } else if (my_hash == remote_hash && alerted_it != g_alerted_user_frame.end()) {
                 g_alerted_user_frame.erase(alerted_it);
             }
