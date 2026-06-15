@@ -149,7 +149,7 @@ void client::load_public_server_list() {
     public_servers["SFO|sfo.play64.com|San Francisco (USA)"] = SERVER_STATUS_PENDING;
     public_servers["SAO|169.155.126.48:9000|Sao Paulo (Brazil)"] = SERVER_STATUS_PENDING;
     public_servers["HKG|103.70.0.124:9070|Hong Kong (China)"] = SERVER_STATUS_PENDING;
-    public_servers["SYD|169.155.124.36:9005|Sydney (Australia)"] = SERVER_STATUS_PENDING;
+    public_servers["SYD|169.155.124.69:9005|Sydney (Australia)"] = SERVER_STATUS_PENDING;
 
     // Populate code/address maps so 3-letter codes resolve to their endpoints
     for (const auto& e : public_servers) {

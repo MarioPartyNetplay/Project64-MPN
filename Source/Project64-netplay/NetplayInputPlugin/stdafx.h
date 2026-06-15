@@ -35,7 +35,7 @@
 
 #ifdef _WIN32
 #if !defined(__MINGW32__) && !defined(__MINGW64__)
-#include <atlbase.h>
+#include <windows.h>
 #else
 #define QOS_NON_ADAPTIVE_FLOW 0x00000002
 typedef UINT32 QOS_FLOWID, *PQOS_FLOWID;
