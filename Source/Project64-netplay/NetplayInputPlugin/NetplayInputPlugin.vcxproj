@@ -140,8 +140,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <TargetName>netplay_input_plugin</TargetName>
-    <OutDir>$(SolutionDir)bin\Release\Plugin\Input\</OutDir>
+    <TargetName>Project64-Netplay</TargetName>
+    <OutDir>$(SolutionDir)bin\Release\Plugin\Netplay\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release (Server)|Win32'">
     <LinkIncremental>false</LinkIncremental>
